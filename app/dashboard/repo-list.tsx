@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 type Repo = {
   name: string;
   full_name: string;
@@ -28,11 +30,9 @@ export default function RepoList({ repos }: { repos: Repo[] }) {
           const pct = (repo.commit_count / maxCommits) * 100;
           const color = repo.language ? (LANG_COLORS[repo.language] ?? "#6b7280") : "#6b7280";
           return (
-            <a
+            <Link
               key={repo.name}
-              href={`https://github.com/${repo.full_name}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={`/dashboard/repos/${repo.name}`}
               className="block group"
             >
               <div className="mb-1 flex items-center justify-between">
@@ -58,7 +58,7 @@ export default function RepoList({ repos }: { repos: Repo[] }) {
                   style={{ width: `${pct}%`, backgroundColor: color }}
                 />
               </div>
-            </a>
+            </Link>
           );
         })}
       </div>

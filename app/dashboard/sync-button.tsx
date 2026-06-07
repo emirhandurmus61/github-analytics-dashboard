@@ -1,44 +1,79 @@
 "use client";
 
 import { useState } from "react";
-import { startSync } from "@/app/actions/sync";
+import { useRouter } from "next/navigation";
+
+type Status = "idle" | "loading" | "done" | "error";
+
+type ProgressEvent = {
+  step: string;
+  message: string;
+  total?: number;
+  current?: number;
+};
 
 export default function SyncButton({ label = "Senkronizasyonu Başlat" }: { label?: string }) {
-  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [status, setStatus] = useState<Status>("idle");
+  const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   async function handleSync() {
     setStatus("loading");
     setError(null);
-    const result = await startSync();
-    if (result.success) {
+    setProgress({ step: "start", message: "Başlatılıyor..." });
+
+    const es = new EventSource("/api/sync");
+
+    es.addEventListener("progress", (e) => {
+      const data: ProgressEvent = JSON.parse(e.data);
+      setProgress(data);
+    });
+
+    es.addEventListener("done", () => {
+      es.close();
       setStatus("done");
-    } else {
+      setProgress(null);
+      setTimeout(() => router.refresh(), 800);
+    });
+
+    es.addEventListener("error", (e) => {
+      es.close();
+      try {
+        const data = JSON.parse((e as MessageEvent).data);
+        setError(data.message);
+      } catch {
+        setError("Senkronizasyon sırasında hata oluştu");
+      }
       setStatus("error");
-      setError(result.error ?? "Bilinmeyen hata");
-    }
+    });
+
+    es.onerror = () => {
+      if (status !== "done") {
+        es.close();
+        setError("Bağlantı kesildi");
+        setStatus("error");
+      }
+    };
   }
 
   if (status === "done") {
     return (
-      <div className="flex flex-col items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-          <svg className="h-6 w-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <p className="text-sm text-emerald-400">Senkronizasyon tamamlandı!</p>
-        <p className="text-xs text-zinc-500">Sayfa yenileniyor...</p>
+      <div className="flex items-center gap-2 text-sm text-emerald-400">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        Tamamlandı!
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-end gap-2">
       <button
         onClick={handleSync}
         disabled={status === "loading"}
-        className="flex items-center gap-2.5 rounded-xl bg-zinc-100 px-6 py-2.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex items-center gap-2 rounded-xl bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         {status === "loading" ? (
           <>
@@ -48,15 +83,28 @@ export default function SyncButton({ label = "Senkronizasyonu Başlat" }: { labe
             </svg>
             Senkronize ediliyor...
           </>
-        ) : (
-          label
-        )}
+        ) : label}
       </button>
-      {status === "loading" && (
-        <p className="text-xs text-zinc-600">
-          Repolar ve commitler çekiliyor, bu birkaç dakika sürebilir...
-        </p>
+
+      {status === "loading" && progress && (
+        <div className="w-72 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+          <p className="mb-2 text-xs text-zinc-400">{progress.message}</p>
+          {progress.total && progress.current !== undefined && (
+            <>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                />
+              </div>
+              <p className="mt-1 text-right text-xs text-zinc-600">
+                {progress.current}/{progress.total}
+              </p>
+            </>
+          )}
+        </div>
       )}
+
       {status === "error" && (
         <p className="text-xs text-red-400">{error}</p>
       )}

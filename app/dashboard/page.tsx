@@ -11,6 +11,7 @@ import StreakCard from "./streak-card";
 import CodeStats from "./code-stats";
 import InsightCards from "./insight-cards";
 import GoalTracker from "./goal-tracker";
+import CompareView from "./compare-view";
 import { calculateStreaks } from "@/lib/streak";
 import { generateInsights } from "@/lib/insights";
 
@@ -50,6 +51,8 @@ export default async function DashboardPage({ searchParams }: Props) {
   let insights: import("@/lib/insights").Insight[] = [];
   let topRepo: string | null = null;
   let topRepoCommits = 0;
+  let thisMonthData = { label: "", commits: 0, activeDays: 0, linesAdded: 0 };
+  let lastMonthData = { label: "", commits: 0, activeDays: 0, linesAdded: 0 };
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -220,6 +223,36 @@ export default async function DashboardPage({ searchParams }: Props) {
       topRepoCommits = repoListData[0].commit_count;
     }
 
+    // Bu ay vs geçen ay karşılaştırması
+    const MONTH_NAMES = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+    const now2 = new Date();
+    const thisMonthStart = new Date(now2.getFullYear(), now2.getMonth(), 1).toISOString().slice(0, 10);
+    const lastMonthStart = new Date(now2.getFullYear(), now2.getMonth() - 1, 1).toISOString().slice(0, 10);
+    const lastMonthEnd = new Date(now2.getFullYear(), now2.getMonth(), 0).toISOString().slice(0, 10);
+
+    const thisMonthStats = heatmapData.filter((d) => d.date >= thisMonthStart);
+    const lastMonthStats = heatmapData.filter((d) => d.date >= lastMonthStart && d.date <= lastMonthEnd);
+
+    const { data: thisMonthLines } = await supabaseAdmin
+      .from("daily_stats").select("lines_added")
+      .eq("user_id", dbUser.id).gte("date", thisMonthStart);
+    const { data: lastMonthLines } = await supabaseAdmin
+      .from("daily_stats").select("lines_added")
+      .eq("user_id", dbUser.id).gte("date", lastMonthStart).lte("date", lastMonthEnd);
+
+    thisMonthData = {
+      label: MONTH_NAMES[now2.getMonth()],
+      commits: thisMonthStats.reduce((s, d) => s + d.commit_count, 0),
+      activeDays: thisMonthStats.filter((d) => d.commit_count > 0).length,
+      linesAdded: (thisMonthLines ?? []).reduce((s, d) => s + (d.lines_added ?? 0), 0),
+    };
+    lastMonthData = {
+      label: MONTH_NAMES[(now2.getMonth() - 1 + 12) % 12],
+      commits: lastMonthStats.reduce((s, d) => s + d.commit_count, 0),
+      activeDays: lastMonthStats.filter((d) => d.commit_count > 0).length,
+      linesAdded: (lastMonthLines ?? []).reduce((s, d) => s + (d.lines_added ?? 0), 0),
+    };
+
     // İçgörüler
     const topLang = topLanguages[0]?.language ?? null;
     insights = generateInsights(
@@ -298,8 +331,11 @@ export default async function DashboardPage({ searchParams }: Props) {
           {/* Kod & Katkı istatistikleri */}
           <CodeStats {...codeStats} />
 
-          {/* Bu hafta vs geçen hafta */}
-          <WeekCompare thisWeek={thisWeek} lastWeek={lastWeek} />
+          {/* Bu hafta vs geçen hafta + Bu ay vs geçen ay */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <WeekCompare thisWeek={thisWeek} lastWeek={lastWeek} />
+            <CompareView thisMonth={thisMonthData} lastMonth={lastMonthData} />
+          </div>
 
           {/* Heatmap — yatay scroll mobilde */}
           <ContributionHeatmap data={heatmapData} />
