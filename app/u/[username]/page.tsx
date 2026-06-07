@@ -135,7 +135,7 @@ export default async function PublicProfilePage({ params }: Props) {
         </div>
 
         {/* Özet kartlar */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {[
             { label: "Toplam Repo", value: stats.repoCount },
             { label: "Commit (1 yıl)", value: stats.commitCount },
@@ -154,7 +154,7 @@ export default async function PublicProfilePage({ params }: Props) {
         <ContributionHeatmap data={heatmapData} />
 
         {/* Dil dağılımı + Top repolar */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Dil dağılımı */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
             <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>

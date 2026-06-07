@@ -33,8 +33,8 @@ export default async function DashboardLayout({
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="hidden items-center gap-2.5 sm:flex">
               {session.user?.image && (
                 <Image
                   src={session.user.image}
