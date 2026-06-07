@@ -2,6 +2,9 @@ import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import SyncButton from "./sync-button";
 import ContributionHeatmap from "./contribution-heatmap";
+import HourHeatmap from "./hour-heatmap";
+import RepoList from "./repo-list";
+import WeekCompare from "./week-compare";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -18,22 +21,21 @@ export default async function DashboardPage() {
   let topLanguages: { language: string; bytes: number }[] = [];
   let recentActivity: { date: string; commit_count: number }[] = [];
   let heatmapData: { date: string; commit_count: number }[] = [];
+  let hourData: { hour: number; day: number; count: number }[] = [];
+  let repoListData: { name: string; full_name: string; language: string | null; stars: number; forks: number; commit_count: number }[] = [];
+  let thisWeek = 0;
+  let lastWeek = 0;
 
   if (hasSynced && dbUser) {
-    // Repo id'lerini bir kez çek
-    const { data: repoIds } = await supabaseAdmin
+    const { data: repoRows } = await supabaseAdmin
       .from("repositories")
-      .select("id")
+      .select("id, name, full_name, language, stars, forks, is_fork")
       .eq("user_id", dbUser.id);
 
-    const ids = repoIds?.map((r) => r.id) ?? [];
+    const ids = repoRows?.map((r) => r.id) ?? [];
+    const ownRepoIds = repoRows?.filter((r) => !r.is_fork).map((r) => r.id) ?? [];
 
-    const [reposRes, commitsRes, langsRes, activityRes, heatmapRes] = await Promise.all([
-      supabaseAdmin
-        .from("repositories")
-        .select("count", { count: "exact", head: true })
-        .eq("user_id", dbUser.id),
-
+    const [commitsRes, langsRes, activityRes, heatmapRes, allCommitsRes] = await Promise.all([
       supabaseAdmin
         .from("commits")
         .select("count", { count: "exact", head: true })
@@ -51,13 +53,19 @@ export default async function DashboardPage() {
         .order("date", { ascending: false })
         .limit(30),
 
-      // Heatmap için son 1 yıl
       supabaseAdmin
         .from("daily_stats")
         .select("date, commit_count")
         .eq("user_id", dbUser.id)
         .gte("date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
         .order("date", { ascending: true }),
+
+      // Saate göre dağılım için son 1 yılın commit'leri
+      supabaseAdmin
+        .from("commits")
+        .select("committed_at")
+        .in("repo_id", ownRepoIds)
+        .gte("committed_at", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()),
     ]);
 
     // Dil toplamları
@@ -71,13 +79,76 @@ export default async function DashboardPage() {
       .map(([language, bytes]) => ({ language, bytes }));
 
     stats = {
-      repoCount: reposRes.count ?? 0,
+      repoCount: repoRows?.length ?? 0,
       commitCount: commitsRes.count ?? 0,
       languageCount: langMap.size,
     };
 
     recentActivity = (activityRes.data ?? []).reverse();
     heatmapData = heatmapRes.data ?? [];
+
+    // Saat & gün heatmap verisi
+    const hourMap = new Map<string, number>();
+    for (const { committed_at } of allCommitsRes.data ?? []) {
+      const d = new Date(committed_at);
+      const hour = d.getHours();
+      const day = (d.getDay() + 6) % 7; // Pzt=0
+      const key = `${day}-${hour}`;
+      hourMap.set(key, (hourMap.get(key) ?? 0) + 1);
+    }
+    hourData = Array.from(hourMap.entries()).map(([key, count]) => {
+      const [day, hour] = key.split("-").map(Number);
+      return { day, hour, count };
+    });
+
+    // Repo başına commit sayısı
+    const repoCommitMap = new Map<string, number>();
+    for (const { committed_at: _, ...__ } of allCommitsRes.data ?? []) {
+      // sadece count lazım, ayrı query daha temiz
+    }
+
+    // Her repo için commit count
+    const repoCommitCounts = await Promise.all(
+      (repoRows ?? []).filter((r) => !r.is_fork).map(async (repo) => {
+        const { count } = await supabaseAdmin
+          .from("commits")
+          .select("count", { count: "exact", head: true })
+          .eq("repo_id", repo.id)
+          .gte("committed_at", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString());
+        return { ...repo, commit_count: count ?? 0 };
+      })
+    );
+
+    repoListData = repoCommitCounts
+      .sort((a, b) => b.commit_count - a.commit_count)
+      .slice(0, 8)
+      .map((r) => ({
+        name: r.name,
+        full_name: r.full_name,
+        language: r.language,
+        stars: r.stars,
+        forks: r.forks,
+        commit_count: r.commit_count,
+      }));
+
+    // Bu hafta vs geçen hafta
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const startOfLastWeek = new Date(startOfWeek);
+    startOfLastWeek.setDate(startOfWeek.getDate() - 7);
+
+    const weekStats = heatmapData.filter((d) => d.date >= startOfWeek.toISOString().slice(0, 10));
+    const lastWeekStats = heatmapData.filter(
+      (d) =>
+        d.date >= startOfLastWeek.toISOString().slice(0, 10) &&
+        d.date < startOfWeek.toISOString().slice(0, 10)
+    );
+
+    thisWeek = weekStats.reduce((s, d) => s + d.commit_count, 0);
+    lastWeek = lastWeekStats.reduce((s, d) => s + d.commit_count, 0);
   }
 
   const lastSynced = dbUser?.last_synced_at
@@ -92,9 +163,7 @@ export default async function DashboardPage() {
             Merhaba, {session?.user?.name?.split(" ")[0]} 👋
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            {lastSynced
-              ? `Son senkronizasyon: ${lastSynced}`
-              : "GitHub verilerini çekmek için senkronizasyonu başlat."}
+            {lastSynced ? `Son senkronizasyon: ${lastSynced}` : "GitHub verilerini çekmek için senkronizasyonu başlat."}
           </p>
         </div>
         {hasSynced && (
@@ -121,7 +190,7 @@ export default async function DashboardPage() {
           <SyncButton />
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Özet kartlar */}
           <div className="grid grid-cols-3 gap-4">
             <StatCard label="Toplam Repo" value={stats.repoCount} />
@@ -129,10 +198,13 @@ export default async function DashboardPage() {
             <StatCard label="Kullanılan Dil" value={stats.languageCount} />
           </div>
 
+          {/* Bu hafta vs geçen hafta */}
+          <WeekCompare thisWeek={thisWeek} lastWeek={lastWeek} />
+
           {/* Contribution heatmap */}
           <ContributionHeatmap data={heatmapData} />
 
-          {/* Aktivite ve diller */}
+          {/* Saat heatmap + Son 30 gün */}
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
               <h2 className="mb-4 text-sm font-medium text-zinc-400">Son 30 Gün Commit Aktivitesi</h2>
@@ -143,6 +215,12 @@ export default async function DashboardPage() {
               <LanguageList languages={topLanguages} />
             </div>
           </div>
+
+          {/* Saat heatmap */}
+          <HourHeatmap data={hourData} />
+
+          {/* Repo listesi */}
+          <RepoList repos={repoListData} />
         </div>
       )}
     </div>
@@ -179,19 +257,9 @@ function ActivityBar({ data }: { data: { date: string; commit_count: number }[] 
 }
 
 const LANG_COLORS: Record<string, string> = {
-  TypeScript: "#3178c6",
-  JavaScript: "#f1e05a",
-  Python: "#3572A5",
-  Rust: "#dea584",
-  Go: "#00ADD8",
-  CSS: "#563d7c",
-  HTML: "#e34c26",
-  Java: "#b07219",
-  "C++": "#f34b7d",
-  "C#": "#178600",
-  C: "#555555",
-  Ruby: "#701516",
-  Swift: "#F05138",
+  TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572A5",
+  Rust: "#dea584", Go: "#00ADD8", CSS: "#563d7c", HTML: "#e34c26",
+  Java: "#b07219", "C++": "#f34b7d", "C#": "#178600", C: "#555555",
 };
 
 function LanguageList({ languages }: { languages: { language: string; bytes: number }[] }) {
