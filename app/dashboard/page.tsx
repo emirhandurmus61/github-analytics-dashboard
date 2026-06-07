@@ -9,7 +9,10 @@ import WeekCompare from "./week-compare";
 import Filters, { type DateRange } from "./filters";
 import StreakCard from "./streak-card";
 import CodeStats from "./code-stats";
+import InsightCards from "./insight-cards";
+import GoalTracker from "./goal-tracker";
 import { calculateStreaks } from "@/lib/streak";
+import { generateInsights } from "@/lib/insights";
 
 type Props = {
   searchParams: Promise<{ range?: string; hideForks?: string }>;
@@ -44,6 +47,9 @@ export default async function DashboardPage({ searchParams }: Props) {
   let lastWeek = 0;
   let streakData = { currentStreak: 0, longestStreak: 0, totalActiveDays: 0 };
   let codeStats = { linesAdded: 0, linesDeleted: 0, totalCommits: 0, mergedPRs: 0, openIssues: 0, closedIssues: 0 };
+  let insights: import("@/lib/insights").Insight[] = [];
+  let topRepo: string | null = null;
+  let topRepoCommits = 0;
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -207,6 +213,26 @@ export default async function DashboardPage({ searchParams }: Props) {
       openIssues,
       closedIssues,
     };
+
+    // En aktif repo
+    if (repoListData.length > 0) {
+      topRepo = repoListData[0].name;
+      topRepoCommits = repoListData[0].commit_count;
+    }
+
+    // İçgörüler
+    const topLang = topLanguages[0]?.language ?? null;
+    insights = generateInsights(
+      heatmapData,
+      hourData,
+      topRepo,
+      topRepoCommits,
+      streakData.currentStreak,
+      streakData.longestStreak,
+      linesAdded,
+      linesDeleted,
+      topLang,
+    );
   }
 
   const lastSynced = dbUser?.last_synced_at
@@ -260,8 +286,14 @@ export default async function DashboardPage({ searchParams }: Props) {
             <StatCard label="Kullanılan Dil" value={stats.languageCount} />
           </div>
 
-          {/* Streak kartı */}
-          <StreakCard {...streakData} />
+          {/* İçgörüler */}
+          <InsightCards insights={insights} />
+
+          {/* Streak + Haftalık Hedef */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <StreakCard {...streakData} />
+            <GoalTracker thisWeek={thisWeek} />
+          </div>
 
           {/* Kod & Katkı istatistikleri */}
           <CodeStats {...codeStats} />
