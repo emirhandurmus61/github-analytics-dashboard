@@ -49,6 +49,13 @@ export default async function DashboardLayout({
               </span>
             </div>
 
+            <a
+              href={`/u/${session.user?.username}`}
+              className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+            >
+              Profil ↗
+            </a>
+
             <form
               action={async () => {
                 "use server";

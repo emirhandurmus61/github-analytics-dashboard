@@ -1,11 +1,11 @@
 import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import SyncButton from "./sync-button";
+import ContributionHeatmap from "./contribution-heatmap";
 
 export default async function DashboardPage() {
   const session = await auth();
 
-  // Kullanıcıyı ve özet istatistikleri çek
   const { data: dbUser } = await supabaseAdmin
     .from("users")
     .select("id, last_synced_at")
@@ -17,9 +17,18 @@ export default async function DashboardPage() {
   let stats = { repoCount: 0, commitCount: 0, languageCount: 0 };
   let topLanguages: { language: string; bytes: number }[] = [];
   let recentActivity: { date: string; commit_count: number }[] = [];
+  let heatmapData: { date: string; commit_count: number }[] = [];
 
   if (hasSynced && dbUser) {
-    const [reposRes, commitsRes, langsRes, activityRes] = await Promise.all([
+    // Repo id'lerini bir kez çek
+    const { data: repoIds } = await supabaseAdmin
+      .from("repositories")
+      .select("id")
+      .eq("user_id", dbUser.id);
+
+    const ids = repoIds?.map((r) => r.id) ?? [];
+
+    const [reposRes, commitsRes, langsRes, activityRes, heatmapRes] = await Promise.all([
       supabaseAdmin
         .from("repositories")
         .select("count", { count: "exact", head: true })
@@ -28,28 +37,12 @@ export default async function DashboardPage() {
       supabaseAdmin
         .from("commits")
         .select("count", { count: "exact", head: true })
-        .in(
-          "repo_id",
-          (
-            await supabaseAdmin
-              .from("repositories")
-              .select("id")
-              .eq("user_id", dbUser.id)
-          ).data?.map((r) => r.id) ?? []
-        ),
+        .in("repo_id", ids),
 
       supabaseAdmin
         .from("repo_languages")
         .select("language, bytes")
-        .in(
-          "repo_id",
-          (
-            await supabaseAdmin
-              .from("repositories")
-              .select("id")
-              .eq("user_id", dbUser.id)
-          ).data?.map((r) => r.id) ?? []
-        ),
+        .in("repo_id", ids),
 
       supabaseAdmin
         .from("daily_stats")
@@ -57,9 +50,17 @@ export default async function DashboardPage() {
         .eq("user_id", dbUser.id)
         .order("date", { ascending: false })
         .limit(30),
+
+      // Heatmap için son 1 yıl
+      supabaseAdmin
+        .from("daily_stats")
+        .select("date, commit_count")
+        .eq("user_id", dbUser.id)
+        .gte("date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+        .order("date", { ascending: true }),
     ]);
 
-    // Dil toplamlarını hesapla
+    // Dil toplamları
     const langMap = new Map<string, number>();
     for (const row of langsRes.data ?? []) {
       langMap.set(row.language, (langMap.get(row.language) ?? 0) + row.bytes);
@@ -76,6 +77,7 @@ export default async function DashboardPage() {
     };
 
     recentActivity = (activityRes.data ?? []).reverse();
+    heatmapData = heatmapRes.data ?? [];
   }
 
   const lastSynced = dbUser?.last_synced_at
@@ -103,7 +105,6 @@ export default async function DashboardPage() {
       </div>
 
       {!hasSynced ? (
-        /* İlk kez — senkronizasyon kartı */
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center">
           <div className="mb-4 flex justify-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-zinc-800">
@@ -120,7 +121,6 @@ export default async function DashboardPage() {
           <SyncButton />
         </div>
       ) : (
-        /* Dashboard içeriği */
         <div className="space-y-6">
           {/* Özet kartlar */}
           <div className="grid grid-cols-3 gap-4">
@@ -129,15 +129,15 @@ export default async function DashboardPage() {
             <StatCard label="Kullanılan Dil" value={stats.languageCount} />
           </div>
 
+          {/* Contribution heatmap */}
+          <ContributionHeatmap data={heatmapData} />
+
           {/* Aktivite ve diller */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Son 30 gün aktivite */}
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
               <h2 className="mb-4 text-sm font-medium text-zinc-400">Son 30 Gün Commit Aktivitesi</h2>
               <ActivityBar data={recentActivity} />
             </div>
-
-            {/* Dil dağılımı */}
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
               <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>
               <LanguageList languages={topLanguages} />
@@ -160,9 +160,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
 
 function ActivityBar({ data }: { data: { date: string; commit_count: number }[] }) {
   if (data.length === 0) return <p className="text-sm text-zinc-600">Veri yok</p>;
-
   const max = Math.max(...data.map((d) => d.commit_count));
-
   return (
     <div className="flex h-24 items-end gap-1">
       {data.map((d) => {
@@ -190,6 +188,7 @@ const LANG_COLORS: Record<string, string> = {
   HTML: "#e34c26",
   Java: "#b07219",
   "C++": "#f34b7d",
+  "C#": "#178600",
   C: "#555555",
   Ruby: "#701516",
   Swift: "#F05138",
@@ -197,9 +196,7 @@ const LANG_COLORS: Record<string, string> = {
 
 function LanguageList({ languages }: { languages: { language: string; bytes: number }[] }) {
   if (languages.length === 0) return <p className="text-sm text-zinc-600">Veri yok</p>;
-
   const total = languages.reduce((sum, l) => sum + l.bytes, 0);
-
   return (
     <div className="space-y-3">
       {languages.map(({ language, bytes }) => {
@@ -212,10 +209,7 @@ function LanguageList({ languages }: { languages: { language: string; bytes: num
               <span className="text-zinc-500">{pct}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${pct}%`, backgroundColor: color }}
-              />
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
             </div>
           </div>
         );
