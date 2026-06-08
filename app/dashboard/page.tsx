@@ -14,6 +14,9 @@ import GoalTracker from "./goal-tracker";
 import CompareView from "./compare-view";
 import VelocityChart from "./velocity-chart";
 import RhythmAnalysis from "./rhythm-analysis";
+import RepoHealthList from "./repo-health-list";
+import LangEvolution, { type MonthLangPoint } from "./lang-evolution";
+import CommitQuality from "./commit-quality";
 import { calculateStreaks } from "@/lib/streak";
 import { generateInsights } from "@/lib/insights";
 
@@ -46,6 +49,15 @@ export default async function DashboardPage({ searchParams }: Props) {
     name: string; full_name: string; language: string | null;
     stars: number; forks: number; commit_count: number;
   }[] = [];
+  let repoHealthData: {
+    name: string; full_name: string; language: string | null;
+    stars: number; forks: number;
+    lastCommitDate: string | null;
+    commitCount90d: number;
+    openIssues: number;
+    totalIssues: number;
+    isArchived: boolean;
+  }[] = [];
   let thisWeek = 0;
   let lastWeek = 0;
   let streakData = { currentStreak: 0, longestStreak: 0, totalActiveDays: 0 };
@@ -56,6 +68,16 @@ export default async function DashboardPage({ searchParams }: Props) {
   let thisMonthData = { label: "", commits: 0, activeDays: 0, linesAdded: 0 };
   let lastMonthData = { label: "", commits: 0, activeDays: 0, linesAdded: 0 };
   let commitTimestamps: string[] = [];
+  let langEvolutionData: MonthLangPoint[] = [];
+  let langEvolutionKeys: string[] = [];
+  let commitQuality: {
+    avgMsgLength: number;
+    multiLinePct: number;
+    conventionalPct: number;
+    typeDist: { type: string; count: number }[];
+    biggestCommits: { message: string; additions: number; deletions: number; date: string }[];
+    totalAnalyzed: number;
+  } | null = null;
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -64,7 +86,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
     const { data: repoRows } = await supabaseAdmin
       .from("repositories")
-      .select("id, name, full_name, language, stars, forks, is_fork")
+      .select("id, name, full_name, language, stars, forks, is_fork, is_archived")
       .eq("user_id", dbUser.id)
       .then((res) => ({
         ...res,
@@ -104,7 +126,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
         supabaseAdmin
           .from("commits")
-          .select("committed_at")
+          .select("committed_at, repo_id, message, additions, deletions")
           .in("repo_id", ownIds)
           .gte("committed_at", new Date(Date.now() - Number(dateRange) * 24 * 60 * 60 * 1000).toISOString()),
       ]);
@@ -130,6 +152,105 @@ export default async function DashboardPage({ searchParams }: Props) {
 
     // Commit timestamp'leri (ritim analizi için)
     commitTimestamps = (allCommitsRes.data ?? []).map((c) => c.committed_at);
+
+    // Dil evrimi — repo_id → language eşlemesi
+    const repoLangMap = new Map<string, string>();
+    for (const r of repoRows ?? []) {
+      if (r.language) repoLangMap.set(r.id, r.language);
+    }
+
+    // Aylık dil → commit sayısı
+    const MONTH_LABELS = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+    const monthLangMap = new Map<string, Map<string, number>>(); // "YYYY-MM" → lang → count
+    for (const { committed_at, repo_id } of allCommitsRes.data ?? []) {
+      const lang = repoLangMap.get(repo_id);
+      if (!lang) continue;
+      const ym = committed_at.slice(0, 7); // "YYYY-MM"
+      if (!monthLangMap.has(ym)) monthLangMap.set(ym, new Map());
+      const m = monthLangMap.get(ym)!;
+      m.set(lang, (m.get(lang) ?? 0) + 1);
+    }
+
+    // Son 12 ay sıralı
+    const today = new Date();
+    const months: string[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+
+    // Toplam commit sayısına göre top dilleri belirle
+    const globalLangCount = new Map<string, number>();
+    for (const langCounts of monthLangMap.values()) {
+      for (const [l, c] of langCounts) {
+        globalLangCount.set(l, (globalLangCount.get(l) ?? 0) + c);
+      }
+    }
+    langEvolutionKeys = Array.from(globalLangCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([l]) => l);
+
+    langEvolutionData = months.map((ym) => {
+      const d = new Date(ym + "-01");
+      const label = `${MONTH_LABELS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+      const point: MonthLangPoint = { month: ym, label };
+      const langCounts = monthLangMap.get(ym) ?? new Map();
+      for (const l of langEvolutionKeys) {
+        point[l] = langCounts.get(l) ?? 0;
+      }
+      return point;
+    });
+
+    // Commit kalite analizi
+    const commits = allCommitsRes.data ?? [];
+    if (commits.length > 0) {
+      const CONVENTIONAL_RE = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+?\))?(!)?:/i;
+      const TYPE_RE = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)/i;
+
+      let totalMsgLen = 0;
+      let multiLine = 0;
+      let conventional = 0;
+      const typeCounts = new Map<string, number>();
+
+      for (const c of commits) {
+        const msg = c.message ?? "";
+        totalMsgLen += msg.length;
+        if (msg.includes("\n")) multiLine++;
+        if (CONVENTIONAL_RE.test(msg)) {
+          conventional++;
+          const match = msg.match(TYPE_RE);
+          if (match) {
+            const t = match[1].toLowerCase();
+            typeCounts.set(t, (typeCounts.get(t) ?? 0) + 1);
+          }
+        }
+      }
+
+      const typeDist = Array.from(typeCounts.entries())
+        .map(([type, count]) => ({ type, count }))
+        .sort((a, b) => b.count - a.count);
+
+      const biggestCommits = [...commits]
+        .filter((c) => (c.additions ?? 0) + (c.deletions ?? 0) > 0)
+        .sort((a, b) => ((b.additions ?? 0) + (b.deletions ?? 0)) - ((a.additions ?? 0) + (a.deletions ?? 0)))
+        .slice(0, 5)
+        .map((c) => ({
+          message: (c.message ?? "").split("\n")[0].slice(0, 72),
+          additions: c.additions ?? 0,
+          deletions: c.deletions ?? 0,
+          date: c.committed_at.slice(0, 10),
+        }));
+
+      commitQuality = {
+        avgMsgLength: Math.round(totalMsgLen / commits.length),
+        multiLinePct: Math.round((multiLine / commits.length) * 100),
+        conventionalPct: Math.round((conventional / commits.length) * 100),
+        typeDist,
+        biggestCommits,
+        totalAnalyzed: commits.length,
+      };
+    }
 
     // Saat heatmap
     const hourMap = new Map<string, number>();
@@ -162,6 +283,60 @@ export default async function DashboardPage({ searchParams }: Props) {
         name: r.name, full_name: r.full_name, language: r.language,
         stars: r.stars, forks: r.forks, commit_count: r.commit_count,
       }));
+
+    // Repo sağlık skoru için ek veriler — bulk sorgularla
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const ownRepos = (repoRows ?? []).filter((r) => !r.is_fork);
+    const ownIds2 = ownRepos.map((r) => r.id);
+
+    const [allCommitsForHealth, allIssuesForHealth] = await Promise.all([
+      // Tüm own repo'ların commit'leri (son tarih + 90 gün sayısı için)
+      supabaseAdmin
+        .from("commits")
+        .select("repo_id, committed_at")
+        .in("repo_id", ownIds2)
+        .order("committed_at", { ascending: false }),
+      // Tüm issue'lar
+      supabaseAdmin
+        .from("issues")
+        .select("repo_id, state")
+        .in("repo_id", ownIds2),
+    ]);
+
+    // repo_id → son commit tarihi + 90 gün sayısı
+    const lastCommitMap = new Map<string, string>();
+    const count90dMap = new Map<string, number>();
+    for (const c of allCommitsForHealth.data ?? []) {
+      if (!lastCommitMap.has(c.repo_id)) lastCommitMap.set(c.repo_id, c.committed_at);
+      if (c.committed_at >= ninetyDaysAgo) {
+        count90dMap.set(c.repo_id, (count90dMap.get(c.repo_id) ?? 0) + 1);
+      }
+    }
+
+    // repo_id → { open, total }
+    const issueMap = new Map<string, { open: number; total: number }>();
+    for (const i of allIssuesForHealth.data ?? []) {
+      const cur = issueMap.get(i.repo_id) ?? { open: 0, total: 0 };
+      cur.total++;
+      if (i.state === "open") cur.open++;
+      issueMap.set(i.repo_id, cur);
+    }
+
+    repoHealthData = ownRepos.map((repo) => {
+      const issues = issueMap.get(repo.id) ?? { open: 0, total: 0 };
+      return {
+        name: repo.name,
+        full_name: repo.full_name,
+        language: repo.language,
+        stars: repo.stars,
+        forks: repo.forks,
+        lastCommitDate: lastCommitMap.get(repo.id) ?? null,
+        commitCount90d: count90dMap.get(repo.id) ?? 0,
+        openIssues: issues.open,
+        totalIssues: issues.total,
+        isArchived: (repo as { is_archived?: boolean }).is_archived ?? false,
+      };
+    });
 
     // Bu hafta vs geçen hafta
     const now = new Date();
@@ -346,6 +521,9 @@ export default async function DashboardPage({ searchParams }: Props) {
           {/* Velocity grafiği */}
           <VelocityChart data={heatmapData} />
 
+          {/* Dil evrimi */}
+          <LangEvolution data={langEvolutionData} languages={langEvolutionKeys} />
+
           {/* Heatmap — yatay scroll mobilde */}
           <ContributionHeatmap data={heatmapData} />
 
@@ -366,11 +544,17 @@ export default async function DashboardPage({ searchParams }: Props) {
           {/* Çalışma ritmi analizi */}
           <RhythmAnalysis hourData={hourData} commitTimestamps={commitTimestamps} />
 
+          {/* Commit kalite analizi */}
+          {commitQuality && <CommitQuality {...commitQuality} />}
+
           {/* Saat heatmap — detay */}
           <HourHeatmap data={hourData} />
 
           {/* Repo listesi */}
           <RepoList repos={repoListData} />
+
+          {/* Repo sağlık skorları */}
+          <RepoHealthList repos={repoHealthData} />
         </div>
       )}
     </div>
