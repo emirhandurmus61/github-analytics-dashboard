@@ -12,6 +12,8 @@ import CodeStats from "./code-stats";
 import InsightCards from "./insight-cards";
 import GoalTracker from "./goal-tracker";
 import CompareView from "./compare-view";
+import VelocityChart from "./velocity-chart";
+import RhythmAnalysis from "./rhythm-analysis";
 import { calculateStreaks } from "@/lib/streak";
 import { generateInsights } from "@/lib/insights";
 
@@ -53,6 +55,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   let topRepoCommits = 0;
   let thisMonthData = { label: "", commits: 0, activeDays: 0, linesAdded: 0 };
   let lastMonthData = { label: "", commits: 0, activeDays: 0, linesAdded: 0 };
+  let commitTimestamps: string[] = [];
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -124,6 +127,9 @@ export default async function DashboardPage({ searchParams }: Props) {
 
     recentActivity = (activityRes.data ?? []).reverse();
     heatmapData = heatmapRes.data ?? [];
+
+    // Commit timestamp'leri (ritim analizi için)
+    commitTimestamps = (allCommitsRes.data ?? []).map((c) => c.committed_at);
 
     // Saat heatmap
     const hourMap = new Map<string, number>();
@@ -337,6 +343,9 @@ export default async function DashboardPage({ searchParams }: Props) {
             <CompareView thisMonth={thisMonthData} lastMonth={lastMonthData} />
           </div>
 
+          {/* Velocity grafiği */}
+          <VelocityChart data={heatmapData} />
+
           {/* Heatmap — yatay scroll mobilde */}
           <ContributionHeatmap data={heatmapData} />
 
@@ -354,7 +363,10 @@ export default async function DashboardPage({ searchParams }: Props) {
             </div>
           </div>
 
-          {/* Saat heatmap */}
+          {/* Çalışma ritmi analizi */}
+          <RhythmAnalysis hourData={hourData} commitTimestamps={commitTimestamps} />
+
+          {/* Saat heatmap — detay */}
           <HourHeatmap data={hourData} />
 
           {/* Repo listesi */}
