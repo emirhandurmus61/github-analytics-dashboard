@@ -76,6 +76,21 @@ export default async function DashboardLayout({
                 Profil ↗
               </a>
 
+              <a
+                href={`/u/${session.user?.username}/${new Date().getFullYear()}`}
+                className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+              >
+                Wrapped ✦
+              </a>
+
+              <a
+                href={`/api/card/${session.user?.username}`}
+                download={`${session.user?.username}-dev-card.png`}
+                className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+              >
+                Kart ↓
+              </a>
+
               <form
                 action={async () => {
                   "use server";

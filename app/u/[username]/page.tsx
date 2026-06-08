@@ -210,14 +210,28 @@ export default async function PublicProfilePage({ params }: Props) {
               </div>
               <span className="text-sm font-medium text-zinc-400">Dev Analytics</span>
             </div>
-            <a
-              href={`https://github.com/${username}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-zinc-600 transition-colors hover:text-zinc-400"
-            >
-              github.com/{username} ↗
-            </a>
+            <div className="flex items-center gap-3">
+              {/* Developer Card indir */}
+              <a
+                href={`/api/card/${username}`}
+                download={`${username}-dev-card.png`}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+                style={{ borderColor: theme.accentBorder }}
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span style={{ color: theme.accent }}>Kartı İndir</span>
+              </a>
+              <a
+                href={`https://github.com/${username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-zinc-600 transition-colors hover:text-zinc-400"
+              >
+                github.com/{username} ↗
+              </a>
+            </div>
           </div>
         </header>
 
@@ -323,8 +337,22 @@ export default async function PublicProfilePage({ params }: Props) {
           {/* Widgetlar — kullanıcının belirlediği sırada */}
           {widgetOrder.map((key) => renderWidget(key))}
 
+          {/* Wrapped linkleri */}
+          <div className="flex flex-wrap justify-center gap-2 pt-2">
+            {[new Date().getFullYear(), new Date().getFullYear() - 1].map((yr) => (
+              <a
+                key={yr}
+                href={`/u/${username}/${yr}`}
+                className="rounded-full border px-3 py-1.5 text-xs transition-colors hover:opacity-80"
+                style={{ borderColor: theme.accentBorder, backgroundColor: theme.accentBg, color: theme.accent }}
+              >
+                {yr} Wrapped ✦
+              </a>
+            ))}
+          </div>
+
           {/* Footer */}
-          <p className="text-center text-xs text-zinc-700 pt-4">
+          <p className="text-center text-xs text-zinc-700 pt-2">
             Bu profil{" "}
             <a href="/" className="text-zinc-500 hover:text-zinc-400 transition-colors">
               Dev Analytics Dashboard
