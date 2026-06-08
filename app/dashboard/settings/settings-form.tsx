@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveProfileSettings } from "./actions";
+import { THEMES, type ThemeAccent } from "@/lib/themes";
 
 type Widgets = {
   heatmap: boolean;
@@ -17,6 +18,7 @@ type Props = {
   repos: { name: string }[];
   username: string;
   badgeUrl: string;
+  currentTheme: ThemeAccent;
 };
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -28,16 +30,111 @@ export default function SettingsForm({
   repos,
   username,
   badgeUrl,
+  currentTheme,
 }: Props) {
   const [state, formAction, pending] = useActionState(
     saveProfileSettings,
     initialState
   );
+  const [selectedTheme, setSelectedTheme] = useState<ThemeAccent>(currentTheme);
+
+  // Canlı önizleme için seçili temanın renklerini al
+  const previewColors = THEMES[selectedTheme];
 
   return (
     <div className="space-y-8">
       <form action={formAction} className="space-y-6">
-        {/* Biyografi */}
+
+        {/* Tema Seçimi */}
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-5">
+          <div>
+            <h2 className="text-sm font-medium text-zinc-300">Tema Rengi</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Seçtiğin renk dashboard ve public profilinde tüm vurgu noktalarına yansır.
+            </p>
+          </div>
+
+          {/* Renk seçenekleri */}
+          <div className="flex flex-wrap gap-3">
+            {(Object.entries(THEMES) as [ThemeAccent, typeof THEMES[ThemeAccent]][]).map(
+              ([key, theme]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedTheme(key)}
+                  className="group flex flex-col items-center gap-2"
+                  title={theme.label}
+                >
+                  <div
+                    className="h-8 w-8 rounded-full transition-all duration-200"
+                    style={{
+                      backgroundColor: theme.accent,
+                      boxShadow:
+                        selectedTheme === key
+                          ? `0 0 0 3px #09090b, 0 0 0 5px ${theme.accent}`
+                          : "none",
+                      transform: selectedTheme === key ? "scale(1.15)" : "scale(1)",
+                    }}
+                  />
+                  <span
+                    className="text-xs transition-colors"
+                    style={{
+                      color: selectedTheme === key ? theme.accent : "#71717a",
+                    }}
+                  >
+                    {theme.label}
+                  </span>
+                </button>
+              )
+            )}
+          </div>
+
+          {/* Canlı önizleme */}
+          <div
+            className="rounded-xl border p-4 space-y-3 transition-all duration-300"
+            style={{
+              backgroundColor: previewColors.accentBg,
+              borderColor: previewColors.accentBorder,
+            }}
+          >
+            <p className="text-xs text-zinc-500">Önizleme</p>
+            <div className="flex items-center gap-4">
+              {/* Mini streak kartı */}
+              <div className="flex flex-col items-center">
+                <span className="text-2xl font-bold" style={{ color: previewColors.accent }}>7</span>
+                <span className="text-xs text-zinc-600">Streak 🔥</span>
+              </div>
+              {/* Mini progress bar */}
+              <div className="flex-1 space-y-1">
+                <div className="flex justify-between text-xs text-zinc-600">
+                  <span>Haftalık Hedef</span>
+                  <span style={{ color: previewColors.accent }}>14 / 20</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: "70%", backgroundColor: previewColors.accentMid }}
+                  />
+                </div>
+              </div>
+              {/* Mini heatmap örneği */}
+              <div className="flex gap-0.5">
+                {previewColors.shades.map((shade, i) => (
+                  <div
+                    key={i}
+                    className="h-4 w-4 rounded-sm"
+                    style={{ backgroundColor: shade }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Gizli input */}
+          <input type="hidden" name="theme_accent" value={selectedTheme} />
+        </div>
+
+        {/* Profil Bilgileri */}
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
           <h2 className="text-sm font-medium text-zinc-300">Profil Bilgileri</h2>
 
@@ -99,7 +196,7 @@ export default function SettingsForm({
                   type="checkbox"
                   name={key}
                   defaultChecked={checked}
-                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-900"
+                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-800"
                 />
                 <span className="text-sm text-zinc-300 group-hover:text-zinc-100 transition-colors">
                   {label}
@@ -114,13 +211,19 @@ export default function SettingsForm({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-50 transition-colors"
+            className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors"
+            style={{
+              backgroundColor: previewColors.accent,
+              color: "#09090b",
+            }}
           >
             {pending ? "Kaydediliyor..." : "Kaydet"}
           </button>
 
           {state?.success && (
-            <span className="text-sm text-emerald-400">Profil güncellendi.</span>
+            <span className="text-sm" style={{ color: previewColors.accent }}>
+              Profil güncellendi.
+            </span>
           )}
           {state?.error && (
             <span className="text-sm text-red-400">{state.error}</span>
@@ -136,13 +239,11 @@ export default function SettingsForm({
         </p>
 
         <div className="rounded-lg overflow-hidden border border-zinc-700">
-          {/* Önizleme */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={badgeUrl}
             alt="Dev Analytics Badge"
             className="block"
-            style={{ imageRendering: "auto" }}
           />
         </div>
 

@@ -3,6 +3,14 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Tema accent renkleri — ThemeProvider tarafından dinamik olarak set edilir */
+  /* Varsayılan: Emerald */
+  --accent: #34d399;
+  --accent-mid: #10b981;
+  --accent-dim: #064e3b;
+  --accent-bg: rgba(52, 211, 153, 0.08);
+  --accent-border: rgba(52, 211, 153, 0.2);
 }
 
 @theme inline {

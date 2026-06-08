@@ -1,5 +1,7 @@
 "use client";
 
+import { useThemeColors } from "@/components/theme-provider";
+
 type Props = {
   linesAdded: number;
   linesDeleted: number;
@@ -23,7 +25,11 @@ export default function CodeStats({
   openIssues,
   closedIssues,
 }: Props) {
+  const theme = useThemeColors();
   const netLines = linesAdded - linesDeleted;
+  const addPct = linesAdded + linesDeleted > 0
+    ? (linesAdded / (linesAdded + linesDeleted)) * 100
+    : 0;
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
@@ -33,49 +39,47 @@ export default function CodeStats({
         <StatBox
           value={`+${formatLines(linesAdded)}`}
           label="Satır Eklendi"
-          color="text-emerald-400"
+          color={theme.accent}
         />
         <StatBox
           value={`-${formatLines(linesDeleted)}`}
           label="Satır Silindi"
-          color="text-red-400"
+          color="#f87171"
         />
         <StatBox
           value={netLines >= 0 ? `+${formatLines(netLines)}` : formatLines(netLines)}
           label="Net Değişim"
-          color={netLines >= 0 ? "text-blue-400" : "text-orange-400"}
+          color={netLines >= 0 ? theme.accentMid : "#fb923c"}
         />
         <StatBox
           value={totalCommits.toLocaleString("tr-TR")}
           label="Commit"
-          color="text-zinc-100"
+          color="#f4f4f5"
         />
         <StatBox
           value={mergedPRs.toString()}
           label="Merge PR"
-          color="text-purple-400"
+          color="#c084fc"
         />
         <StatBox
           value={`${closedIssues}/${openIssues + closedIssues}`}
           label="Kapalı Issue"
-          color="text-yellow-400"
+          color="#fbbf24"
         />
       </div>
 
-      {/* Satır oranı bar */}
       {(linesAdded + linesDeleted) > 0 && (
         <div className="mt-5">
           <div className="mb-1.5 flex justify-between text-xs text-zinc-600">
             <span>Ekleme vs Silme oranı</span>
-            <span>
-              %{Math.round((linesAdded / (linesAdded + linesDeleted)) * 100)} ekleme
-            </span>
+            <span>%{Math.round(addPct)} ekleme</span>
           </div>
           <div className="flex h-2 w-full overflow-hidden rounded-full bg-red-900/40">
             <div
-              className="h-full rounded-full bg-emerald-500"
+              className="h-full rounded-full transition-all"
               style={{
-                width: `${(linesAdded / (linesAdded + linesDeleted)) * 100}%`,
+                width: `${addPct}%`,
+                backgroundColor: theme.accent,
               }}
             />
           </div>
@@ -85,18 +89,10 @@ export default function CodeStats({
   );
 }
 
-function StatBox({
-  value,
-  label,
-  color,
-}: {
-  value: string;
-  label: string;
-  color: string;
-}) {
+function StatBox({ value, label, color }: { value: string; label: string; color: string }) {
   return (
     <div className="rounded-xl bg-zinc-800/50 px-3 py-3 text-center">
-      <div className={`text-xl font-bold ${color}`}>{value}</div>
+      <div className="text-xl font-bold" style={{ color }}>{value}</div>
       <div className="mt-1 text-xs text-zinc-600">{label}</div>
     </div>
   );

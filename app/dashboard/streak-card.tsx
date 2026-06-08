@@ -1,5 +1,7 @@
 "use client";
 
+import { useThemeColors } from "@/components/theme-provider";
+
 type Props = {
   currentStreak: number;
   longestStreak: number;
@@ -7,12 +9,14 @@ type Props = {
 };
 
 export default function StreakCard({ currentStreak, longestStreak, totalActiveDays }: Props) {
+  const theme = useThemeColors();
+
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
       <h2 className="mb-5 text-sm font-medium text-zinc-400">Streak & Aktivite</h2>
       <div className="grid grid-cols-3 gap-4">
         <div className="text-center">
-          <div className="mb-1 text-4xl font-bold text-orange-400">
+          <div className="mb-1 text-4xl font-bold" style={{ color: theme.accent }}>
             {currentStreak}
           </div>
           <div className="text-xs text-zinc-500">Günlük Streak 🔥</div>
@@ -30,7 +34,7 @@ export default function StreakCard({ currentStreak, longestStreak, totalActiveDa
           </div>
         </div>
         <div className="text-center">
-          <div className="mb-1 text-4xl font-bold text-emerald-400">
+          <div className="mb-1 text-4xl font-bold" style={{ color: theme.accentMid }}>
             {totalActiveDays}
           </div>
           <div className="text-xs text-zinc-500">Aktif Gün (1 yıl)</div>

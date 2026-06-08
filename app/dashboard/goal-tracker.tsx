@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useThemeColors } from "@/components/theme-provider";
 
 const GOALS = [5, 10, 20, 30, 50];
 
 export default function GoalTracker({ thisWeek }: { thisWeek: number }) {
+  const theme = useThemeColors();
   const [goal, setGoal] = useState<number>(20);
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
@@ -22,6 +24,9 @@ export default function GoalTracker({ thisWeek }: { thisWeek: number }) {
 
   const pct = Math.min(Math.round((thisWeek / goal) * 100), 100);
   const done = thisWeek >= goal;
+  const nearDone = pct >= 70;
+
+  const barColor = done ? theme.accent : nearDone ? theme.accentMid : "#52525b";
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
@@ -42,13 +47,17 @@ export default function GoalTracker({ thisWeek }: { thisWeek: number }) {
               <button
                 key={g}
                 onClick={() => saveGoal(g)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                style={
                   g === goal
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
-                }`}
+                    ? { backgroundColor: theme.accent, color: "#09090b" }
+                    : undefined
+                }
               >
-                {g} commit
+                {g !== goal && (
+                  <span className="text-zinc-400 hover:text-zinc-200">{g} commit</span>
+                )}
+                {g === goal && `${g} commit`}
               </button>
             ))}
           </div>
@@ -72,13 +81,16 @@ export default function GoalTracker({ thisWeek }: { thisWeek: number }) {
         <div className="space-y-3">
           <div className="flex items-end justify-between">
             <div>
-              <span className={`text-4xl font-bold ${done ? "text-emerald-400" : "text-zinc-100"}`}>
+              <span
+                className="text-4xl font-bold"
+                style={{ color: done ? theme.accent : "#f4f4f5" }}
+              >
                 {thisWeek}
               </span>
               <span className="ml-1 text-zinc-600">/ {goal} commit</span>
             </div>
             {done && (
-              <span className="text-sm font-medium text-emerald-400">
+              <span className="text-sm font-medium" style={{ color: theme.accent }}>
                 Hedef tamamlandı! 🎉
               </span>
             )}
@@ -86,10 +98,8 @@ export default function GoalTracker({ thisWeek }: { thisWeek: number }) {
 
           <div className="relative h-3 w-full overflow-hidden rounded-full bg-zinc-800">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                done ? "bg-emerald-400" : pct >= 70 ? "bg-blue-400" : "bg-zinc-500"
-              }`}
-              style={{ width: `${pct}%` }}
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${pct}%`, backgroundColor: barColor }}
             />
           </div>
 

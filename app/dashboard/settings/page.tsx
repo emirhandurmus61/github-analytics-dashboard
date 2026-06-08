@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 import SettingsForm from "./settings-form";
+import { isValidTheme, DEFAULT_THEME, type ThemeAccent } from "@/lib/themes";
 
 type Widgets = {
   heatmap: boolean;
@@ -25,7 +26,7 @@ export default async function SettingsPage() {
 
   const { data: user } = await supabaseAdmin
     .from("users")
-    .select("id, bio, pinned_repo_name, public_widgets")
+    .select("id, bio, pinned_repo_name, public_widgets, theme_accent")
     .eq("username", username)
     .single();
 
@@ -45,7 +46,10 @@ export default async function SettingsPage() {
       ? { ...DEFAULT_WIDGETS, ...(user.public_widgets as Partial<Widgets>) }
       : DEFAULT_WIDGETS;
 
-  // Badge URL — kendi origin'e göre (server-side absolute URL için env kullan)
+  const currentTheme: ThemeAccent = isValidTheme(user.theme_accent)
+    ? user.theme_accent
+    : DEFAULT_THEME;
+
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
   const badgeUrl = `${baseUrl}/api/badge/${username}`;
 
@@ -54,7 +58,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-xl font-semibold text-zinc-100">Profil Ayarları</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Genel profilini özelleştir ve badge'ini al.
+          Temanı, profilini ve badge'ini özelleştir.
         </p>
       </div>
 
@@ -65,6 +69,7 @@ export default async function SettingsPage() {
         repos={repos}
         username={username}
         badgeUrl={badgeUrl}
+        currentTheme={currentTheme}
       />
     </div>
   );

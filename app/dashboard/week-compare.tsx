@@ -1,11 +1,14 @@
 "use client";
 
+import { useThemeColors } from "@/components/theme-provider";
+
 type Props = {
   thisWeek: number;
   lastWeek: number;
 };
 
 export default function WeekCompare({ thisWeek, lastWeek }: Props) {
+  const theme = useThemeColors();
   const diff = thisWeek - lastWeek;
   const pct = lastWeek > 0 ? Math.round((diff / lastWeek) * 100) : thisWeek > 0 ? 100 : 0;
   const isUp = diff >= 0;
@@ -24,7 +27,10 @@ export default function WeekCompare({ thisWeek, lastWeek }: Props) {
             <p className="text-2xl font-semibold text-zinc-500">{lastWeek}</p>
           </div>
         </div>
-        <div className={`flex items-center gap-1 text-sm font-medium ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+        <div
+          className="flex items-center gap-1 text-sm font-medium"
+          style={{ color: isUp ? theme.accent : "#f87171" }}
+        >
           <span>{isUp ? "▲" : "▼"}</span>
           <span>{Math.abs(pct)}%</span>
           <span className="text-xs font-normal text-zinc-600 ml-1">

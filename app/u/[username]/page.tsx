@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import ContributionHeatmap from "@/app/dashboard/contribution-heatmap";
 import { calculateStreaks } from "@/lib/streak";
+import { ThemeProvider } from "@/components/theme-provider";
+import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import type { Metadata } from "next";
 
 type Props = { params: Promise<{ username: string }> };
@@ -40,7 +42,7 @@ export default async function PublicProfilePage({ params }: Props) {
 
   const { data: user } = await supabaseAdmin
     .from("users")
-    .select("id, username, name, avatar_url, last_synced_at, bio, pinned_repo_name, public_widgets")
+    .select("id, username, name, avatar_url, last_synced_at, bio, pinned_repo_name, public_widgets, theme_accent")
     .eq("username", username)
     .single();
 
@@ -50,6 +52,9 @@ export default async function PublicProfilePage({ params }: Props) {
     user.public_widgets && typeof user.public_widgets === "object"
       ? { ...DEFAULT_WIDGETS, ...(user.public_widgets as Partial<Widgets>) }
       : DEFAULT_WIDGETS;
+
+  const accent = isValidTheme(user.theme_accent) ? user.theme_accent : DEFAULT_THEME;
+  const theme = THEMES[accent];
 
   // Repo id'leri
   const { data: repoRows } = await supabaseAdmin
@@ -120,6 +125,7 @@ export default async function PublicProfilePage({ params }: Props) {
   void ownIds; // kullanılmıyor ama ileride kullanılabilir
 
   return (
+    <ThemeProvider accent={accent}>
     <div className="min-h-screen bg-zinc-950">
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-950 px-6 py-4">
@@ -187,7 +193,7 @@ export default async function PublicProfilePage({ params }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
               <p className="text-xs text-zinc-500">Mevcut Streak</p>
-              <p className="mt-1.5 text-3xl font-semibold text-emerald-400">
+              <p className="mt-1.5 text-3xl font-semibold" style={{ color: theme.accent }}>
                 {currentStreak} <span className="text-base font-normal text-zinc-500">gün</span>
               </p>
             </div>
@@ -229,7 +235,9 @@ export default async function PublicProfilePage({ params }: Props) {
         )}
 
         {/* Contribution heatmap */}
-        {widgets.heatmap && <ContributionHeatmap data={heatmapData} />}
+        {widgets.heatmap && (
+          <ContributionHeatmap data={heatmapData} accentShades={theme.shades} />
+        )}
 
         {/* Dil dağılımı + Top repolar */}
         {(widgets.languages || widgets.repos) && (
@@ -302,5 +310,6 @@ export default async function PublicProfilePage({ params }: Props) {
         </p>
       </main>
     </div>
+    </ThemeProvider>
   );
 }

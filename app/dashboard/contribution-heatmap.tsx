@@ -1,5 +1,7 @@
 "use client";
 
+import { useThemeColors } from "@/components/theme-provider";
+
 type DayData = {
   date: string;
   commit_count: number;
@@ -7,34 +9,24 @@ type DayData = {
 
 type Props = {
   data: DayData[];
+  // Public profil gibi ThemeProvider olmayan yerlerde direkt renk geçilebilir
+  accentShades?: [string, string, string, string];
 };
 
 const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 const DAYS = ["Pzt", "", "Çar", "", "Cum", "", "Paz"];
 
-function getColor(count: number, max: number): string {
-  if (count === 0) return "#1c1c1c";
-  const intensity = count / max;
-  if (intensity < 0.25) return "#166534";
-  if (intensity < 0.5) return "#16a34a";
-  if (intensity < 0.75) return "#22c55e";
-  return "#4ade80";
-}
-
 function buildGrid(data: DayData[]): { date: string; count: number }[][] {
   const map = new Map(data.map((d) => [d.date, d.commit_count]));
 
-  // Son 52 hafta + bu haftanın başına kadar
   const today = new Date();
   const endDate = new Date(today);
-  // Haftanın sonuna (Pazar) kadar git
-  const dayOfWeek = (today.getDay() + 6) % 7; // Pazartesi=0
+  const dayOfWeek = (today.getDay() + 6) % 7;
   endDate.setDate(endDate.getDate() + (6 - dayOfWeek));
 
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 52 * 7 + 1);
 
-  // Haftanın başına (Pazartesi) ayarla
   const startDay = (startDate.getDay() + 6) % 7;
   startDate.setDate(startDate.getDate() - startDay);
 
@@ -69,7 +61,13 @@ function getMonthLabels(weeks: { date: string; count: number }[][]): { label: st
   return labels;
 }
 
-export default function ContributionHeatmap({ data }: Props) {
+function HeatmapInner({
+  data,
+  shades,
+}: {
+  data: DayData[];
+  shades: [string, string, string, string];
+}) {
   const weeks = buildGrid(data);
   const max = Math.max(...data.map((d) => d.commit_count), 1);
   const monthLabels = getMonthLabels(weeks);
@@ -77,6 +75,15 @@ export default function ContributionHeatmap({ data }: Props) {
 
   const cellSize = 13;
   const gap = 3;
+
+  function getColor(count: number): string {
+    if (count === 0) return "#1c1c1c";
+    const intensity = count / max;
+    if (intensity < 0.25) return shades[0];
+    if (intensity < 0.5) return shades[1];
+    if (intensity < 0.75) return shades[2];
+    return shades[3];
+  }
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
@@ -102,7 +109,6 @@ export default function ContributionHeatmap({ data }: Props) {
 
           {/* Grid */}
           <div className="flex gap-0">
-            {/* Gün etiketleri */}
             <div className="mr-2 flex flex-col justify-between py-0.5" style={{ gap: gap }}>
               {DAYS.map((day, i) => (
                 <span
@@ -115,7 +121,6 @@ export default function ContributionHeatmap({ data }: Props) {
               ))}
             </div>
 
-            {/* Hücreler */}
             <div className="flex" style={{ gap: gap }}>
               {weeks.map((week, wi) => (
                 <div key={wi} className="flex flex-col" style={{ gap: gap }}>
@@ -127,7 +132,7 @@ export default function ContributionHeatmap({ data }: Props) {
                       style={{
                         width: cellSize,
                         height: cellSize,
-                        backgroundColor: getColor(day.count, max),
+                        backgroundColor: getColor(day.count),
                       }}
                     />
                   ))}
@@ -139,7 +144,7 @@ export default function ContributionHeatmap({ data }: Props) {
           {/* Legend */}
           <div className="mt-3 flex items-center justify-end gap-1.5">
             <span className="text-xs text-zinc-600">Az</span>
-            {["#1c1c1c", "#166534", "#16a34a", "#22c55e", "#4ade80"].map((color) => (
+            {["#1c1c1c", ...shades].map((color) => (
               <div
                 key={color}
                 className="rounded-sm"
@@ -152,4 +157,11 @@ export default function ContributionHeatmap({ data }: Props) {
       </div>
     </div>
   );
+}
+
+// Dashboard içinde: ThemeProvider'dan renk alır
+export default function ContributionHeatmap({ data, accentShades }: Props) {
+  const theme = useThemeColors();
+  const shades = accentShades ?? theme.shades;
+  return <HeatmapInner data={data} shades={shades} />;
 }
