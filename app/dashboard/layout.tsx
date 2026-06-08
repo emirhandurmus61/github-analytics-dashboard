@@ -50,6 +50,13 @@ export default async function DashboardLayout({
             </div>
 
             <a
+              href="/dashboard/settings"
+              className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+            >
+              Ayarlar
+            </a>
+
+            <a
               href={`/u/${session.user?.username}`}
               className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
             >

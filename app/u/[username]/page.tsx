@@ -2,9 +2,30 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import ContributionHeatmap from "@/app/dashboard/contribution-heatmap";
+import { calculateStreaks } from "@/lib/streak";
 import type { Metadata } from "next";
 
 type Props = { params: Promise<{ username: string }> };
+
+type Widgets = {
+  heatmap: boolean;
+  languages: boolean;
+  repos: boolean;
+  streak: boolean;
+};
+
+const DEFAULT_WIDGETS: Widgets = {
+  heatmap: true,
+  languages: true,
+  repos: true,
+  streak: true,
+};
+
+const LANG_COLORS: Record<string, string> = {
+  TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572A5",
+  Rust: "#dea584", Go: "#00ADD8", CSS: "#563d7c", HTML: "#e34c26",
+  Java: "#b07219", "C++": "#f34b7d", "C#": "#178600", C: "#555555",
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
@@ -19,21 +40,27 @@ export default async function PublicProfilePage({ params }: Props) {
 
   const { data: user } = await supabaseAdmin
     .from("users")
-    .select("id, username, name, avatar_url, last_synced_at")
+    .select("id, username, name, avatar_url, last_synced_at, bio, pinned_repo_name, public_widgets")
     .eq("username", username)
     .single();
 
   if (!user || !user.last_synced_at) notFound();
 
+  const widgets: Widgets =
+    user.public_widgets && typeof user.public_widgets === "object"
+      ? { ...DEFAULT_WIDGETS, ...(user.public_widgets as Partial<Widgets>) }
+      : DEFAULT_WIDGETS;
+
   // Repo id'leri
-  const { data: repoIds } = await supabaseAdmin
+  const { data: repoRows } = await supabaseAdmin
     .from("repositories")
-    .select("id")
+    .select("id, name, full_name, language, stars, forks, is_fork")
     .eq("user_id", user.id);
 
-  const ids = repoIds?.map((r) => r.id) ?? [];
+  const ids = (repoRows ?? []).map((r) => r.id);
+  const ownIds = (repoRows ?? []).filter((r) => !r.is_fork).map((r) => r.id);
 
-  const [reposRes, commitsRes, langsRes, heatmapRes, topReposRes] = await Promise.all([
+  const [reposRes, commitsRes, langsRes, heatmapRes] = await Promise.all([
     supabaseAdmin
       .from("repositories")
       .select("count", { count: "exact", head: true })
@@ -55,14 +82,6 @@ export default async function PublicProfilePage({ params }: Props) {
       .eq("user_id", user.id)
       .gte("date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
       .order("date", { ascending: true }),
-
-    supabaseAdmin
-      .from("repositories")
-      .select("name, full_name, language, stars, forks, is_fork")
-      .eq("user_id", user.id)
-      .eq("is_fork", false)
-      .order("stars", { ascending: false })
-      .limit(6),
   ]);
 
   // Dil toplamları
@@ -82,13 +101,23 @@ export default async function PublicProfilePage({ params }: Props) {
   };
 
   const heatmapData = heatmapRes.data ?? [];
-  const topRepos = topReposRes.data ?? [];
 
-  const LANG_COLORS: Record<string, string> = {
-    TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572A5",
-    Rust: "#dea584", Go: "#00ADD8", CSS: "#563d7c", HTML: "#e34c26",
-    Java: "#b07219", "C++": "#f34b7d", "C#": "#178600", C: "#555555",
-  };
+  // Streak
+  const activeDates = heatmapData.filter((d) => d.commit_count > 0).map((d) => d.date);
+  const { currentStreak, longestStreak } = calculateStreaks(activeDates);
+
+  // Pinned repo verisi
+  const pinnedRepo = user.pinned_repo_name
+    ? (repoRows ?? []).find((r) => r.name === user.pinned_repo_name) ?? null
+    : null;
+
+  // Top repolar (yıldıza göre, fork olmayan)
+  const topRepos = (repoRows ?? [])
+    .filter((r) => !r.is_fork)
+    .sort((a, b) => b.stars - a.stars)
+    .slice(0, 6);
+
+  void ownIds; // kullanılmıyor ama ileride kullanılabilir
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -116,21 +145,24 @@ export default async function PublicProfilePage({ params }: Props) {
 
       <main className="mx-auto max-w-4xl px-6 py-10 space-y-8">
         {/* Profil */}
-        <div className="flex items-center gap-5">
+        <div className="flex items-start gap-5">
           {user.avatar_url && (
             <Image
               src={user.avatar_url}
               alt={username}
               width={72}
               height={72}
-              className="rounded-full ring-2 ring-zinc-800"
+              className="rounded-full ring-2 ring-zinc-800 shrink-0"
             />
           )}
-          <div>
+          <div className="space-y-1">
             <h1 className="text-2xl font-semibold text-zinc-100">
               {user.name ?? username}
             </h1>
             <p className="text-sm text-zinc-500">@{username}</p>
+            {user.bio && (
+              <p className="text-sm text-zinc-400 pt-1">{user.bio}</p>
+            )}
           </div>
         </div>
 
@@ -150,63 +182,115 @@ export default async function PublicProfilePage({ params }: Props) {
           ))}
         </div>
 
+        {/* Streak kartı */}
+        {widgets.streak && (currentStreak > 0 || longestStreak > 0) && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+              <p className="text-xs text-zinc-500">Mevcut Streak</p>
+              <p className="mt-1.5 text-3xl font-semibold text-emerald-400">
+                {currentStreak} <span className="text-base font-normal text-zinc-500">gün</span>
+              </p>
+            </div>
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+              <p className="text-xs text-zinc-500">En Uzun Streak</p>
+              <p className="mt-1.5 text-3xl font-semibold text-zinc-100">
+                {longestStreak} <span className="text-base font-normal text-zinc-500">gün</span>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Pinned repo */}
+        {pinnedRepo && (
+          <div>
+            <h2 className="mb-3 text-sm font-medium text-zinc-400">Öne Çıkan Repo</h2>
+            <a
+              href={`https://github.com/${pinnedRepo.full_name}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-2xl border border-zinc-700 bg-zinc-900 p-5 hover:border-zinc-600 transition-colors"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                {pinnedRepo.language && (
+                  <div
+                    className="h-3 w-3 rounded-full shrink-0"
+                    style={{ backgroundColor: LANG_COLORS[pinnedRepo.language] ?? "#6b7280" }}
+                  />
+                )}
+                <span className="text-sm font-medium text-zinc-100">{pinnedRepo.name}</span>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-zinc-600 mt-2">
+                <span>★ {pinnedRepo.stars}</span>
+                <span>⑂ {pinnedRepo.forks}</span>
+                {pinnedRepo.language && <span>{pinnedRepo.language}</span>}
+              </div>
+            </a>
+          </div>
+        )}
+
         {/* Contribution heatmap */}
-        <ContributionHeatmap data={heatmapData} />
+        {widgets.heatmap && <ContributionHeatmap data={heatmapData} />}
 
         {/* Dil dağılımı + Top repolar */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* Dil dağılımı */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>
-            <div className="space-y-3">
-              {topLanguages.map(([lang, bytes]) => {
-                const pct = totalBytes > 0 ? ((bytes / totalBytes) * 100).toFixed(1) : "0";
-                const color = LANG_COLORS[lang] ?? "#6b7280";
-                return (
-                  <div key={lang}>
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-zinc-300">{lang}</span>
-                      <span className="text-zinc-500">{pct}%</span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        {(widgets.languages || widgets.repos) && (
+          <div className={`grid grid-cols-1 gap-4 ${widgets.languages && widgets.repos ? "md:grid-cols-2" : ""}`}>
+            {/* Dil dağılımı */}
+            {widgets.languages && (
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+                <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>
+                <div className="space-y-3">
+                  {topLanguages.map(([lang, bytes]) => {
+                    const pct = totalBytes > 0 ? ((bytes / totalBytes) * 100).toFixed(1) : "0";
+                    const color = LANG_COLORS[lang] ?? "#6b7280";
+                    return (
+                      <div key={lang}>
+                        <div className="mb-1 flex justify-between text-xs">
+                          <span className="text-zinc-300">{lang}</span>
+                          <span className="text-zinc-500">{pct}%</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-          {/* Top repolar */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <h2 className="mb-4 text-sm font-medium text-zinc-400">En Yıldızlı Repolar</h2>
-            <div className="space-y-3">
-              {topRepos.map((repo) => (
-                <a
-                  key={repo.name}
-                  href={`https://github.com/${repo.full_name}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-zinc-800"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {repo.language && (
-                      <div
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: LANG_COLORS[repo.language] ?? "#6b7280" }}
-                      />
-                    )}
-                    <span className="truncate text-sm text-zinc-300">{repo.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0 text-xs text-zinc-600">
-                    <span>★ {repo.stars}</span>
-                    <span>⑂ {repo.forks}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
+            {/* Top repolar */}
+            {widgets.repos && (
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+                <h2 className="mb-4 text-sm font-medium text-zinc-400">En Yıldızlı Repolar</h2>
+                <div className="space-y-3">
+                  {topRepos.map((repo) => (
+                    <a
+                      key={repo.name}
+                      href={`https://github.com/${repo.full_name}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-zinc-800"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {repo.language && (
+                          <div
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: LANG_COLORS[repo.language] ?? "#6b7280" }}
+                          />
+                        )}
+                        <span className="truncate text-sm text-zinc-300">{repo.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 text-xs text-zinc-600">
+                        <span>★ {repo.stars}</span>
+                        <span>⑂ {repo.forks}</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Footer */}
         <p className="text-center text-xs text-zinc-700">
