@@ -17,6 +17,9 @@ import RhythmAnalysis from "./rhythm-analysis";
 import RepoHealthList from "./repo-health-list";
 import LangEvolution, { type MonthLangPoint } from "./lang-evolution";
 import CommitQuality from "./commit-quality";
+import BadgeCollection from "./badge-collection";
+import { calcBadges, type Badge } from "@/lib/badges";
+import StreakGuard, { type StreakStatus } from "./streak-guard";
 import { calculateStreaks } from "@/lib/streak";
 import { generateInsights } from "@/lib/insights";
 
@@ -34,7 +37,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const { data: dbUser } = await supabaseAdmin
     .from("users")
-    .select("id, last_synced_at")
+    .select("id, last_synced_at, weekly_commit_goal")
     .eq("username", session?.user?.username ?? "")
     .single();
 
@@ -78,6 +81,10 @@ export default async function DashboardPage({ searchParams }: Props) {
     biggestCommits: { message: string; additions: number; deletions: number; date: string }[];
     totalAnalyzed: number;
   } | null = null;
+  let badges: Badge[] = [];
+  let streakStatus: StreakStatus = "no_streak";
+  let weeklyGoal = dbUser?.weekly_commit_goal ?? 20;
+  let goalHistory: { week_start: string; goal: number; actual: number }[] = [];
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -362,6 +369,25 @@ export default async function DashboardPage({ searchParams }: Props) {
       .map((d) => d.date);
     streakData = calculateStreaks(activeDates);
 
+    // Streak koruma durumu
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const activeDateSet = new Set(activeDates);
+    const hasToday = activeDateSet.has(todayStr);
+    const hasYesterday = activeDateSet.has(yesterdayStr);
+
+    if (streakData.currentStreak === 0 && streakData.longestStreak === 0) {
+      streakStatus = "no_streak";
+    } else if (hasToday) {
+      streakStatus = "safe";
+    } else if (hasYesterday) {
+      streakStatus = "at_risk";
+    } else if (streakData.longestStreak > 0) {
+      streakStatus = "broken_today";
+    } else {
+      streakStatus = "no_streak";
+    }
+
     // Code stats
     const [dailyStatsRes, prsRes, issuesRes] = await Promise.all([
       supabaseAdmin
@@ -447,6 +473,49 @@ export default async function DashboardPage({ searchParams }: Props) {
       linesDeleted,
       topLang,
     );
+
+    // Rozetler
+    const repoForkMap = new Map<string, boolean>(
+      (repoRows ?? []).map((r) => [r.id, r.is_fork])
+    );
+    badges = calcBadges({
+      hasSynced: true,
+      longestStreak: streakData.longestStreak,
+      commitTimestamps: (allCommitsRes.data ?? []).map((c) => c.committed_at),
+      repoForkMap,
+      commitRepoIds: (allCommitsRes.data ?? []).map((c) => c.repo_id),
+      commitDeletions: (allCommitsRes.data ?? []).map((c) => c.deletions ?? 0),
+      languageCount: langMap.size,
+    });
+
+    // Haftalık hedef
+    weeklyGoal = dbUser.weekly_commit_goal ?? 20;
+
+    // Bu haftanın Pazartesi'si
+    const todayNow = new Date();
+    const thisDow = (todayNow.getDay() + 6) % 7;
+    const thisMonday = new Date(todayNow);
+    thisMonday.setDate(todayNow.getDate() - thisDow);
+    thisMonday.setHours(0, 0, 0, 0);
+    const thisWeekStart = thisMonday.toISOString().slice(0, 10);
+
+    // Bu haftanın hedef/gerçek kaydını upsert et (sayfa yüklenince güncelle)
+    await supabaseAdmin
+      .from("weekly_goal_history")
+      .upsert(
+        { user_id: dbUser.id, week_start: thisWeekStart, goal: weeklyGoal, actual: thisWeek },
+        { onConflict: "user_id,week_start", ignoreDuplicates: false }
+      );
+
+    // Son 12 haftalık geçmişi çek
+    const { data: historyRows } = await supabaseAdmin
+      .from("weekly_goal_history")
+      .select("week_start, goal, actual")
+      .eq("user_id", dbUser.id)
+      .order("week_start", { ascending: false })
+      .limit(12);
+
+    goalHistory = historyRows ?? [];
   }
 
   const lastSynced = dbUser?.last_synced_at
@@ -493,6 +562,9 @@ export default async function DashboardPage({ searchParams }: Props) {
         </div>
       ) : (
         <div className="space-y-5">
+          {/* Streak uyarı banner */}
+          <StreakGuard status={streakStatus} currentStreak={streakData.currentStreak || streakData.longestStreak} />
+
           {/* Özet kartlar — mobilde 1 kolon, tablette 3 */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard label="Toplam Repo" value={stats.repoCount} />
@@ -506,8 +578,11 @@ export default async function DashboardPage({ searchParams }: Props) {
           {/* Streak + Haftalık Hedef */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <StreakCard {...streakData} />
-            <GoalTracker thisWeek={thisWeek} />
+            <GoalTracker thisWeek={thisWeek} initialGoal={weeklyGoal} history={goalHistory} />
           </div>
+
+          {/* Rozetler */}
+          <BadgeCollection badges={badges} />
 
           {/* Kod & Katkı istatistikleri */}
           <CodeStats {...codeStats} />

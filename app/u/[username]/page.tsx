@@ -6,6 +6,7 @@ import { calculateStreaks } from "@/lib/streak";
 import { ThemeProvider } from "@/components/theme-provider";
 import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import { WIDGET_KEYS, type WidgetKey } from "@/lib/widgets";
+import { calcBadges, RARITY_COLORS } from "@/lib/badges";
 import type { Metadata } from "next";
 
 type Props = { params: Promise<{ username: string }> };
@@ -69,7 +70,9 @@ export default async function PublicProfilePage({ params }: Props) {
 
   const ids = (repoRows ?? []).map((r) => r.id);
 
-  const [reposRes, commitsRes, langsRes, heatmapRes] = await Promise.all([
+  const ownIds = (repoRows ?? []).filter((r) => !r.is_fork).map((r) => r.id);
+
+  const [reposRes, commitsRes, langsRes, heatmapRes, badgeCommitsRes] = await Promise.all([
     supabaseAdmin.from("repositories").select("count", { count: "exact", head: true }).eq("user_id", user.id),
     supabaseAdmin.from("commits").select("count", { count: "exact", head: true }).in("repo_id", ids),
     supabaseAdmin.from("repo_languages").select("language, bytes").in("repo_id", ids),
@@ -79,6 +82,11 @@ export default async function PublicProfilePage({ params }: Props) {
       .eq("user_id", user.id)
       .gte("date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
       .order("date", { ascending: true }),
+    supabaseAdmin
+      .from("commits")
+      .select("committed_at, repo_id, deletions")
+      .in("repo_id", ownIds)
+      .gte("committed_at", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()),
   ]);
 
   const langMap = new Map<string, number>();
@@ -97,6 +105,21 @@ export default async function PublicProfilePage({ params }: Props) {
   const heatmapData = heatmapRes.data ?? [];
   const activeDates = heatmapData.filter((d) => d.commit_count > 0).map((d) => d.date);
   const { currentStreak, longestStreak } = calculateStreaks(activeDates);
+
+  // Rozetler
+  const repoForkMap = new Map<string, boolean>(
+    (repoRows ?? []).map((r) => [r.id, r.is_fork])
+  );
+  const badgeCommits = badgeCommitsRes.data ?? [];
+  const earnedBadges = calcBadges({
+    hasSynced: true,
+    longestStreak,
+    commitTimestamps: badgeCommits.map((c) => c.committed_at),
+    repoForkMap,
+    commitRepoIds: badgeCommits.map((c) => c.repo_id),
+    commitDeletions: badgeCommits.map((c) => c.deletions ?? 0),
+    languageCount: langMap.size,
+  }).filter((b) => b.earned);
 
   const pinnedRepo = user.pinned_repo_name
     ? (repoRows ?? []).find((r) => r.name === user.pinned_repo_name) ?? null
@@ -270,6 +293,31 @@ export default async function PublicProfilePage({ params }: Props) {
               </div>
             ))}
           </div>
+
+          {/* Rozetler */}
+          {earnedBadges.length > 0 && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+              <h2 className="mb-3 text-sm font-medium text-zinc-400">Rozetler</h2>
+              <div className="flex flex-wrap gap-2">
+                {earnedBadges.map((badge) => {
+                  const rarity = RARITY_COLORS[badge.rarity];
+                  return (
+                    <div
+                      key={badge.id}
+                      className="flex items-center gap-2 rounded-xl border px-3 py-2"
+                      style={{ borderColor: rarity.border, backgroundColor: rarity.bg }}
+                      title={badge.description}
+                    >
+                      <span className="text-base">{badge.emoji}</span>
+                      <span className="text-xs font-medium" style={{ color: rarity.text }}>
+                        {badge.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* F.3 — Özel bölümler */}
           {(user.currently_working_on || user.yearly_goal || techTags.length > 0) && (

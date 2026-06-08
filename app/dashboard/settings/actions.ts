@@ -68,3 +68,53 @@ export async function saveProfileSettings(
   revalidatePath("/dashboard");
   return { success: true };
 }
+
+export async function saveWeeklyGoal(goal: number) {
+  const session = await auth();
+  if (!session?.user?.username) return { error: "Oturum bulunamadı" };
+
+  const clampedGoal = Math.max(1, Math.min(500, Math.round(goal)));
+
+  // Kullanıcı ID'sini al
+  const { data: dbUser } = await supabaseAdmin
+    .from("users")
+    .select("id")
+    .eq("username", session.user.username)
+    .single();
+
+  if (!dbUser) return { error: "Kullanıcı bulunamadı" };
+
+  // weekly_commit_goal güncelle
+  await supabaseAdmin
+    .from("users")
+    .update({ weekly_commit_goal: clampedGoal })
+    .eq("id", dbUser.id);
+
+  // Bu haftanın Pazartesi'sini hesapla
+  const today = new Date();
+  const dayOfWeek = (today.getDay() + 6) % 7; // Pzt=0
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - dayOfWeek);
+  monday.setHours(0, 0, 0, 0);
+  const weekStart = monday.toISOString().slice(0, 10);
+
+  // Bu haftanın kaydını güncelle (yoksa oluştur)
+  await supabaseAdmin
+    .from("weekly_goal_history")
+    .upsert(
+      { user_id: dbUser.id, week_start: weekStart, goal: clampedGoal },
+      { onConflict: "user_id,week_start", ignoreDuplicates: false }
+    );
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function syncWeeklyGoalHistory(userId: string, weekStart: string, actual: number, goal: number) {
+  await supabaseAdmin
+    .from("weekly_goal_history")
+    .upsert(
+      { user_id: userId, week_start: weekStart, goal, actual },
+      { onConflict: "user_id,week_start", ignoreDuplicates: false }
+    );
+}
