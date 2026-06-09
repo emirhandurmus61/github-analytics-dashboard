@@ -22,6 +22,8 @@ import { calcBadges, type Badge } from "@/lib/badges";
 import StreakGuard, { type StreakStatus } from "./streak-guard";
 import { calculateStreaks } from "@/lib/streak";
 import { generateInsights } from "@/lib/insights";
+import DashboardGrid, { SortableWidget } from "./dashboard-grid";
+import { DEFAULT_WIDGET_CONFIGS } from "@/lib/widget-config";
 
 type Props = {
   searchParams: Promise<{ range?: string; hideForks?: string }>;
@@ -562,74 +564,121 @@ export default async function DashboardPage({ searchParams }: Props) {
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Streak uyarı banner */}
+          {/* Streak uyarı banner — grid dışında, her zaman üstte */}
           <StreakGuard status={streakStatus} currentStreak={streakData.currentStreak || streakData.longestStreak} />
 
-          {/* Özet kartlar — mobilde 1 kolon, tablette 3 */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard label="Toplam Repo" value={stats.repoCount} />
-            <StatCard label={`Commit (${dateRange === "365" ? "1 yıl" : dateRange + " gün"})`} value={stats.commitCount} />
-            <StatCard label="Kullanılan Dil" value={stats.languageCount} />
-          </div>
+          {/* Özelleştirilebilir Grid */}
+          <DashboardGrid widgetIds={DEFAULT_WIDGET_CONFIGS.map((c) => c.id)}>
 
-          {/* İçgörüler */}
-          <InsightCards insights={insights} />
+            {/* Stat kartlar */}
+            <SortableWidget key="stat-repos" id="stat-repos" data-widget-id="stat-repos">
+              <StatCard label="Toplam Repo" value={stats.repoCount} />
+            </SortableWidget>
 
-          {/* Streak + Haftalık Hedef */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <StreakCard {...streakData} />
-            <GoalTracker thisWeek={thisWeek} initialGoal={weeklyGoal} history={goalHistory} />
-          </div>
+            <SortableWidget key="stat-commits" id="stat-commits" data-widget-id="stat-commits">
+              <StatCard label={`Commit (${dateRange === "365" ? "1 yıl" : dateRange + " gün"})`} value={stats.commitCount} />
+            </SortableWidget>
 
-          {/* Rozetler */}
-          <BadgeCollection badges={badges} />
+            <SortableWidget key="stat-langs" id="stat-langs" data-widget-id="stat-langs">
+              <StatCard label="Kullanılan Dil" value={stats.languageCount} />
+            </SortableWidget>
 
-          {/* Kod & Katkı istatistikleri */}
-          <CodeStats {...codeStats} />
+            {/* İçgörüler */}
+            <SortableWidget key="insights" id="insights" data-widget-id="insights">
+              <InsightCards insights={insights} />
+            </SortableWidget>
 
-          {/* Bu hafta vs geçen hafta + Bu ay vs geçen ay */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <WeekCompare thisWeek={thisWeek} lastWeek={lastWeek} />
-            <CompareView thisMonth={thisMonthData} lastMonth={lastMonthData} />
-          </div>
+            {/* Streak */}
+            <SortableWidget key="streak" id="streak" data-widget-id="streak">
+              <StreakCard {...streakData} />
+            </SortableWidget>
 
-          {/* Velocity grafiği */}
-          <VelocityChart data={heatmapData} />
+            {/* Haftalık Hedef */}
+            <SortableWidget key="goal" id="goal" data-widget-id="goal">
+              <GoalTracker thisWeek={thisWeek} initialGoal={weeklyGoal} history={goalHistory} />
+            </SortableWidget>
 
-          {/* Dil evrimi */}
-          <LangEvolution data={langEvolutionData} languages={langEvolutionKeys} />
+            {/* Rozetler */}
+            <SortableWidget key="badges" id="badges" data-widget-id="badges">
+              <BadgeCollection badges={badges} />
+            </SortableWidget>
 
-          {/* Heatmap — yatay scroll mobilde */}
-          <ContributionHeatmap data={heatmapData} />
+            {/* Kod istatistikleri */}
+            <SortableWidget key="code-stats" id="code-stats" data-widget-id="code-stats">
+              <CodeStats {...codeStats} />
+            </SortableWidget>
 
-          {/* Aktivite + Dil — mobilde alt alta */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-              <h2 className="mb-4 text-sm font-medium text-zinc-400">
-                Son {dateRange === "365" ? "30" : dateRange} Gün Commit Aktivitesi
-              </h2>
-              <ActivityBar data={recentActivity} />
-            </div>
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-              <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>
-              <LanguageList languages={topLanguages} />
-            </div>
-          </div>
+            {/* Bu hafta vs geçen */}
+            <SortableWidget key="week-compare" id="week-compare" data-widget-id="week-compare">
+              <WeekCompare thisWeek={thisWeek} lastWeek={lastWeek} />
+            </SortableWidget>
 
-          {/* Çalışma ritmi analizi */}
-          <RhythmAnalysis hourData={hourData} commitTimestamps={commitTimestamps} />
+            {/* Bu ay vs geçen */}
+            <SortableWidget key="month-compare" id="month-compare" data-widget-id="month-compare">
+              <CompareView thisMonth={thisMonthData} lastMonth={lastMonthData} />
+            </SortableWidget>
 
-          {/* Commit kalite analizi */}
-          {commitQuality && <CommitQuality {...commitQuality} />}
+            {/* Velocity */}
+            <SortableWidget key="velocity" id="velocity" data-widget-id="velocity">
+              <VelocityChart data={heatmapData} />
+            </SortableWidget>
 
-          {/* Saat heatmap — detay */}
-          <HourHeatmap data={hourData} />
+            {/* Dil evrimi */}
+            <SortableWidget key="lang-evolution" id="lang-evolution" data-widget-id="lang-evolution">
+              <LangEvolution data={langEvolutionData} languages={langEvolutionKeys} />
+            </SortableWidget>
 
-          {/* Repo listesi */}
-          <RepoList repos={repoListData} />
+            {/* Katkı heatmap */}
+            <SortableWidget key="heatmap" id="heatmap" data-widget-id="heatmap">
+              <ContributionHeatmap data={heatmapData} />
+            </SortableWidget>
 
-          {/* Repo sağlık skorları */}
-          <RepoHealthList repos={repoHealthData} />
+            {/* Commit aktivitesi */}
+            <SortableWidget key="activity-bar" id="activity-bar" data-widget-id="activity-bar">
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 h-full">
+                <h2 className="mb-4 text-sm font-medium text-zinc-400">
+                  Son {dateRange === "365" ? "30" : dateRange} Gün Commit Aktivitesi
+                </h2>
+                <ActivityBar data={recentActivity} />
+              </div>
+            </SortableWidget>
+
+            {/* Dil dağılımı */}
+            <SortableWidget key="lang-dist" id="lang-dist" data-widget-id="lang-dist">
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 h-full">
+                <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>
+                <LanguageList languages={topLanguages} />
+              </div>
+            </SortableWidget>
+
+            {/* Çalışma ritmi */}
+            <SortableWidget key="rhythm" id="rhythm" data-widget-id="rhythm">
+              <RhythmAnalysis hourData={hourData} commitTimestamps={commitTimestamps} />
+            </SortableWidget>
+
+            {/* Commit kalitesi */}
+            {commitQuality && (
+              <SortableWidget key="commit-quality" id="commit-quality" data-widget-id="commit-quality">
+                <CommitQuality {...commitQuality} />
+              </SortableWidget>
+            )}
+
+            {/* Saat heatmap */}
+            <SortableWidget key="hour-heatmap" id="hour-heatmap" data-widget-id="hour-heatmap">
+              <HourHeatmap data={hourData} />
+            </SortableWidget>
+
+            {/* Repo listesi */}
+            <SortableWidget key="repo-list" id="repo-list" data-widget-id="repo-list">
+              <RepoList repos={repoListData} />
+            </SortableWidget>
+
+            {/* Repo sağlık */}
+            <SortableWidget key="repo-health" id="repo-health" data-widget-id="repo-health">
+              <RepoHealthList repos={repoHealthData} />
+            </SortableWidget>
+
+          </DashboardGrid>
         </div>
       )}
     </div>
