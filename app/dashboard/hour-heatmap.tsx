@@ -2,6 +2,7 @@
 
 import { useThemeColors } from "@/components/theme-provider";
 import { Clock } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
 
 type Props = { data: { hour: number; day: number; count: number }[] };
 
@@ -10,6 +11,9 @@ const DAYS = ["Pzt","Sal","Car","Per","Cum","Cmt","Paz"];
 export default function HourHeatmap({ data }: Props) {
   const theme = useThemeColors();
   const max = Math.max(...data.map((d) => d.count), 1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [rowH, setRowH] = useState(28);
+  const gap = 3;
 
   const grid: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
   for (const { hour, day, count } of data) {
@@ -18,6 +22,20 @@ export default function HourHeatmap({ data }: Props) {
 
   const hourTotals = Array.from({ length: 24 }, (_, h) => grid.reduce((s, r) => s + r[h], 0));
   const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height ?? 0;
+      // Available: total minus hour labels (16px) minus legend (24px)
+      const avail = h - 40;
+      const size = Math.floor((avail - gap * 6) / 7);
+      setRowH(Math.max(16, Math.min(size, 42)));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   function getColor(count: number) {
     if (count === 0) return "#1a1a1e";
@@ -40,38 +58,43 @@ export default function HourHeatmap({ data }: Props) {
         </span>
       </div>
 
-      <div className="overflow-x-auto flex-1 min-h-0">
-        <div style={{ minWidth: 520 }}>
-          <div className="mb-0.5 flex pl-9">
+      <div ref={containerRef} className="overflow-x-auto flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0" style={{ minWidth: 480 }}>
+          {/* Hour labels */}
+          <div className="mb-1 flex pl-10">
             {Array.from({ length: 24 }, (_, i) => (
-              <div key={i} className="flex-1 text-[9px] text-zinc-700">
+              <div key={i} className="flex-1 text-xs text-zinc-700">
                 {i % 6 === 0 ? `${String(i).padStart(2, "0")}` : ""}
               </div>
             ))}
           </div>
-          <div className="space-y-0.5">
+
+          {/* Grid rows */}
+          <div className="flex flex-col" style={{ gap }}>
             {DAYS.map((day, di) => (
-              <div key={day} className="flex items-center gap-0.5">
-                <span className="w-8 shrink-0 text-right text-[10px] text-zinc-600">{day}</span>
+              <div key={day} className="flex items-center" style={{ gap }}>
+                <span className="w-8 shrink-0 text-right text-xs text-zinc-600">{day}</span>
                 <div className="flex flex-1 gap-px">
                   {grid[di].map((count, hi) => (
                     <div
                       key={hi}
                       title={`${day} ${String(hi).padStart(2, "0")}:00 -- ${count} commit`}
-                      className="h-5 flex-1 rounded-[2px] hover:opacity-80 transition-opacity"
-                      style={{ backgroundColor: getColor(count) }}
+                      className="flex-1 rounded-[3px] hover:opacity-80 transition-opacity"
+                      style={{ height: rowH, backgroundColor: getColor(count) }}
                     />
                   ))}
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-2 flex items-center justify-end gap-1">
-            <span className="text-[9px] text-zinc-600">Az</span>
+
+          {/* Legend */}
+          <div className="mt-3 flex items-center justify-end gap-1.5">
+            <span className="text-xs text-zinc-600">Az</span>
             {["#1a1a1e", ...theme.shades].map((c) => (
-              <div key={c} className="h-3 w-3 rounded-[2px]" style={{ backgroundColor: c }} />
+              <div key={c} className="rounded-[3px]" style={{ width: rowH, height: rowH, maxWidth: 16, maxHeight: 16, backgroundColor: c }} />
             ))}
-            <span className="text-[9px] text-zinc-600">Cok</span>
+            <span className="text-xs text-zinc-600">Cok</span>
           </div>
         </div>
       </div>

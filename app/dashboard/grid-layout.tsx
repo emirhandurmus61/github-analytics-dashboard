@@ -42,6 +42,9 @@ import {
   Eye,
   EyeOff,
   Maximize2,
+  ChevronUp,
+  ChevronDown,
+  X,
 } from "lucide-react";
 
 /* ─── Context ─────────────────────────────────────────────── */
@@ -249,38 +252,102 @@ function GridBackground({ totalRows }: { totalRows: number }) {
   );
 }
 
-/* ─── Visibility Panel ───────────────────────────────────── */
+/* ─── Sticky Edit Toolbar ─────────────────────────────────── */
 
-function VisibilityPanel({
+function EditToolbar({
   configs,
   onToggle,
+  onReset,
+  onDone,
 }: {
   configs: WidgetConfig[];
   onToggle: (id: WidgetId) => void;
+  onReset: () => void;
+  onDone: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = configs.filter((c) => c.visible).length;
+
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/90 backdrop-blur-sm p-4 mb-4">
-      <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest mb-3">
-        Widget Gorunurlugu
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {configs.map((cfg) => (
+    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
+      <div
+        className="pointer-events-auto w-full max-w-3xl mx-4 mb-4 rounded-2xl border border-zinc-700/50 bg-zinc-900/85 backdrop-blur-xl shadow-2xl shadow-black/40"
+        style={{ boxShadow: "0 -4px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(63,63,70,0.3)" }}
+      >
+        {/* Widget visibility — expandable panel */}
+        {expanded && (
+          <div className="px-4 pt-4 pb-2 border-b border-zinc-800/60">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest">
+                Widgetlar ({visible}/{configs.length})
+              </p>
+              <button
+                onClick={() => setExpanded(false)}
+                className="text-zinc-600 hover:text-zinc-400 transition-colors p-1 rounded-lg hover:bg-zinc-800/50"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-auto custom-scroll pb-1">
+              {configs.map((cfg) => (
+                <button
+                  key={cfg.id}
+                  onClick={() => onToggle(cfg.id)}
+                  className={`
+                    flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium
+                    transition-all border
+                    ${cfg.visible
+                      ? "border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]"
+                      : "border-zinc-800 bg-zinc-800/50 text-zinc-600 hover:text-zinc-400"
+                    }
+                  `}
+                >
+                  {cfg.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Main bar */}
+        <div className="flex items-center gap-3 px-4 py-3">
+          {/* Done button */}
           <button
-            key={cfg.id}
-            onClick={() => onToggle(cfg.id)}
-            className={`
-              flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium
-              transition-all border
-              ${cfg.visible
-                ? "border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]"
-                : "border-zinc-800 bg-zinc-900 text-zinc-600 hover:text-zinc-400"
-              }
-            `}
+            onClick={onDone}
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium
+              bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/20
+              hover:brightness-110 transition-all select-none shrink-0"
           >
-            {cfg.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-            {cfg.label}
+            <Check className="w-4 h-4" />
+            Bitti
           </button>
-        ))}
+
+          {/* Hint */}
+          <span className="text-xs text-zinc-500 hidden sm:block flex-1 min-w-0">
+            Kartlari surukle, kenar ve koselerden boyutlandir
+          </span>
+
+          {/* Toggle widget visibility panel */}
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium
+              text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors border border-zinc-800"
+          >
+            {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            Widgetlar
+          </button>
+
+          {/* Reset */}
+          <button
+            onClick={onReset}
+            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400
+              transition-colors rounded-lg px-3 py-1.5 hover:bg-zinc-800/50 shrink-0"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Sifirla
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -410,40 +477,30 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
 
   return (
     <GridContext.Provider value={{ editing, configs, setColSpan, setRowSpan, toggleVisible }}>
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-4">
-        <button
-          onClick={() => setEditing((e) => !e)}
-          className={`
-            flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium
-            transition-all duration-200 select-none
-            ${editing
-              ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/25"
-              : "bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-            }
-          `}
-        >
-          {editing ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
-          {editing ? "Bitti" : "Duzenle"}
-        </button>
+      {/* Edit button (top) */}
+      {!editing && (
+        <div className="flex items-center mb-4">
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium
+              bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
+              transition-all duration-200 select-none"
+          >
+            <Pencil className="w-4 h-4" />
+            Duzenle
+          </button>
+        </div>
+      )}
 
-        {editing && (
-          <>
-            <span className="text-xs text-zinc-600 hidden sm:block">
-              Kartlari surukle, kenar ve koselerden boyutlandir
-            </span>
-            <button
-              onClick={handleReset}
-              className="ml-auto flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400 transition-colors rounded-lg px-3 py-1.5 hover:bg-zinc-800/50"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Sifirla
-            </button>
-          </>
-        )}
-      </div>
-
-      {editing && <VisibilityPanel configs={configs} onToggle={toggleVisible} />}
+      {/* Sticky bottom toolbar (edit mode) */}
+      {editing && (
+        <EditToolbar
+          configs={configs}
+          onToggle={toggleVisible}
+          onReset={handleReset}
+          onDone={() => setEditing(false)}
+        />
+      )}
 
       <DndContext
         sensors={sensors}
@@ -452,7 +509,7 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={order} strategy={rectSortingStrategy}>
-          <div className="relative">
+          <div className="relative" style={editing ? { paddingBottom: 80 } : undefined}>
             {editing && <GridBackground totalRows={totalRows} />}
 
             <div
