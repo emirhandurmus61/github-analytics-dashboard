@@ -31,31 +31,12 @@ function ScoreRing({ score, color, size = 40 }: { score: number; color: string; 
 
   return (
     <svg width={size} height={size} className="shrink-0 -rotate-90">
-      {/* Track */}
-      <circle
-        cx={size / 2} cy={size / 2} r={r}
-        fill="none" stroke="#27272a" strokeWidth={3}
-      />
-      {/* Progress */}
-      <circle
-        cx={size / 2} cy={size / 2} r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth={3}
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-      />
-      {/* Score label — rotated back */}
-      <text
-        x={size / 2} y={size / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={size < 44 ? 10 : 12}
-        fontWeight="600"
-        fill={color}
-        transform={`rotate(90, ${size / 2}, ${size / 2})`}
-      >
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#27272a" strokeWidth={3} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={3}
+        strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" />
+      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
+        fontSize={size < 44 ? 10 : 12} fontWeight="600" fill={color}
+        transform={`rotate(90, ${size / 2}, ${size / 2})`}>
         {score}
       </text>
     </svg>
@@ -77,9 +58,7 @@ function FactorBar({ label, value, max, color }: { label: string; value: number;
   );
 }
 
-type RepoRowProps = { repo: RepoInput; health: RepoHealth };
-
-function RepoRow({ repo, health }: RepoRowProps) {
+function RepoRow({ repo, health }: { repo: RepoInput; health: RepoHealth }) {
   const [expanded, setExpanded] = useState(false);
   const color = HEALTH_COLORS[health.status];
   const langColor = repo.language ? (LANG_COLORS[repo.language] ?? "#6b7280") : null;
@@ -87,64 +66,35 @@ function RepoRow({ repo, health }: RepoRowProps) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 overflow-hidden">
       <button
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"
+        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-800/50 transition-colors text-left"
         onClick={() => setExpanded((v) => !v)}
       >
-        {/* Score ring */}
-        <ScoreRing score={health.score} color={color} size={42} />
-
-        {/* Repo bilgisi */}
+        <ScoreRing score={health.score} color={color} size={38} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
             {langColor && <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: langColor }} />}
             <span className="text-sm font-medium text-zinc-200 truncate">{repo.name}</span>
           </div>
-          <div className="flex items-center gap-3 text-xs text-zinc-600">
-            <span
-              className="rounded-full px-1.5 py-0.5 text-xs font-medium"
-              style={{ backgroundColor: `${color}18`, color }}
-            >
-              {health.label}
-            </span>
+          <div className="flex items-center gap-2 text-xs text-zinc-600">
+            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${color}18`, color }}>{health.label}</span>
             {repo.language && <span>{repo.language}</span>}
-            <span>★ {repo.stars}</span>
-            <span>⑂ {repo.forks}</span>
+            <span>{repo.stars} stars</span>
           </div>
         </div>
-
-        {/* Expand chevron */}
-        <svg
-          className={`h-4 w-4 text-zinc-600 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
+        <svg className={`h-4 w-4 text-zinc-600 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {expanded && (
-        <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
-          <p className="text-xs text-zinc-600 mb-2">Skor Detayları</p>
-          <FactorBar label="Güncellik" value={health.factors.recency} max={40} color={color} />
-          <FactorBar label="Aktivite (90 gün)" value={health.factors.activity} max={30} color={color} />
+        <div className="border-t border-zinc-800 px-3 py-2.5 space-y-2">
+          <FactorBar label="Guncellik" value={health.factors.recency} max={40} color={color} />
+          <FactorBar label="Aktivite" value={health.factors.activity} max={30} color={color} />
           <FactorBar label="Topluluk" value={health.factors.community} max={20} color={color} />
-          <FactorBar label="Issue Yönetimi" value={health.factors.issues} max={10} color={color} />
+          <FactorBar label="Issue" value={health.factors.issues} max={10} color={color} />
           <div className="flex gap-3 mt-2 pt-2 border-t border-zinc-800">
-            <Link
-              href={`/dashboard/repos/${repo.name}`}
-              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Detay →
-            </Link>
-            <a
-              href={`https://github.com/${repo.full_name}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              GitHub ↗
-            </a>
+            <Link href={`/dashboard/repos/${repo.name}`} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors" onClick={(e) => e.stopPropagation()}>Detay</Link>
+            <a href={`https://github.com/${repo.full_name}`} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors" onClick={(e) => e.stopPropagation()}>GitHub</a>
           </div>
         </div>
       )}
@@ -177,7 +127,6 @@ export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
     return b.repo.commitCount90d - a.repo.commitCount90d;
   });
 
-  // Özet istatistikler
   const active = withHealth.filter((r) => r.health.status === "active").length;
   const slowing = withHealth.filter((r) => r.health.status === "slowing").length;
   const idle = withHealth.filter((r) => r.health.status === "idle").length;
@@ -185,74 +134,47 @@ export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
   const avgScore = Math.round(withHealth.reduce((s, r) => s + r.health.score, 0) / withHealth.length);
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-5">
-      {/* Başlık */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div>
-          <h2 className="text-sm font-medium text-zinc-400">Repo Sağlık Skoru</h2>
-          <p className="mt-0.5 text-xs text-zinc-600">
-            {repos.length} repo · güncellik, aktivite, topluluk ve issue yönetimine göre
-          </p>
+          <h2 className="text-sm font-medium text-zinc-400">Repo Saglik Skoru</h2>
+          <p className="text-xs text-zinc-600">{repos.length} repo</p>
         </div>
-        {/* Sıralama */}
         <div className="flex items-center gap-1 rounded-lg border border-zinc-800 p-1 self-start">
           {(["score", "activity", "name"] as const).map((key) => (
             <button
               key={key}
               onClick={() => setSortBy(key)}
-              className="rounded px-2.5 py-1 text-xs transition-colors"
+              className="rounded-md px-2.5 py-1 text-xs transition-colors"
               style={sortBy === key ? { backgroundColor: theme.accentBg, color: theme.accent } : { color: "#71717a" }}
             >
-              {key === "score" ? "Skor" : key === "activity" ? "Aktivite" : "İsim"}
+              {key === "score" ? "Skor" : key === "activity" ? "Aktivite" : "Isim"}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Özet bar */}
-      <div className="flex items-center gap-4">
+      {/* Summary bar */}
+      <div className="flex items-center gap-3 my-3 shrink-0">
         <div className="flex-1 flex h-2.5 rounded-full overflow-hidden gap-px">
-          {active > 0 && (
-            <div
-              title={`${active} aktif`}
-              className="h-full transition-all"
-              style={{ width: `${(active / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.active }}
-            />
-          )}
-          {slowing > 0 && (
-            <div
-              title={`${slowing} yavaşlıyor`}
-              className="h-full transition-all"
-              style={{ width: `${(slowing / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.slowing }}
-            />
-          )}
-          {idle > 0 && (
-            <div
-              title={`${idle} hareketsiz`}
-              className="h-full transition-all"
-              style={{ width: `${(idle / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.idle }}
-            />
-          )}
-          {archived > 0 && (
-            <div
-              title={`${archived} arşiv`}
-              className="h-full transition-all"
-              style={{ width: `${(archived / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.archived }}
-            />
-          )}
+          {active > 0 && <div className="h-full" style={{ width: `${(active / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.active }} />}
+          {slowing > 0 && <div className="h-full" style={{ width: `${(slowing / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.slowing }} />}
+          {idle > 0 && <div className="h-full" style={{ width: `${(idle / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.idle }} />}
+          {archived > 0 && <div className="h-full" style={{ width: `${(archived / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.archived }} />}
         </div>
-        <div className="shrink-0 text-xs text-zinc-500">
-          Ort. <span style={{ color: theme.accent }} className="font-semibold">{avgScore}</span> /100
-        </div>
+        <span className="text-sm text-zinc-500 shrink-0">
+          Ort. <span className="font-bold text-base" style={{ color: theme.accent }}>{avgScore}</span>/100
+        </span>
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-xs">
+      <div className="flex flex-wrap gap-3 text-xs shrink-0 mb-3">
         {[
           { status: "active" as const, label: "Aktif", count: active },
-          { status: "slowing" as const, label: "Yavaşlıyor", count: slowing },
+          { status: "slowing" as const, label: "Yavasliyor", count: slowing },
           { status: "idle" as const, label: "Hareketsiz", count: idle },
-          { status: "archived" as const, label: "Arşiv", count: archived },
+          { status: "archived" as const, label: "Arsiv", count: archived },
         ].map(({ status, label, count }) => count > 0 && (
           <div key={status} className="flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full" style={{ backgroundColor: HEALTH_COLORS[status] }} />
@@ -262,8 +184,8 @@ export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
         ))}
       </div>
 
-      {/* Repo listesi */}
-      <div className="space-y-2">
+      {/* Repo list */}
+      <div className="space-y-2 flex-1 min-h-0 overflow-auto custom-scroll">
         {sorted.map(({ repo, health }) => (
           <RepoRow key={repo.name} repo={repo} health={health} />
         ))}

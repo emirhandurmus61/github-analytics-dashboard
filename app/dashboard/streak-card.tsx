@@ -1,6 +1,7 @@
 "use client";
 
 import { useThemeColors } from "@/components/theme-provider";
+import { Flame, Zap, CalendarDays } from "lucide-react";
 
 type Props = {
   currentStreak: number;
@@ -11,39 +12,29 @@ type Props = {
 export default function StreakCard({ currentStreak, longestStreak, totalActiveDays }: Props) {
   const theme = useThemeColors();
 
+  const items = [
+    { icon: <Flame className="w-5 h-5" />, value: currentStreak, label: "Streak", color: theme.accent },
+    { icon: <Zap className="w-5 h-5" />, value: longestStreak, label: "Rekor", color: "#facc15" },
+    { icon: <CalendarDays className="w-5 h-5" />, value: totalActiveDays, label: "Aktif Gun", color: theme.accentMid },
+  ];
+
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-      <h2 className="mb-5 text-sm font-medium text-zinc-400">Streak & Aktivite</h2>
-      <div className="grid grid-cols-3 gap-4">
-        <div className="text-center">
-          <div className="mb-1 text-4xl font-bold" style={{ color: theme.accent }}>
-            {currentStreak}
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
+      <div className="grid grid-cols-3 gap-3 flex-1">
+        {items.map((item) => (
+          <div key={item.label} className="flex flex-col items-center justify-center text-center gap-2">
+            <div
+              className="flex items-center justify-center w-10 h-10 rounded-xl"
+              style={{ backgroundColor: `${item.color}15`, color: item.color }}
+            >
+              {item.icon}
+            </div>
+            <div className="text-2xl font-bold tabular-nums" style={{ color: item.color }}>
+              {item.value}
+            </div>
+            <div className="text-[10px] text-zinc-500">{item.label}</div>
           </div>
-          <div className="text-xs text-zinc-500">Günlük Streak 🔥</div>
-          <div className="mt-1 text-xs text-zinc-700">
-            {currentStreak === 0 ? "Bugün commit at!" : `${currentStreak} gün üst üste`}
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="mb-1 text-4xl font-bold text-yellow-400">
-            {longestStreak}
-          </div>
-          <div className="text-xs text-zinc-500">En Uzun Streak ⚡</div>
-          <div className="mt-1 text-xs text-zinc-700">
-            {longestStreak > 0 ? `Rekor: ${longestStreak} gün` : "Henüz yok"}
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="mb-1 text-4xl font-bold" style={{ color: theme.accentMid }}>
-            {totalActiveDays}
-          </div>
-          <div className="text-xs text-zinc-500">Aktif Gün (1 yıl)</div>
-          <div className="mt-1 text-xs text-zinc-700">
-            {totalActiveDays > 0
-              ? `%${Math.round((totalActiveDays / 365) * 100)} doluluk`
-              : "Veri yok"}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );

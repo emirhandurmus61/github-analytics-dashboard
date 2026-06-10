@@ -530,7 +530,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-zinc-100 sm:text-2xl">
-            Merhaba, {session?.user?.name?.split(" ")[0]} 👋
+            Merhaba, {session?.user?.name?.split(" ")[0]}
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
             {lastSynced ? `Son senkronizasyon: ${lastSynced}` : "Senkronizasyonu başlat."}
@@ -635,18 +635,18 @@ export default async function DashboardPage({ searchParams }: Props) {
 
             {/* Commit aktivitesi */}
             <SortableWidget key="activity-bar" id="activity-bar" data-widget-id="activity-bar">
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 h-full">
-                <h2 className="mb-4 text-sm font-medium text-zinc-400">
-                  Son {dateRange === "365" ? "30" : dateRange} Gün Commit Aktivitesi
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
+                <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">
+                  Son {dateRange === "365" ? "30" : dateRange} Gun Aktivite
                 </h2>
                 <ActivityBar data={recentActivity} />
               </div>
             </SortableWidget>
 
-            {/* Dil dağılımı */}
+            {/* Dil dagilimi */}
             <SortableWidget key="lang-dist" id="lang-dist" data-widget-id="lang-dist">
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 h-full">
-                <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
+                <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">Dil Dagilimi</h2>
                 <LanguageList languages={topLanguages} />
               </div>
             </SortableWidget>
@@ -687,24 +687,24 @@ export default async function DashboardPage({ searchParams }: Props) {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-zinc-100">{value.toLocaleString("tr-TR")}</p>
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 h-full flex flex-col items-center justify-center p-5 gap-2">
+      <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">{label}</p>
+      <p className="text-4xl font-bold text-zinc-100 tabular-nums">{value.toLocaleString("tr-TR")}</p>
     </div>
   );
 }
 
 function ActivityBar({ data }: { data: { date: string; commit_count: number }[] }) {
-  if (data.length === 0) return <p className="text-sm text-zinc-600">Veri yok</p>;
+  if (data.length === 0) return <p className="text-[11px] text-zinc-600">Veri yok</p>;
   const max = Math.max(...data.map((d) => d.commit_count));
   return (
-    <div className="flex h-24 items-end gap-1">
+    <div className="flex items-end gap-0.5 flex-1">
       {data.map((d) => {
         const height = max > 0 ? Math.max((d.commit_count / max) * 100, 4) : 4;
         return (
           <div key={d.date} title={`${d.date}: ${d.commit_count} commit`}
-            className="flex-1 rounded-sm bg-emerald-500 opacity-80 transition-opacity hover:opacity-100"
-            style={{ height: `${height}%` }}
+            className="flex-1 rounded-sm opacity-80 transition-opacity hover:opacity-100"
+            style={{ height: `${height}%`, backgroundColor: "var(--accent, #34d399)" }}
           />
         );
       })}
@@ -719,10 +719,10 @@ const LANG_COLORS: Record<string, string> = {
 };
 
 function LanguageList({ languages }: { languages: { language: string; bytes: number }[] }) {
-  if (languages.length === 0) return <p className="text-sm text-zinc-600">Veri yok</p>;
+  if (languages.length === 0) return <p className="text-[11px] text-zinc-600">Veri yok</p>;
   const total = languages.reduce((sum, l) => sum + l.bytes, 0);
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 flex-1">
       {languages.map(({ language, bytes }) => {
         const pct = total > 0 ? ((bytes / total) * 100).toFixed(1) : "0";
         const color = LANG_COLORS[language] ?? "#6b7280";
@@ -730,7 +730,7 @@ function LanguageList({ languages }: { languages: { language: string; bytes: num
           <div key={language}>
             <div className="mb-1 flex justify-between text-xs">
               <span className="text-zinc-300">{language}</span>
-              <span className="text-zinc-500">{pct}%</span>
+              <span className="text-zinc-600 tabular-nums">{pct}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
               <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />

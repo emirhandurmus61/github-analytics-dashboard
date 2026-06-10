@@ -2,68 +2,80 @@
 
 import { useThemeColors } from "@/components/theme-provider";
 import { type Badge, RARITY_COLORS } from "@/lib/badges";
+import {
+  Rocket, Flame, Zap, Moon, Swords, Eraser, Globe, Globe2, Lock, Trophy,
+} from "lucide-react";
 
 type Props = { badges: Badge[] };
 
 const RARITY_LABEL: Record<Badge["rarity"], string> = {
-  common: "Yaygın",
+  common: "Yaygin",
   rare: "Nadir",
   epic: "Epik",
 };
 
+const RARITY_GLOW: Record<Badge["rarity"], string> = {
+  common: "rgba(161,161,170,0.12)",
+  rare: "rgba(96,165,250,0.18)",
+  epic: "rgba(192,132,252,0.22)",
+};
+
+const BADGE_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  first_sync: Rocket,
+  streak_7: Flame,
+  streak_30: Zap,
+  night_owl: Moon,
+  weekend_warrior: Swords,
+  big_cleanup: Eraser,
+  polyglot: Globe,
+  open_source: Globe2,
+};
+
 function BadgeCard({ badge }: { badge: Badge }) {
-  const theme = useThemeColors();
   const rarity = RARITY_COLORS[badge.rarity];
+  const glow = RARITY_GLOW[badge.rarity];
+  const Icon = BADGE_ICON[badge.id] ?? Rocket;
+
+  if (!badge.earned) {
+    return (
+      <div className="relative flex flex-col items-center justify-center gap-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 p-3 text-center h-full">
+        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-800/50">
+          <Icon className="w-5 h-5 text-zinc-700" />
+        </div>
+        <p className="text-[10px] font-medium text-zinc-700 leading-tight">{badge.name}</p>
+        <Lock className="absolute top-2 right-2 w-2.5 h-2.5 text-zinc-700" />
+      </div>
+    );
+  }
 
   return (
     <div
-      className="relative flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition-all"
-      style={
-        badge.earned
-          ? { borderColor: rarity.border, backgroundColor: rarity.bg }
-          : { borderColor: "#27272a", backgroundColor: "#18181b", opacity: 0.45 }
-      }
-      title={badge.earned ? badge.description : `Kilitli: ${badge.description}`}
+      className="relative flex flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center overflow-hidden h-full"
+      style={{
+        borderColor: rarity.border,
+        backgroundColor: rarity.bg,
+        boxShadow: `0 0 20px ${glow}, inset 0 1px 0 rgba(255,255,255,0.05)`,
+      }}
     >
-      {/* Rozet emoji */}
-      <span
-        className="text-3xl leading-none"
-        style={{ filter: badge.earned ? "none" : "grayscale(1) opacity(0.4)" }}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-30"
+        style={{ background: `linear-gradient(135deg, transparent 40%, ${rarity.text}15 50%, transparent 60%)` }}
+      />
+      <div
+        className="relative flex items-center justify-center w-10 h-10 rounded-xl"
+        style={{ backgroundColor: `${rarity.text}18`, boxShadow: `0 0 12px ${rarity.text}20`, color: rarity.text }}
       >
-        {badge.emoji}
-      </span>
-
-      {/* İsim */}
-      <p
-        className="text-xs font-semibold leading-tight"
-        style={{ color: badge.earned ? rarity.text : "#52525b" }}
-      >
+        <Icon className="w-5 h-5" />
+      </div>
+      <p className="text-[10px] font-semibold leading-tight" style={{ color: rarity.text }}>
         {badge.name}
       </p>
-
-      {/* Rarity pill */}
-      {badge.earned && (
-        <span
-          className="rounded-full px-1.5 py-0.5 text-xs"
-          style={{ backgroundColor: rarity.bg, color: rarity.text, border: `1px solid ${rarity.border}` }}
-        >
-          {RARITY_LABEL[badge.rarity]}
-        </span>
-      )}
-
-      {/* Kilit ikonu */}
-      {!badge.earned && (
-        <svg
-          className="absolute top-2 right-2 h-3 w-3 text-zinc-700"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-          />
-        </svg>
-      )}
+      <span
+        className="rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider"
+        style={{ backgroundColor: `${rarity.text}12`, color: rarity.text, border: `1px solid ${rarity.border}` }}
+      >
+        {RARITY_LABEL[badge.rarity]}
+      </span>
     </div>
   );
 }
@@ -72,62 +84,68 @@ export default function BadgeCollection({ badges }: Props) {
   const theme = useThemeColors();
   const earned = badges.filter((b) => b.earned);
   const total = badges.length;
+  const pct = total > 0 ? Math.round((earned.length / total) * 100) : 0;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-5">
-      {/* Başlık */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-sm font-medium text-zinc-400">Rozetler</h2>
-          <p className="mt-0.5 text-xs text-zinc-600">
-            {earned.length}/{total} rozet kazanıldı
-          </p>
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center w-9 h-9 rounded-xl"
+            style={{ backgroundColor: `${theme.accent}15` }}
+          >
+            <Trophy className="w-4.5 h-4.5 text-[var(--accent)]" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-300">Rozet Koleksiyonu</h2>
+            <p className="text-xs text-zinc-600">{earned.length} / {total} rozet</p>
+          </div>
         </div>
-        {/* İlerleme halkası metin */}
-        <div
-          className="flex items-center gap-2 rounded-xl border px-3 py-2"
-          style={{ borderColor: theme.accentBorder, backgroundColor: theme.accentBg }}
-        >
-          <span className="text-xs font-semibold" style={{ color: theme.accent }}>
-            {earned.length}/{total}
-          </span>
-          <span className="text-xs text-zinc-500">tamamlandı</span>
-        </div>
+        <span className="text-xl font-bold tabular-nums" style={{ color: theme.accent }}>
+          %{pct}
+        </span>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+      {/* Progress */}
+      <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden mb-4 shrink-0">
         <div
-          className="h-full rounded-full transition-all"
-          style={{
-            width: `${(earned.length / total) * 100}%`,
-            backgroundColor: theme.accent,
-          }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, backgroundColor: theme.accent, boxShadow: `0 0 8px ${theme.accent}40` }}
         />
       </div>
 
-      {/* Rozet grid */}
-      <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
+      {/* Grid */}
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-8 flex-1 min-h-0 overflow-auto custom-scroll">
         {badges.map((badge) => (
           <BadgeCard key={badge.id} badge={badge} />
         ))}
       </div>
 
-      {/* Kazanılmamış rozetlerin ipuçları */}
+      {/* Next goals */}
       {badges.some((b) => !b.earned) && (
-        <div className="space-y-1.5 border-t border-zinc-800 pt-4">
-          <p className="text-xs text-zinc-600 mb-2">Sıradaki hedefler</p>
-          {badges
-            .filter((b) => !b.earned)
-            .slice(0, 3)
-            .map((b) => (
-              <div key={b.id} className="flex items-center gap-2 text-xs text-zinc-600">
-                <span className="text-sm">{b.emoji}</span>
-                <span>
-                  <span className="text-zinc-400">{b.name}:</span> {b.description}
-                </span>
-              </div>
-            ))}
+        <div className="mt-3 pt-3 border-t border-zinc-800/60 shrink-0">
+          <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Siradaki</p>
+          <div className="space-y-1.5">
+            {badges
+              .filter((b) => !b.earned)
+              .slice(0, 2)
+              .map((b) => {
+                const Icon = BADGE_ICON[b.id] ?? Rocket;
+                const r = RARITY_COLORS[b.rarity];
+                return (
+                  <div key={b.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 bg-zinc-800/30">
+                    <div className="flex items-center justify-center w-5 h-5 rounded-md" style={{ backgroundColor: `${r.text}10`, color: r.text }}>
+                      <Icon className="w-3 h-3 opacity-50" />
+                    </div>
+                    <span className="text-xs text-zinc-400 flex-1 min-w-0 truncate">{b.name}</span>
+                    <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0" style={{ color: r.text, backgroundColor: `${r.text}10` }}>
+                      {RARITY_LABEL[b.rarity]}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       )}
     </div>
