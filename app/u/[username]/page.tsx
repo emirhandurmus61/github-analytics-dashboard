@@ -1,13 +1,12 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
-import Image from "next/image";
-import ContributionHeatmap from "@/app/dashboard/contribution-heatmap";
 import { calculateStreaks } from "@/lib/streak";
 import { ThemeProvider } from "@/components/theme-provider";
 import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import { WIDGET_KEYS, type WidgetKey } from "@/lib/widgets";
-import { calcBadges, RARITY_COLORS } from "@/lib/badges";
+import { calcBadges } from "@/lib/badges";
 import type { Metadata } from "next";
+import ProfileClient from "./profile-client";
 
 type Props = { params: Promise<{ username: string }> };
 
@@ -31,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   return {
     title: `${username} — Dev Analytics`,
-    description: `${username} kullanıcısının GitHub aktivite istatistikleri.`,
+    description: `${username} kullanicisinin GitHub aktivite istatistikleri.`,
   };
 }
 
@@ -46,6 +45,23 @@ export default async function PublicProfilePage({ params }: Props) {
 
   if (!user || !user.last_synced_at) notFound();
 
+  // Yeni kolonlar (pinned_repos, profile_readme) henuz migration yapilmamis olabilir — ayri sorgula
+  let pinnedReposDb: string[] = [];
+  let profileReadmeDb: string | null = null;
+  try {
+    const { data: extra } = await supabaseAdmin
+      .from("users")
+      .select("pinned_repos, profile_readme")
+      .eq("id", user.id)
+      .single();
+    if (extra) {
+      pinnedReposDb = Array.isArray(extra.pinned_repos) ? extra.pinned_repos : [];
+      profileReadmeDb = extra.profile_readme ?? null;
+    }
+  } catch {
+    // Kolonlar henuz yok — sessizce devam et
+  }
+
   const widgets: Widgets =
     user.public_widgets && typeof user.public_widgets === "object"
       ? { ...DEFAULT_WIDGETS, ...(user.public_widgets as Partial<Widgets>) }
@@ -59,17 +75,15 @@ export default async function PublicProfilePage({ params }: Props) {
 
   const accent = isValidTheme(user.theme_accent) ? user.theme_accent : DEFAULT_THEME;
   const theme = THEMES[accent];
-
   const techTags: string[] = Array.isArray(user.tech_tags) ? user.tech_tags : [];
 
-  // Repolar
+  // Repos
   const { data: repoRows } = await supabaseAdmin
     .from("repositories")
-    .select("id, name, full_name, language, stars, forks, is_fork")
+    .select("id, name, full_name, description, language, stars, forks, is_fork")
     .eq("user_id", user.id);
 
   const ids = (repoRows ?? []).map((r) => r.id);
-
   const ownIds = (repoRows ?? []).filter((r) => !r.is_fork).map((r) => r.id);
 
   const [reposRes, commitsRes, langsRes, heatmapRes, badgeCommitsRes] = await Promise.all([
@@ -89,24 +103,33 @@ export default async function PublicProfilePage({ params }: Props) {
       .gte("committed_at", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()),
   ]);
 
+  // Languages
   const langMap = new Map<string, number>();
   for (const row of langsRes.data ?? []) {
     langMap.set(row.language, (langMap.get(row.language) ?? 0) + row.bytes);
   }
-  const topLanguages = Array.from(langMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const totalBytes = topLanguages.reduce((s, [, b]) => s + b, 0);
+  const topLanguagesRaw = Array.from(langMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const totalBytes = topLanguagesRaw.reduce((s, [, b]) => s + b, 0);
+  const topLanguages = topLanguagesRaw.map(([lang, bytes]) => ({
+    lang,
+    bytes,
+    pct: totalBytes > 0 ? (bytes / totalBytes) * 100 : 0,
+    color: LANG_COLORS[lang] ?? "#6b7280",
+  }));
+
+  // Stats
+  const heatmapData = heatmapRes.data ?? [];
+  const activeDates = heatmapData.filter((d) => d.commit_count > 0).map((d) => d.date);
+  const { currentStreak, longestStreak, totalActiveDays } = calculateStreaks(activeDates);
 
   const stats = {
     repoCount: reposRes.count ?? 0,
     commitCount: commitsRes.count ?? 0,
     languageCount: langMap.size,
+    activeDays: totalActiveDays,
   };
 
-  const heatmapData = heatmapRes.data ?? [];
-  const activeDates = heatmapData.filter((d) => d.commit_count > 0).map((d) => d.date);
-  const { currentStreak, longestStreak } = calculateStreaks(activeDates);
-
-  // Rozetler
+  // Badges
   const repoForkMap = new Map<string, boolean>(
     (repoRows ?? []).map((r) => [r.id, r.is_fork])
   );
@@ -121,294 +144,46 @@ export default async function PublicProfilePage({ params }: Props) {
     languageCount: langMap.size,
   }).filter((b) => b.earned);
 
-  const pinnedRepo = user.pinned_repo_name
-    ? (repoRows ?? []).find((r) => r.name === user.pinned_repo_name) ?? null
-    : null;
+  // Pinned repos (new array field, fallback to single pinned_repo_name)
+  const pinnedNames: string[] = pinnedReposDb.length > 0
+    ? pinnedReposDb.slice(0, 3)
+    : (user.pinned_repo_name ? [user.pinned_repo_name] : []);
 
+  const pinnedReposData = pinnedNames
+    .map((n) => (repoRows ?? []).find((r) => r.name === n))
+    .filter((r): r is NonNullable<typeof r> => r != null)
+    .map((r) => ({ name: r.name, full_name: r.full_name, language: r.language, stars: r.stars, forks: r.forks, description: r.description }));
+
+  // Top repos
+  const pinnedSet = new Set(pinnedNames);
   const topRepos = (repoRows ?? [])
-    .filter((r) => !r.is_fork)
+    .filter((r) => !r.is_fork && !pinnedSet.has(r.name))
     .sort((a, b) => b.stars - a.stars)
-    .slice(0, 6);
-
-  // Widget render map — sıralı olarak render edilecek
-  function renderWidget(key: WidgetKey) {
-    if (!widgets[key]) return null;
-
-    switch (key) {
-      case "streak":
-        if (currentStreak === 0 && longestStreak === 0) return null;
-        return (
-          <div key="streak" className="grid grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-              <p className="text-xs text-zinc-500">Mevcut Streak</p>
-              <p className="mt-1.5 text-3xl font-semibold" style={{ color: theme.accent }}>
-                {currentStreak} <span className="text-base font-normal text-zinc-500">gün</span>
-              </p>
-            </div>
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-              <p className="text-xs text-zinc-500">En Uzun Streak</p>
-              <p className="mt-1.5 text-3xl font-semibold text-zinc-100">
-                {longestStreak} <span className="text-base font-normal text-zinc-500">gün</span>
-              </p>
-            </div>
-          </div>
-        );
-
-      case "heatmap":
-        return (
-          <ContributionHeatmap key="heatmap" data={heatmapData} accentShades={theme.shades} />
-        );
-
-      case "languages":
-        if (topLanguages.length === 0) return null;
-        return (
-          <div key="languages" className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>
-            <div className="space-y-3">
-              {topLanguages.map(([lang, bytes]) => {
-                const pct = totalBytes > 0 ? ((bytes / totalBytes) * 100).toFixed(1) : "0";
-                const color = LANG_COLORS[lang] ?? "#6b7280";
-                return (
-                  <div key={lang}>
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-zinc-300">{lang}</span>
-                      <span className="text-zinc-500">{pct}%</span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-
-      case "repos":
-        if (topRepos.length === 0) return null;
-        return (
-          <div key="repos" className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <h2 className="mb-4 text-sm font-medium text-zinc-400">En Yıldızlı Repolar</h2>
-            <div className="space-y-3">
-              {topRepos.map((repo) => (
-                <a
-                  key={repo.name}
-                  href={`https://github.com/${repo.full_name}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-zinc-800"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {repo.language && (
-                      <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: LANG_COLORS[repo.language] ?? "#6b7280" }} />
-                    )}
-                    <span className="truncate text-sm text-zinc-300">{repo.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0 text-xs text-zinc-600">
-                    <span>★ {repo.stars}</span>
-                    <span>⑂ {repo.forks}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  }
+    .slice(0, 6)
+    .map((r) => ({ name: r.name, full_name: r.full_name, language: r.language, stars: r.stars, forks: r.forks, description: r.description }));
 
   return (
     <ThemeProvider accent={accent}>
-      <div className="min-h-screen bg-zinc-950">
-        {/* Header */}
-        <header className="border-b border-zinc-800 bg-zinc-950 px-6 py-4">
-          <div className="mx-auto flex max-w-4xl items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-800">
-                <svg className="h-4 w-4 text-zinc-100" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium text-zinc-400">Dev Analytics</span>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Developer Card indir */}
-              <a
-                href={`/api/card/${username}`}
-                download={`${username}-dev-card.png`}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
-                style={{ borderColor: theme.accentBorder }}
-              >
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span style={{ color: theme.accent }}>Kartı İndir</span>
-              </a>
-              <a
-                href={`https://github.com/${username}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-zinc-600 transition-colors hover:text-zinc-400"
-              >
-                github.com/{username} ↗
-              </a>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-4xl px-6 py-10 space-y-6">
-
-          {/* Profil başlığı */}
-          <div className="flex items-start gap-5">
-            {user.avatar_url && (
-              <Image
-                src={user.avatar_url}
-                alt={username}
-                width={72}
-                height={72}
-                className="rounded-full ring-2 ring-zinc-800 shrink-0"
-              />
-            )}
-            <div className="space-y-1 min-w-0">
-              <h1 className="text-2xl font-semibold text-zinc-100">{user.name ?? username}</h1>
-              <p className="text-sm text-zinc-500">@{username}</p>
-              {user.bio && <p className="text-sm text-zinc-400 pt-1">{user.bio}</p>}
-            </div>
-          </div>
-
-          {/* Özet kartlar */}
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "Toplam Repo", value: stats.repoCount },
-              { label: "Commit (1 yıl)", value: stats.commitCount },
-              { label: "Kullanılan Dil", value: stats.languageCount },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-                <p className="text-xs text-zinc-500">{label}</p>
-                <p className="mt-1.5 text-3xl font-semibold text-zinc-100">
-                  {value.toLocaleString("tr-TR")}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Rozetler */}
-          {earnedBadges.length > 0 && (
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-              <h2 className="mb-3 text-sm font-medium text-zinc-400">Rozetler</h2>
-              <div className="flex flex-wrap gap-2">
-                {earnedBadges.map((badge) => {
-                  const rarity = RARITY_COLORS[badge.rarity];
-                  return (
-                    <div
-                      key={badge.id}
-                      className="flex items-center gap-2 rounded-xl border px-3 py-2"
-                      style={{ borderColor: rarity.border, backgroundColor: rarity.bg }}
-                      title={badge.description}
-                    >
-                      <span className="text-base">{badge.emoji}</span>
-                      <span className="text-xs font-medium" style={{ color: rarity.text }}>
-                        {badge.name}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* F.3 — Özel bölümler */}
-          {(user.currently_working_on || user.yearly_goal || techTags.length > 0) && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {user.currently_working_on && (
-                <div
-                  className="rounded-2xl border p-5 space-y-2"
-                  style={{ borderColor: theme.accentBorder, backgroundColor: theme.accentBg }}
-                >
-                  <p className="text-xs text-zinc-500">Şu an üzerinde</p>
-                  <p className="text-sm text-zinc-200 leading-relaxed">{user.currently_working_on}</p>
-                </div>
-              )}
-              {user.yearly_goal && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 space-y-2">
-                  <p className="text-xs text-zinc-500">Bu yıl hedefim</p>
-                  <p className="text-sm text-zinc-200 leading-relaxed">{user.yearly_goal}</p>
-                </div>
-              )}
-              {techTags.length > 0 && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
-                  <p className="text-xs text-zinc-500">Favori araçlar</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {techTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full border px-2.5 py-0.5 text-xs"
-                        style={{ borderColor: theme.accentBorder, color: theme.accent, backgroundColor: theme.accentBg }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Pinned repo */}
-          {pinnedRepo && (
-            <div>
-              <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Öne Çıkan Repo</h2>
-              <a
-                href={`https://github.com/${pinnedRepo.full_name}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block rounded-2xl border bg-zinc-900 p-5 transition-colors hover:border-zinc-600"
-                style={{ borderColor: theme.accentBorder }}
-              >
-                <div className="flex items-center gap-2">
-                  {pinnedRepo.language && (
-                    <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: LANG_COLORS[pinnedRepo.language] ?? "#6b7280" }} />
-                  )}
-                  <span className="text-sm font-medium" style={{ color: theme.accent }}>{pinnedRepo.name}</span>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-zinc-600 mt-2">
-                  <span>★ {pinnedRepo.stars}</span>
-                  <span>⑂ {pinnedRepo.forks}</span>
-                  {pinnedRepo.language && <span>{pinnedRepo.language}</span>}
-                </div>
-              </a>
-            </div>
-          )}
-
-          {/* Widgetlar — kullanıcının belirlediği sırada */}
-          {widgetOrder.map((key) => renderWidget(key))}
-
-          {/* Wrapped linkleri */}
-          <div className="flex flex-wrap justify-center gap-2 pt-2">
-            {[new Date().getFullYear(), new Date().getFullYear() - 1].map((yr) => (
-              <a
-                key={yr}
-                href={`/u/${username}/${yr}`}
-                className="rounded-full border px-3 py-1.5 text-xs transition-colors hover:opacity-80"
-                style={{ borderColor: theme.accentBorder, backgroundColor: theme.accentBg, color: theme.accent }}
-              >
-                {yr} Wrapped ✦
-              </a>
-            ))}
-          </div>
-
-          {/* Footer */}
-          <p className="text-center text-xs text-zinc-700 pt-2">
-            Bu profil{" "}
-            <a href="/" className="text-zinc-500 hover:text-zinc-400 transition-colors">
-              Dev Analytics Dashboard
-            </a>{" "}
-            ile oluşturuldu
-          </p>
-        </main>
-      </div>
+      <ProfileClient
+        username={username}
+        name={user.name ?? username}
+        avatarUrl={user.avatar_url}
+        bio={user.bio}
+        profileReadme={profileReadmeDb}
+        currentlyWorkingOn={user.currently_working_on}
+        yearlyGoal={user.yearly_goal}
+        techTags={techTags}
+        stats={stats}
+        currentStreak={currentStreak}
+        longestStreak={longestStreak}
+        earnedBadges={earnedBadges}
+        pinnedRepos={pinnedReposData}
+        topRepos={topRepos}
+        topLanguages={topLanguages}
+        heatmapData={heatmapData}
+        widgetOrder={widgetOrder}
+        widgets={widgets}
+      />
     </ThemeProvider>
   );
 }

@@ -18,6 +18,21 @@ export async function saveProfileSettings(
   const themeRaw = formData.get("theme_accent") as string | null;
   const theme = isValidTheme(themeRaw) ? themeRaw : "emerald";
 
+  // Pinned repos (max 3)
+  const pinnedReposRaw = formData.get("pinned_repos") as string | null;
+  let pinnedRepos: string[] = [];
+  if (pinnedReposRaw) {
+    try {
+      const parsed = JSON.parse(pinnedReposRaw);
+      if (Array.isArray(parsed)) {
+        pinnedRepos = parsed.filter((s): s is string => typeof s === "string" && s.length > 0).slice(0, 3);
+      }
+    } catch { /* invalid JSON */ }
+  }
+
+  // Profile README
+  const profileReadme = (formData.get("profile_readme") as string | null)?.slice(0, 2000) ?? "";
+
   // Widget görünürlüğü
   const widgets = {
     heatmap: formData.get("widget_heatmap") === "on",
@@ -48,6 +63,7 @@ export async function saveProfileSettings(
     .filter((t) => t.length > 0 && t.length <= 30)
     .slice(0, 12);
 
+  // Ana alanlar
   const { error } = await supabaseAdmin
     .from("users")
     .update({
@@ -62,7 +78,20 @@ export async function saveProfileSettings(
     })
     .eq("username", session.user.username);
 
-  if (error) return { error: "Kayıt başarısız: " + error.message };
+  if (error) return { error: "Kayit basarisiz: " + error.message };
+
+  // Yeni kolonlar — migration yapilmamissa sessizce gec
+  try {
+    await supabaseAdmin
+      .from("users")
+      .update({
+        pinned_repos: pinnedRepos,
+        profile_readme: profileReadme || null,
+      })
+      .eq("username", session.user.username);
+  } catch {
+    // Kolonlar henuz yok — sorun degil
+  }
 
   revalidatePath(`/u/${session.user.username}`);
   revalidatePath("/dashboard");

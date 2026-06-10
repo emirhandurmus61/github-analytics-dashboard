@@ -21,6 +21,8 @@ type Widgets = {
 type Props = {
   bio: string | null;
   pinnedRepo: string | null;
+  pinnedRepos: string[];
+  profileReadme: string | null;
   widgets: Widgets;
   widgetOrder: WidgetKey[];
   repos: { name: string }[];
@@ -37,6 +39,8 @@ const initialState: { error?: string; success?: boolean } = {};
 export default function SettingsForm({
   bio,
   pinnedRepo,
+  pinnedRepos,
+  profileReadme,
   widgets,
   widgetOrder,
   repos,
@@ -52,6 +56,14 @@ export default function SettingsForm({
   // Tema
   const [selectedTheme, setSelectedTheme] = useState<ThemeAccent>(currentTheme);
   const previewColors = THEMES[selectedTheme];
+
+  // Pinned repos (max 3)
+  const [selectedPinned, setSelectedPinned] = useState<string[]>(
+    pinnedRepos.length > 0 ? pinnedRepos : (pinnedRepo ? [pinnedRepo] : [])
+  );
+
+  // Profile README
+  const [readme, setReadme] = useState(profileReadme ?? "");
 
   // Widget görünürlük
   const [visibleWidgets, setVisibleWidgets] = useState<Set<WidgetKey>>(
@@ -180,20 +192,55 @@ export default function SettingsForm({
           </div>
 
           <div>
-            <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="pinned_repo">
-              Öne Çıkan Repo
+            <label className="block text-xs text-zinc-500 mb-1.5">
+              One Cikan Repolar <span className="text-zinc-700">(maks. 3)</span>
             </label>
-            <select
-              id="pinned_repo"
-              name="pinned_repo"
-              defaultValue={pinnedRepo ?? ""}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-500 focus:outline-none"
-            >
-              <option value="">— Seçme —</option>
-              {repos.map((r) => (
-                <option key={r.name} value={r.name}>{r.name}</option>
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <select
+                  key={i}
+                  value={selectedPinned[i] ?? ""}
+                  onChange={(e) => {
+                    setSelectedPinned((prev) => {
+                      const next = [...prev];
+                      if (e.target.value) {
+                        next[i] = e.target.value;
+                      } else {
+                        next.splice(i, 1);
+                      }
+                      return next.filter(Boolean);
+                    });
+                  }}
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-500 focus:outline-none"
+                >
+                  <option value="">{i === 0 ? "— Repo sec —" : "— Opsiyonel —"}</option>
+                  {repos
+                    .filter((r) => !selectedPinned.includes(r.name) || selectedPinned[i] === r.name)
+                    .map((r) => (
+                      <option key={r.name} value={r.name}>{r.name}</option>
+                    ))}
+                </select>
               ))}
-            </select>
+            </div>
+            <input type="hidden" name="pinned_repos" value={JSON.stringify(selectedPinned)} />
+            {/* Backward compat */}
+            <input type="hidden" name="pinned_repo" value={selectedPinned[0] ?? ""} />
+          </div>
+        </Section>
+
+        {/* ── Profil README ── */}
+        <Section title="Profil README" desc="Markdown destekli vitrin alani. GitHub profil README'si gibi profilinde gorunsun.">
+          <div>
+            <textarea
+              name="profile_readme"
+              value={readme}
+              onChange={(e) => setReadme(e.target.value)}
+              rows={8}
+              maxLength={2000}
+              placeholder={"### Merhaba! 👋\n\nBen bir yazilim gelistiriciyim.\n\n- 🔭 Su an **proje adi** uzerinde calisiyorum\n- 🌱 **Rust** ogreniyorum\n- 💬 Bana sormak istedigin bir sey varsa GitHub'dan ulas"}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none resize-y font-mono leading-relaxed"
+            />
+            <p className="text-[10px] text-zinc-600 mt-1">{readme.length}/2000 — Markdown destekli: **kalin**, *italik*, `kod`, ### baslik, - liste</p>
           </div>
         </Section>
 

@@ -35,6 +35,23 @@ export default async function SettingsPage() {
 
   if (!user) redirect("/dashboard");
 
+  // Yeni kolonlar — henuz migration yapilmamis olabilir
+  let pinnedReposDb: string[] = [];
+  let profileReadmeDb: string | null = null;
+  try {
+    const { data: extra } = await supabaseAdmin
+      .from("users")
+      .select("pinned_repos, profile_readme")
+      .eq("id", user.id)
+      .single();
+    if (extra) {
+      pinnedReposDb = Array.isArray(extra.pinned_repos) ? extra.pinned_repos : [];
+      profileReadmeDb = extra.profile_readme ?? null;
+    }
+  } catch {
+    // Kolonlar henuz yok
+  }
+
   const { data: repoRows } = await supabaseAdmin
     .from("repositories")
     .select("name")
@@ -71,6 +88,8 @@ export default async function SettingsPage() {
       <SettingsForm
         bio={user.bio}
         pinnedRepo={user.pinned_repo_name}
+        pinnedRepos={pinnedReposDb}
+        profileReadme={profileReadmeDb}
         widgets={widgets}
         widgetOrder={widgetOrder}
         repos={repos}
