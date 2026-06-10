@@ -13,3 +13,24 @@ update users
 -- Profil README icerigi (markdown)
 alter table users
   add column if not exists profile_readme text;
+
+-- Profile gorselleri icin storage bucket
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'profile-images',
+  'profile-images',
+  true,
+  5242880, -- 5MB
+  array['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+)
+on conflict (id) do nothing;
+
+-- Herkes okuyabilir
+create policy "Public read profile images"
+  on storage.objects for select
+  using (bucket_id = 'profile-images');
+
+-- Sadece service role yazabilir (API route uzerinden)
+create policy "Service upload profile images"
+  on storage.objects for insert
+  with check (bucket_id = 'profile-images');

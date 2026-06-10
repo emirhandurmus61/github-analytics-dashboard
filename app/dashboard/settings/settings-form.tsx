@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useRef } from "react";
 import { saveProfileSettings } from "./actions";
 import { THEMES, type ThemeAccent } from "@/lib/themes";
+import { ImagePlus, Loader2 } from "lucide-react";
 import {
   WIDGET_KEYS,
   WIDGET_LABELS,
@@ -230,18 +231,13 @@ export default function SettingsForm({
 
         {/* ── Profil README ── */}
         <Section title="Profil README" desc="Markdown destekli vitrin alani. GitHub profil README'si gibi profilinde gorunsun.">
-          <div>
-            <textarea
-              name="profile_readme"
-              value={readme}
-              onChange={(e) => setReadme(e.target.value)}
-              rows={8}
-              maxLength={2000}
-              placeholder={"### Merhaba! 👋\n\nBen bir yazilim gelistiriciyim.\n\n- 🔭 Su an **proje adi** uzerinde calisiyorum\n- 🌱 **Rust** ogreniyorum\n- 💬 Bana sormak istedigin bir sey varsa GitHub'dan ulas"}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none resize-y font-mono leading-relaxed"
-            />
-            <p className="text-[10px] text-zinc-600 mt-1">{readme.length}/2000 — Markdown destekli: **kalin**, *italik*, `kod`, ### baslik, - liste</p>
-          </div>
+          <ReadmeEditor
+            value={readme}
+            onChange={setReadme}
+            accentColor={previewColors.accent}
+            accentBorder={previewColors.accentBorder}
+            accentBg={previewColors.accentBg}
+          />
         </Section>
 
         {/* ── F.3 Özel Bölümler ── */}
@@ -475,6 +471,206 @@ function CopyBox({ value }: { value: string }) {
       >
         Kopyala
       </button>
+    </div>
+  );
+}
+
+function ReadmeEditor({
+  value,
+  onChange,
+  accentColor,
+  accentBorder,
+  accentBg,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  accentColor: string;
+  accentBorder: string;
+  accentBg: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleUpload(file: File) {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Yukleme basarisiz");
+        return;
+      }
+      // Insert markdown image at cursor position
+      const textarea = textareaRef.current;
+      const imageMarkdown = `\n![${file.name}](${data.url})\n`;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const before = value.slice(0, start);
+        const after = value.slice(start);
+        onChange(before + imageMarkdown + after);
+        // Set cursor after inserted text
+        requestAnimationFrame(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+          textarea.focus();
+        });
+      } else {
+        onChange(value + imageMarkdown);
+      }
+    } catch {
+      alert("Yukleme sirasinda hata olustu");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+      handleUpload(file);
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData.items;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) handleUpload(file);
+        return;
+      }
+    }
+  }
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 mb-2 p-1 rounded-lg border border-zinc-800 bg-zinc-800/50 w-fit">
+        <button
+          type="button"
+          onClick={() => {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selected = value.slice(start, end);
+            const wrapped = selected ? `**${selected}**` : "**kalin metin**";
+            onChange(value.slice(0, start) + wrapped + value.slice(end));
+          }}
+          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors font-bold"
+          title="Kalin"
+        >
+          B
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selected = value.slice(start, end);
+            const wrapped = selected ? `*${selected}*` : "*italik metin*";
+            onChange(value.slice(0, start) + wrapped + value.slice(end));
+          }}
+          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors italic"
+          title="Italik"
+        >
+          I
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+            const start = textarea.selectionStart;
+            onChange(value.slice(0, start) + "\n### " + value.slice(start));
+          }}
+          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors"
+          title="Baslik"
+        >
+          H
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selected = value.slice(start, end);
+            const wrapped = selected ? `\`${selected}\`` : "`kod`";
+            onChange(value.slice(0, start) + wrapped + value.slice(end));
+          }}
+          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors font-mono"
+          title="Kod"
+        >
+          {"<>"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+            const start = textarea.selectionStart;
+            onChange(value.slice(0, start) + "\n- " + value.slice(start));
+          }}
+          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors"
+          title="Liste"
+        >
+          •
+        </button>
+        <div className="w-px h-4 bg-zinc-700 mx-0.5" />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors disabled:opacity-50"
+          style={{ color: accentColor }}
+          title="Gorsel yukle"
+        >
+          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+          <span className="hidden sm:inline">Gorsel</span>
+        </button>
+      </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleUpload(file);
+          e.target.value = "";
+        }}
+      />
+
+      {/* Textarea */}
+      <textarea
+        ref={textareaRef}
+        name="profile_readme"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+        onPaste={handlePaste}
+        rows={10}
+        maxLength={2000}
+        placeholder={"### Merhaba!\n\nBen bir yazilim gelistiriciyim.\n\n- Su an **proje adi** uzerinde calisiyorum\n- **Rust** ogreniyorum\n\n![banner](https://example.com/banner.png)"}
+        className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none resize-y font-mono leading-relaxed"
+      />
+      <div className="flex items-center justify-between mt-1">
+        <p className="text-[10px] text-zinc-600">
+          Gorsel: surukle-birak, yapistir veya Gorsel butonunu kullan
+        </p>
+        <p className="text-[10px] text-zinc-600 tabular-nums">{value.length}/2000</p>
+      </div>
     </div>
   );
 }

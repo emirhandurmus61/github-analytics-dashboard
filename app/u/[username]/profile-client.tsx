@@ -446,6 +446,16 @@ function ProfileReadme({ content }: { content: string }) {
                 {children}
               </blockquote>
             ),
+            img: ({ src, alt }) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src ?? ""}
+                alt={alt ?? ""}
+                loading="lazy"
+                className="rounded-lg max-w-full h-auto my-3 border border-zinc-800/30"
+                style={{ maxHeight: 400 }}
+              />
+            ),
             hr: () => <hr className="border-zinc-800/40 my-4" />,
           }}
         >
