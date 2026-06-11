@@ -24,6 +24,7 @@ import { calculateStreaks } from "@/lib/streak";
 import { generateInsights } from "@/lib/insights";
 import DashboardGrid, { SortableWidget } from "./dashboard-grid";
 import { DEFAULT_WIDGET_CONFIGS } from "@/lib/widget-config";
+import ProfileViewsCard from "./profile-views-card";
 
 type Props = {
   searchParams: Promise<{ range?: string; hideForks?: string }>;
@@ -87,6 +88,8 @@ export default async function DashboardPage({ searchParams }: Props) {
   let streakStatus: StreakStatus = "no_streak";
   let weeklyGoal = dbUser?.weekly_commit_goal ?? 20;
   let goalHistory: { week_start: string; goal: number; actual: number }[] = [];
+  let profileViewsThisWeek = 0;
+  let profileViewsTotal = 0;
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -518,6 +521,26 @@ export default async function DashboardPage({ searchParams }: Props) {
       .limit(12);
 
     goalHistory = historyRows ?? [];
+
+    // Profil görüntülenme sayıları
+    try {
+      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const [weekRes, totalRes] = await Promise.all([
+        supabaseAdmin
+          .from("profile_views")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", dbUser.id)
+          .gte("viewed_at", oneWeekAgo),
+        supabaseAdmin
+          .from("profile_views")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", dbUser.id),
+      ]);
+      profileViewsThisWeek = weekRes.count ?? 0;
+      profileViewsTotal = totalRes.count ?? 0;
+    } catch {
+      // Tablo henüz yoksa sessizce geç
+    }
   }
 
   const lastSynced = dbUser?.last_synced_at
@@ -601,6 +624,15 @@ export default async function DashboardPage({ searchParams }: Props) {
             {/* Rozetler */}
             <SortableWidget key="badges" id="badges" data-widget-id="badges">
               <BadgeCollection badges={badges} />
+            </SortableWidget>
+
+            {/* Profil görüntülenme */}
+            <SortableWidget key="profile-views" id="profile-views" data-widget-id="profile-views">
+              <ProfileViewsCard
+                thisWeek={profileViewsThisWeek}
+                total={profileViewsTotal}
+                username={session?.user?.username ?? ""}
+              />
             </SortableWidget>
 
             {/* Kod istatistikleri */}

@@ -7,6 +7,7 @@ import { WIDGET_KEYS, type WidgetKey } from "@/lib/widgets";
 import { calcBadges } from "@/lib/badges";
 import type { Metadata } from "next";
 import ProfileClient from "./profile-client";
+import { recordProfileView } from "./actions";
 
 type Props = { params: Promise<{ username: string }> };
 
@@ -175,6 +176,7 @@ export default async function PublicProfilePage({ params }: Props) {
     <ThemeProvider accent={accent}>
       <ProfileClient
         username={username}
+        userId={user.id}
         name={user.name ?? username}
         avatarUrl={user.avatar_url}
         bio={user.bio}
@@ -193,6 +195,7 @@ export default async function PublicProfilePage({ params }: Props) {
         widgetOrder={widgetOrder}
         widgets={widgets}
         socialLinks={socialLinks}
+        recordView={recordProfileView}
       />
     </ThemeProvider>
   );

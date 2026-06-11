@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useThemeColors } from "@/components/theme-provider";
 import {
   Flame, Zap, Moon, Swords, Eraser, Globe, Rocket, Trophy,
@@ -38,6 +38,7 @@ type SocialLinks = {
 
 type ProfileProps = {
   username: string;
+  userId: string;
   name: string;
   avatarUrl: string | null;
   bio: string | null;
@@ -56,6 +57,7 @@ type ProfileProps = {
   widgetOrder: string[];
   widgets: Record<string, boolean>;
   socialLinks?: SocialLinks;
+  recordView: (userId: string) => Promise<void>;
 };
 
 /* ─── Badge icon map (lucide icons instead of emojis) ─── */
@@ -516,14 +518,23 @@ function ActivitySparkline({ data }: { data: DayData[] }) {
 export default function ProfileClient(props: ProfileProps) {
   const theme = useThemeColors();
   const {
-    username, name, avatarUrl, bio, profileReadme,
+    username, userId, name, avatarUrl, bio, profileReadme,
     currentlyWorkingOn, yearlyGoal, techTags,
     stats, currentStreak, longestStreak,
     earnedBadges, pinnedRepos, topRepos,
     topLanguages, heatmapData,
     widgets,
     socialLinks,
+    recordView,
   } = props;
+
+  // Ziyareti bir kez kaydet
+  const recorded = useRef(false);
+  useEffect(() => {
+    if (recorded.current) return;
+    recorded.current = true;
+    recordView(userId).catch(() => {/* sessiz hata */});
+  }, [userId, recordView]);
 
   const currentYear = new Date().getFullYear();
 
