@@ -79,12 +79,6 @@ export default async function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <a
-          href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-xs text-zinc-500 transition-colors hover:text-zinc-300 mb-4"
-        >
-          ← Panele Dön
-        </a>
         <h1 className="text-xl font-semibold text-zinc-100">Profil Ayarları</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Temanı, profilini ve badge'ini özelleştir.

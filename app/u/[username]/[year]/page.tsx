@@ -7,6 +7,7 @@ import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import type { Metadata } from "next";
 import WrappedClient from "./wrapped-client";
 import { auth } from "@/lib/auth";
+import Navbar from "@/components/navbar";
 
 type Props = { params: Promise<{ username: string; year: string }> };
 
@@ -213,6 +214,7 @@ export default async function WrappedPage({ params }: Props) {
 
   return (
     <ThemeProvider accent={accent}>
+      <Navbar variant="minimal" />
       <WrappedClient data={wrappedData} isOwner={isOwner} />
     </ThemeProvider>
   );

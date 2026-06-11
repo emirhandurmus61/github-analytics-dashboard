@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import ProfileClient from "./profile-client";
 import { recordProfileView } from "./actions";
 import { auth } from "@/lib/auth";
+import Navbar from "@/components/navbar";
 
 type Props = { params: Promise<{ username: string }> };
 
@@ -178,6 +179,7 @@ export default async function PublicProfilePage({ params }: Props) {
 
   return (
     <ThemeProvider accent={accent}>
+      <Navbar variant="minimal" />
       <ProfileClient
         username={username}
         userId={user.id}
