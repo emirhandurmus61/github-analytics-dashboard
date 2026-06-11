@@ -25,6 +25,7 @@ import { generateInsights } from "@/lib/insights";
 import DashboardGrid, { SortableWidget } from "./dashboard-grid";
 import { DEFAULT_WIDGET_CONFIGS } from "@/lib/widget-config";
 import ProfileViewsCard from "./profile-views-card";
+import AutoSync from "./auto-sync";
 
 type Props = {
   searchParams: Promise<{ range?: string; hideForks?: string }>;
@@ -549,6 +550,9 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   return (
     <div>
+      {/* Arka planda otomatik sync — 1 saatten eski verideyse sessizce tetiklenir */}
+      <AutoSync lastSyncedAt={dbUser?.last_synced_at ?? null} />
+
       {/* Başlık */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
