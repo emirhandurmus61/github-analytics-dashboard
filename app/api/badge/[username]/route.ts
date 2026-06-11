@@ -2,8 +2,6 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
 import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
-
 // Cache 1 saat — badge sık güncellenmez
 export const revalidate = 3600;
 
