@@ -90,6 +90,10 @@ export async function saveProfileSettings(
 
   if (error) return { error: "Kayit basarisiz: " + error.message };
 
+  // README source
+  const readmeSourceRaw = formData.get("readme_source") as string | null;
+  const readmeSource = readmeSourceRaw === "custom" ? "custom" : "github";
+
   // Yeni kolonlar — migration yapilmamissa sessizce gec
   try {
     await supabaseAdmin
@@ -97,6 +101,7 @@ export async function saveProfileSettings(
       .update({
         pinned_repos: pinnedRepos,
         profile_readme: profileReadme || null,
+        readme_source: readmeSource,
       })
       .eq("username", session.user.username);
   } catch {

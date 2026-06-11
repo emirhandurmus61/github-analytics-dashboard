@@ -257,7 +257,26 @@ export async function GET(_req: NextRequest) {
           } catch { /* devam */ }
         }
 
-        // 6. Günlük istatistikler — sadece etkilenen günler güncellenir (J.2)
+        // 6. GitHub profil README
+        send(controller, "progress", { step: "readme", message: "GitHub README çekiliyor..." });
+        try {
+          const readmeRes = await fetch(`${GITHUB_API}/repos/${username}/${username}/readme`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/vnd.github.raw",
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
+          });
+          if (readmeRes.ok) {
+            const readmeContent = (await readmeRes.text()).slice(0, 5000);
+            await supabaseAdmin.from("users")
+              .update({ github_readme: readmeContent })
+              .eq("id", userId);
+            send(controller, "progress", { step: "readme", message: "GitHub README güncellendi" });
+          }
+        } catch { /* README bulunamadı — sorun değil */ }
+
+        // 7. Günlük istatistikler — sadece etkilenen günler güncellenir (J.2)
         send(controller, "progress", { step: "stats", message: "İstatistikler hesaplanıyor..." });
         const { data: allCommits } = await supabaseAdmin
           .from("commits").select("committed_at, repo_id, additions, deletions")

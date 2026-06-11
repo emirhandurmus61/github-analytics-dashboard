@@ -266,7 +266,24 @@ export async function startSync(): Promise<{ success: boolean; error?: string }>
       } catch { /* devam et */ }
     }
 
-    // 6. Günlük istatistikleri güncelle
+    // 6. GitHub profil README
+    try {
+      const readmeRes = await fetch(`${GITHUB_API}/repos/${username}/${username}/readme`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.raw",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      });
+      if (readmeRes.ok) {
+        const readmeContent = (await readmeRes.text()).slice(0, 5000);
+        await supabaseAdmin.from("users")
+          .update({ github_readme: readmeContent })
+          .eq("id", userId);
+      }
+    } catch { /* README bulunamadı */ }
+
+    // 7. Günlük istatistikleri güncelle
     const { data: allCommits } = await supabaseAdmin
       .from("commits")
       .select("committed_at, repo_id, additions, deletions")

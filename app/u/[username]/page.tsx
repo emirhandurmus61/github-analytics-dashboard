@@ -54,18 +54,22 @@ export default async function PublicProfilePage({ params }: Props) {
   // Yeni kolonlar (pinned_repos, profile_readme, social_*) henuz migration yapilmamis olabilir — ayri sorgula
   let pinnedReposDb: string[] = [];
   let profileReadmeDb: string | null = null;
+  let githubReadmeDb: string | null = null;
+  let readmeSourceDb: string = "github";
   let socialLinks: { twitter: string | null; linkedin: string | null; website: string | null; discord: string | null } = {
     twitter: null, linkedin: null, website: null, discord: null,
   };
   try {
     const { data: extra } = await supabaseAdmin
       .from("users")
-      .select("pinned_repos, profile_readme, social_twitter, social_linkedin, social_website, social_discord")
+      .select("pinned_repos, profile_readme, github_readme, readme_source, social_twitter, social_linkedin, social_website, social_discord")
       .eq("id", user.id)
       .single();
     if (extra) {
       pinnedReposDb = Array.isArray(extra.pinned_repos) ? extra.pinned_repos : [];
       profileReadmeDb = extra.profile_readme ?? null;
+      githubReadmeDb = extra.github_readme ?? null;
+      readmeSourceDb = extra.readme_source ?? "github";
       socialLinks = {
         twitter: extra.social_twitter ?? null,
         linkedin: extra.social_linkedin ?? null,
@@ -76,6 +80,9 @@ export default async function PublicProfilePage({ params }: Props) {
   } catch {
     // Kolonlar henuz yok — sessizce devam et
   }
+
+  // README kaynağına göre gösterilecek içerik
+  const displayReadme = readmeSourceDb === "custom" ? profileReadmeDb : (githubReadmeDb ?? profileReadmeDb);
 
   const widgets: Widgets =
     user.public_widgets && typeof user.public_widgets === "object"
@@ -187,7 +194,7 @@ export default async function PublicProfilePage({ params }: Props) {
         name={user.name ?? username}
         avatarUrl={user.avatar_url}
         bio={user.bio}
-        profileReadme={profileReadmeDb}
+        profileReadme={displayReadme}
         currentlyWorkingOn={user.currently_working_on}
         yearlyGoal={user.yearly_goal}
         techTags={techTags}

@@ -38,15 +38,19 @@ export default async function SettingsPage() {
   // Yeni kolonlar — henuz migration yapilmamis olabilir
   let pinnedReposDb: string[] = [];
   let profileReadmeDb: string | null = null;
+  let githubReadmeDb: string | null = null;
+  let readmeSourceDb: "github" | "custom" = "github";
   try {
     const { data: extra } = await supabaseAdmin
       .from("users")
-      .select("pinned_repos, profile_readme")
+      .select("pinned_repos, profile_readme, github_readme, readme_source")
       .eq("id", user.id)
       .single();
     if (extra) {
       pinnedReposDb = Array.isArray(extra.pinned_repos) ? extra.pinned_repos : [];
       profileReadmeDb = extra.profile_readme ?? null;
+      githubReadmeDb = extra.github_readme ?? null;
+      readmeSourceDb = extra.readme_source === "custom" ? "custom" : "github";
     }
   } catch {
     // Kolonlar henuz yok
@@ -90,6 +94,8 @@ export default async function SettingsPage() {
         pinnedRepo={user.pinned_repo_name}
         pinnedRepos={pinnedReposDb}
         profileReadme={profileReadmeDb}
+        githubReadme={githubReadmeDb}
+        readmeSource={readmeSourceDb}
         widgets={widgets}
         widgetOrder={widgetOrder}
         repos={repos}

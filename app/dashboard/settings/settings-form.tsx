@@ -24,6 +24,8 @@ type Props = {
   pinnedRepo: string | null;
   pinnedRepos: string[];
   profileReadme: string | null;
+  githubReadme: string | null;
+  readmeSource: "github" | "custom";
   widgets: Widgets;
   widgetOrder: WidgetKey[];
   repos: { name: string }[];
@@ -46,6 +48,8 @@ export default function SettingsForm({
   pinnedRepo,
   pinnedRepos,
   profileReadme,
+  githubReadme,
+  readmeSource,
   widgets,
   widgetOrder,
   repos,
@@ -72,6 +76,7 @@ export default function SettingsForm({
   );
 
   // Profile README
+  const [selectedReadmeSource, setSelectedReadmeSource] = useState<"github" | "custom">(readmeSource);
   const [readme, setReadme] = useState(profileReadme ?? "");
 
   // Widget görünürlük
@@ -238,14 +243,58 @@ export default function SettingsForm({
         </Section>
 
         {/* ── Profil README ── */}
-        <Section title="Profil README" desc="Markdown destekli vitrin alani. GitHub profil README'si gibi profilinde gorunsun.">
-          <ReadmeEditor
-            value={readme}
-            onChange={setReadme}
-            accentColor={previewColors.accent}
-            accentBorder={previewColors.accentBorder}
-            accentBg={previewColors.accentBg}
-          />
+        <Section title="Profil README" desc="Profilinde gorunecek README kaynagini sec.">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedReadmeSource("github")}
+              className="flex-1 rounded-lg border px-3 py-2.5 text-sm transition-colors text-left"
+              style={
+                selectedReadmeSource === "github"
+                  ? { borderColor: previewColors.accentBorder, color: previewColors.accent, backgroundColor: previewColors.accentBg }
+                  : { borderColor: "#3f3f46", color: "#71717a" }
+              }
+            >
+              <span className="font-medium block">GitHub README</span>
+              <span className="text-xs opacity-70 block mt-0.5">
+                {githubReadme ? "Sync ile otomatik guncellenir" : "Henuz cekilmedi — sync yap"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedReadmeSource("custom")}
+              className="flex-1 rounded-lg border px-3 py-2.5 text-sm transition-colors text-left"
+              style={
+                selectedReadmeSource === "custom"
+                  ? { borderColor: previewColors.accentBorder, color: previewColors.accent, backgroundColor: previewColors.accentBg }
+                  : { borderColor: "#3f3f46", color: "#71717a" }
+              }
+            >
+              <span className="font-medium block">Ozel README</span>
+              <span className="text-xs opacity-70 block mt-0.5">Kendi icerigini yaz</span>
+            </button>
+          </div>
+          <input type="hidden" name="readme_source" value={selectedReadmeSource} />
+
+          {selectedReadmeSource === "github" ? (
+            githubReadme ? (
+              <div className="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm text-zinc-400 max-h-60 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
+                {githubReadme.slice(0, 500)}{githubReadme.length > 500 ? "..." : ""}
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-600">
+                GitHub profilinde README bulunamadi. <code className="text-zinc-500">{username}/{username}</code> reposunu olusturup sync yap.
+              </p>
+            )
+          ) : (
+            <ReadmeEditor
+              value={readme}
+              onChange={setReadme}
+              accentColor={previewColors.accent}
+              accentBorder={previewColors.accentBorder}
+              accentBg={previewColors.accentBg}
+            />
+          )}
         </Section>
 
         {/* ── F.3 Özel Bölümler ── */}
