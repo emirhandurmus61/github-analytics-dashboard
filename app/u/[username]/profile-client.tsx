@@ -10,6 +10,7 @@ import {
   Star, GitFork, MapPin, Calendar, Activity, Code2, Target,
   Sparkles, Award, ChevronRight, Download, ExternalLink,
   BookOpen, Timer, TrendingUp, Layers, Hash, ArrowRight,
+  Link as LinkIcon, MessageCircle,
 } from "lucide-react";
 import type { Badge } from "@/lib/badges";
 
@@ -27,6 +28,13 @@ type RepoData = {
 };
 
 type LangData = { lang: string; bytes: number; pct: number; color: string };
+
+type SocialLinks = {
+  twitter: string | null;
+  linkedin: string | null;
+  website: string | null;
+  discord: string | null;
+};
 
 type ProfileProps = {
   username: string;
@@ -47,6 +55,7 @@ type ProfileProps = {
   heatmapData: DayData[];
   widgetOrder: string[];
   widgets: Record<string, boolean>;
+  socialLinks?: SocialLinks;
 };
 
 /* ─── Badge icon map (lucide icons instead of emojis) ─── */
@@ -513,6 +522,7 @@ export default function ProfileClient(props: ProfileProps) {
     earnedBadges, pinnedRepos, topRepos,
     topLanguages, heatmapData,
     widgets,
+    socialLinks,
   } = props;
 
   const currentYear = new Date().getFullYear();
@@ -623,6 +633,66 @@ export default function ProfileClient(props: ProfileProps) {
                       {tag}
                     </span>
                   ))}
+                </div>
+              )}
+              {/* Sosyal linkler */}
+              {socialLinks && (socialLinks.twitter || socialLinks.linkedin || socialLinks.website || socialLinks.discord) && (
+                <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-3">
+                  {socialLinks.twitter && (
+                    <a
+                      href={`https://x.com/${socialLinks.twitter}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-all hover:scale-105 hover:border-zinc-600"
+                      style={{ borderColor: "#27272a", color: "#71717a" }}
+                      title={`@${socialLinks.twitter}`}
+                    >
+                      {/* X / Twitter icon */}
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                      <span className="hidden sm:inline">@{socialLinks.twitter}</span>
+                    </a>
+                  )}
+                  {socialLinks.linkedin && (
+                    <a
+                      href={`https://linkedin.com/in/${socialLinks.linkedin}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-all hover:scale-105 hover:border-zinc-600"
+                      style={{ borderColor: "#27272a", color: "#71717a" }}
+                      title={socialLinks.linkedin}
+                    >
+                      {/* LinkedIn icon */}
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                      </svg>
+                      <span className="hidden sm:inline">{socialLinks.linkedin}</span>
+                    </a>
+                  )}
+                  {socialLinks.website && (
+                    <a
+                      href={socialLinks.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-all hover:scale-105 hover:border-zinc-600"
+                      style={{ borderColor: "#27272a", color: "#71717a" }}
+                      title={socialLinks.website}
+                    >
+                      <LinkIcon className="w-3 h-3" />
+                      <span className="hidden sm:inline">{socialLinks.website.replace(/^https?:\/\//, "")}</span>
+                    </a>
+                  )}
+                  {socialLinks.discord && (
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs cursor-default"
+                      style={{ borderColor: "#27272a", color: "#71717a" }}
+                      title={socialLinks.discord}
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                      <span className="hidden sm:inline">{socialLinks.discord}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

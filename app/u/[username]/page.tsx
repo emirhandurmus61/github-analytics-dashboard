@@ -45,18 +45,27 @@ export default async function PublicProfilePage({ params }: Props) {
 
   if (!user || !user.last_synced_at) notFound();
 
-  // Yeni kolonlar (pinned_repos, profile_readme) henuz migration yapilmamis olabilir — ayri sorgula
+  // Yeni kolonlar (pinned_repos, profile_readme, social_*) henuz migration yapilmamis olabilir — ayri sorgula
   let pinnedReposDb: string[] = [];
   let profileReadmeDb: string | null = null;
+  let socialLinks: { twitter: string | null; linkedin: string | null; website: string | null; discord: string | null } = {
+    twitter: null, linkedin: null, website: null, discord: null,
+  };
   try {
     const { data: extra } = await supabaseAdmin
       .from("users")
-      .select("pinned_repos, profile_readme")
+      .select("pinned_repos, profile_readme, social_twitter, social_linkedin, social_website, social_discord")
       .eq("id", user.id)
       .single();
     if (extra) {
       pinnedReposDb = Array.isArray(extra.pinned_repos) ? extra.pinned_repos : [];
       profileReadmeDb = extra.profile_readme ?? null;
+      socialLinks = {
+        twitter: extra.social_twitter ?? null,
+        linkedin: extra.social_linkedin ?? null,
+        website: extra.social_website ?? null,
+        discord: extra.social_discord ?? null,
+      };
     }
   } catch {
     // Kolonlar henuz yok — sessizce devam et
@@ -183,6 +192,7 @@ export default async function PublicProfilePage({ params }: Props) {
         heatmapData={heatmapData}
         widgetOrder={widgetOrder}
         widgets={widgets}
+        socialLinks={socialLinks}
       />
     </ThemeProvider>
   );

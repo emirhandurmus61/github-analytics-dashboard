@@ -9,7 +9,7 @@ import { TrendingUp, TrendingDown, Minus, Activity } from "lucide-react";
 type DayData = { date: string; commit_count: number };
 type Props = { data: DayData[] };
 
-type WeekPoint = { label: string; weekStart: string; commits: number; avg: number | null; isCurrent: boolean };
+type WeekPoint = { label: string; weekStart: string; commits: number; avg: number | null; projection: number | null; isCurrent: boolean };
 
 function buildWeeklyData(data: DayData[]): WeekPoint[] {
   const map = new Map(data.map((d) => [d.date, d.commit_count]));
@@ -33,6 +33,14 @@ function buildWeeklyData(data: DayData[]): WeekPoint[] {
   }
 
   const M = ["Oca","Sub","Mar","Nis","May","Haz","Tem","Agu","Eyl","Eki","Kas","Ara"];
+
+  // Projeksiyon: son 4 tamamlanmış haftanın ortalaması
+  const completedWeeks = weeks.slice(0, -1); // son hafta (bu hafta) hariç
+  const last4 = completedWeeks.slice(-4);
+  const projectedWeekly = last4.length > 0
+    ? Math.round(last4.reduce((s, x) => s + x.commits, 0) / last4.length)
+    : 0;
+
   return weeks.map((w, i) => {
     const window = weeks.slice(Math.max(0, i - 2), i + 1);
     const avg = window.reduce((s, x) => s + x.commits, 0) / window.length;
@@ -41,8 +49,9 @@ function buildWeeklyData(data: DayData[]): WeekPoint[] {
     return {
       label: isCurrent ? "Bu hafta" : `${M[d.getMonth()]} ${d.getDate()}`,
       weekStart: w.start.toISOString().slice(0, 10),
-      commits: w.commits,
+      commits: isCurrent ? w.commits : w.commits,
       avg: i >= 2 ? Math.round(avg * 10) / 10 : null,
+      projection: isCurrent ? projectedWeekly : null,
       isCurrent,
     };
   });
@@ -64,11 +73,15 @@ function CustomTooltip({ active, payload, label, color }: { active?: boolean; pa
   if (!active || !payload?.length) return null;
   const commits = payload.find((p) => p.name === "commits")?.value;
   const avg = payload.find((p) => p.name === "avg")?.value;
+  const projection = payload.find((p) => p.name === "projection")?.value;
   return (
     <div className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs shadow-lg">
       <p className="mb-0.5 font-medium text-zinc-300">{label}</p>
       {commits !== undefined && <p style={{ color }}>{commits} commit</p>}
-      {avg !== undefined && avg !== null && <p className="text-zinc-500">Ort. {avg}</p>}
+      {avg !== undefined && avg !== null && <p className="text-zinc-500">3h ort. {avg}</p>}
+      {projection !== undefined && projection !== null && (
+        <p className="text-zinc-400">Projeksiyon: {projection} commit</p>
+      )}
     </div>
   );
 }
@@ -77,8 +90,12 @@ export default function VelocityChart({ data }: Props) {
   const theme = useThemeColors();
   const weeks = buildWeeklyData(data);
   const trend = getTrend(weeks);
-  const maxVal = Math.max(...weeks.map((w) => w.commits), 1);
+  const currentWeek = weeks[weeks.length - 1];
+  const projection = currentWeek?.projection ?? 0;
+  const maxVal = Math.max(...weeks.map((w) => w.commits), projection, 1);
   const TrendIcon = trend.icon;
+  // Tahmini aylık commit: projeksiyon * 4.33 hafta
+  const monthlyProjection = Math.round(projection * 4.33);
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
@@ -88,15 +105,22 @@ export default function VelocityChart({ data }: Props) {
           <Activity className="w-4 h-4 text-zinc-500" />
           <h2 className="text-sm font-medium text-zinc-400">Commit Velocity</h2>
         </div>
-        <div
-          className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 self-start"
-          style={{ borderColor: `${trend.color}30`, backgroundColor: `${trend.color}08` }}
-        >
-          <TrendIcon className="w-3.5 h-3.5" style={{ color: trend.color }} />
-          <span className="text-xs font-medium" style={{ color: trend.color }}>
-            {trend.label}
-            {trend.pct !== 0 && ` (${trend.pct > 0 ? "+" : ""}${trend.pct}%)`}
-          </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {monthlyProjection > 0 && (
+            <span className="text-xs text-zinc-600">
+              ~<span className="text-zinc-400 font-medium">{monthlyProjection}</span> commit/ay tahmini
+            </span>
+          )}
+          <div
+            className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1"
+            style={{ borderColor: `${trend.color}30`, backgroundColor: `${trend.color}08` }}
+          >
+            <TrendIcon className="w-3.5 h-3.5" style={{ color: trend.color }} />
+            <span className="text-xs font-medium" style={{ color: trend.color }}>
+              {trend.label}
+              {trend.pct !== 0 && ` (${trend.pct > 0 ? "+" : ""}${trend.pct}%)`}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -130,12 +154,21 @@ export default function VelocityChart({ data }: Props) {
               stroke={theme.accentMid} strokeWidth={1.5} strokeDasharray="5 3"
               fill="none" dot={false} activeDot={false}
             />
+            <Area
+              type="monotone" dataKey="projection" name="projection"
+              stroke="#71717a" strokeWidth={1.5} strokeDasharray="3 3"
+              fill="none" dot={(p) => {
+                const { cx, cy, index } = p;
+                if (index === weeks.length - 1) return <circle key={index} cx={cx} cy={cy} r={3} fill="#71717a" stroke="#09090b" strokeWidth={2} />;
+                return <circle key={index} cx={cx} cy={cy} r={0} fill="none" />;
+              }} activeDot={false}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
       {/* Legend */}
-      <div className="mt-2 flex items-center gap-4 justify-end shrink-0">
+      <div className="mt-2 flex items-center gap-4 justify-end shrink-0 flex-wrap">
         <div className="flex items-center gap-1">
           <div className="h-px w-4" style={{ backgroundColor: theme.accent }} />
           <span className="text-[10px] text-zinc-600">Haftalik</span>
@@ -144,6 +177,12 @@ export default function VelocityChart({ data }: Props) {
           <div className="h-px w-4 border-t border-dashed" style={{ borderColor: theme.accentMid }} />
           <span className="text-[10px] text-zinc-600">3h ort.</span>
         </div>
+        {projection > 0 && (
+          <div className="flex items-center gap-1">
+            <div className="h-px w-4 border-t border-dashed border-zinc-600" />
+            <span className="text-[10px] text-zinc-600">Projeksiyon</span>
+          </div>
+        )}
       </div>
     </div>
   );

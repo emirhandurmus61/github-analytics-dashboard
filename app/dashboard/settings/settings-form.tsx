@@ -33,6 +33,10 @@ type Props = {
   currentlyWorkingOn: string | null;
   yearlyGoal: string | null;
   techTags: string[];
+  socialTwitter: string | null;
+  socialLinkedin: string | null;
+  socialWebsite: string | null;
+  socialDiscord: string | null;
 };
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -51,6 +55,10 @@ export default function SettingsForm({
   currentlyWorkingOn,
   yearlyGoal,
   techTags,
+  socialTwitter,
+  socialLinkedin,
+  socialWebsite,
+  socialDiscord,
 }: Props) {
   const [state, formAction, pending] = useActionState(saveProfileSettings, initialState);
 
@@ -300,6 +308,74 @@ export default function SettingsForm({
                 ))}
               </div>
             )}
+          </div>
+        </Section>
+
+        {/* ── H.4 Sosyal Linkler ── */}
+        <Section title="Sosyal Linkler" desc="Public profilinde adının altında küçük ikonlar olarak görünür.">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="social_twitter">
+                Twitter / X
+              </label>
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 focus-within:border-zinc-500">
+                <span className="text-xs text-zinc-600 shrink-0">x.com/</span>
+                <input
+                  id="social_twitter"
+                  name="social_twitter"
+                  type="text"
+                  defaultValue={socialTwitter ?? ""}
+                  maxLength={50}
+                  placeholder="kullanici_adi"
+                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="social_linkedin">
+                LinkedIn
+              </label>
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 focus-within:border-zinc-500">
+                <span className="text-xs text-zinc-600 shrink-0">linkedin.com/in/</span>
+                <input
+                  id="social_linkedin"
+                  name="social_linkedin"
+                  type="text"
+                  defaultValue={socialLinkedin ?? ""}
+                  maxLength={80}
+                  placeholder="kullanici-adi"
+                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="social_website">
+                Kişisel Site
+              </label>
+              <input
+                id="social_website"
+                name="social_website"
+                type="url"
+                defaultValue={socialWebsite ?? ""}
+                maxLength={200}
+                placeholder="https://..."
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="social_discord">
+                Discord
+              </label>
+              <input
+                id="social_discord"
+                name="social_discord"
+                type="text"
+                defaultValue={socialDiscord ?? ""}
+                maxLength={50}
+                placeholder="kullanici#0000"
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+              />
+            </div>
           </div>
         </Section>
 

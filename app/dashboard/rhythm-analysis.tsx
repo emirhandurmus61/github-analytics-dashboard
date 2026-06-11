@@ -29,8 +29,10 @@ function buildStats(hourData: HourEntry[], commitTimestamps: string[]) {
   const weekdayTotal = grid.slice(0, 5).flat().reduce((s, c) => s + c, 0);
   const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
   const dayTotals = grid.map((row) => row.reduce((s, c) => s + c, 0));
+  const dayMax = Math.max(...dayTotals, 1);
   const DAY_NAMES = ["Pzt","Sal","Car","Per","Cum","Cmt","Paz"];
-  const peakDay = DAY_NAMES[dayTotals.indexOf(Math.max(...dayTotals))];
+  const peakDayIndex = dayTotals.indexOf(Math.max(...dayTotals));
+  const peakDay = DAY_NAMES[peakDayIndex];
 
   const maxPeriod = Math.max(...Object.values(periodCounts));
   let identityKey: PeriodKey = "afternoon";
@@ -53,7 +55,7 @@ function buildStats(hourData: HourEntry[], commitTimestamps: string[]) {
   }
 
   const weekdayPct = total > 0 ? Math.round((weekdayTotal / total) * 100) : 0;
-  return { total, periodCounts, weekdayPct, weekendPct: 100 - weekdayPct, peakHour, peakDay, identityPeriod, longestSession, hourTotals };
+  return { total, periodCounts, weekdayPct, weekendPct: 100 - weekdayPct, peakHour, peakDay, peakDayIndex, dayTotals, dayMax, DAY_NAMES, identityPeriod, longestSession, hourTotals };
 }
 
 export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
@@ -106,14 +108,38 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
 
         {/* Right: Stats */}
         <div className="space-y-2">
+          {/* Günlük dağılım bar grafiği */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-            <p className="text-[10px] text-zinc-600 mb-1">Hafta Ici / Sonu</p>
-            <div className="flex h-2 rounded-full overflow-hidden bg-zinc-700">
-              <div className="h-full" style={{ width: `${s.weekdayPct}%`, backgroundColor: theme.accent }} />
+            <p className="text-[10px] text-zinc-600 mb-2">Gün Bazlı Dağılım</p>
+            <div className="flex items-end gap-1 h-12">
+              {s.dayTotals.map((count, i) => {
+                const pct = s.dayMax > 0 ? (count / s.dayMax) * 100 : 0;
+                const isWeekend = i >= 5;
+                const isPeak = i === s.peakDayIndex;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                    <div
+                      className="w-full rounded-sm transition-all hover:opacity-80"
+                      title={`${s.DAY_NAMES[i]}: ${count} commit`}
+                      style={{
+                        height: `${Math.max(pct, count > 0 ? 8 : 4)}%`,
+                        backgroundColor: isPeak
+                          ? theme.accent
+                          : isWeekend
+                          ? theme.shades[2]
+                          : count > 0 ? theme.shades[1] : "#1a1a1e",
+                      }}
+                    />
+                    <span className={`text-[8px] tabular-nums ${isPeak ? "" : "text-zinc-700"}`} style={{ color: isPeak ? theme.accent : undefined }}>
+                      {s.DAY_NAMES[i]}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex justify-between text-[10px] mt-1">
-              <span style={{ color: theme.accent }}>%{s.weekdayPct} ici</span>
-              <span className="text-zinc-600">%{s.weekendPct} sonu</span>
+            <div className="flex justify-between text-[10px] mt-1.5">
+              <span style={{ color: theme.accent }}>%{s.weekdayPct} hafta içi</span>
+              <span className="text-zinc-500">%{s.weekendPct} hafta sonu</span>
             </div>
           </div>
 
@@ -127,7 +153,7 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
             <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
               <div className="flex items-center gap-1 mb-1">
                 <Calendar className="w-2.5 h-2.5 text-zinc-600" />
-                <p className="text-[10px] text-zinc-600">En Aktif</p>
+                <p className="text-[10px] text-zinc-600">En Aktif Gün</p>
               </div>
               <p className="text-sm font-semibold text-zinc-200">{s.peakDay}</p>
             </div>

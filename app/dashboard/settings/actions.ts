@@ -63,6 +63,12 @@ export async function saveProfileSettings(
     .filter((t) => t.length > 0 && t.length <= 30)
     .slice(0, 12);
 
+  // H.4 — Sosyal linkler
+  const socialTwitter = (formData.get("social_twitter") as string | null)?.trim().replace(/^@/, "").slice(0, 50) || null;
+  const socialLinkedin = (formData.get("social_linkedin") as string | null)?.trim().slice(0, 80) || null;
+  const socialWebsite = (formData.get("social_website") as string | null)?.trim().slice(0, 200) || null;
+  const socialDiscord = (formData.get("social_discord") as string | null)?.trim().slice(0, 50) || null;
+
   // Ana alanlar
   const { error } = await supabaseAdmin
     .from("users")
@@ -75,6 +81,10 @@ export async function saveProfileSettings(
       currently_working_on: currentlyWorkingOn || null,
       yearly_goal: yearlyGoal || null,
       tech_tags: techTags,
+      social_twitter: socialTwitter,
+      social_linkedin: socialLinkedin,
+      social_website: socialWebsite,
+      social_discord: socialDiscord,
     })
     .eq("username", session.user.username);
 
