@@ -31,7 +31,7 @@ export default async function DashboardLayout({
         {/* Navbar */}
         <header className="border-b border-zinc-800 bg-zinc-950 px-6 py-4">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
-            <div className="flex items-center gap-3">
+            <a href="/dashboard" className="flex items-center gap-3 transition-opacity hover:opacity-80">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800">
                 <svg
                   className="h-4 w-4 text-zinc-100"
@@ -44,7 +44,7 @@ export default async function DashboardLayout({
               <span className="text-sm font-semibold text-zinc-100">
                 Dev Analytics
               </span>
-            </div>
+            </a>
 
             <div className="flex items-center gap-2 sm:gap-4">
               <div className="hidden items-center gap-2.5 sm:flex">

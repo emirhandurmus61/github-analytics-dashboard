@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import type { Metadata } from "next";
 import WrappedClient from "./wrapped-client";
+import { auth } from "@/lib/auth";
 
 type Props = { params: Promise<{ username: string; year: string }> };
 
@@ -31,6 +32,9 @@ const DAY_NAMES = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartes
 export default async function WrappedPage({ params }: Props) {
   const { username, year } = await params;
   const yearNum = parseInt(year, 10);
+
+  const session = await auth();
+  const isOwner = session?.user?.username === username;
 
   if (isNaN(yearNum) || yearNum < 2015 || yearNum > new Date().getFullYear()) {
     notFound();
@@ -209,7 +213,7 @@ export default async function WrappedPage({ params }: Props) {
 
   return (
     <ThemeProvider accent={accent}>
-      <WrappedClient data={wrappedData} />
+      <WrappedClient data={wrappedData} isOwner={isOwner} />
     </ThemeProvider>
   );
 }

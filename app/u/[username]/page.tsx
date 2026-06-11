@@ -8,6 +8,7 @@ import { calcBadges } from "@/lib/badges";
 import type { Metadata } from "next";
 import ProfileClient from "./profile-client";
 import { recordProfileView } from "./actions";
+import { auth } from "@/lib/auth";
 
 type Props = { params: Promise<{ username: string }> };
 
@@ -37,6 +38,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PublicProfilePage({ params }: Props) {
   const { username } = await params;
+
+  const session = await auth();
+  const isOwner = session?.user?.username === username;
 
   const { data: user } = await supabaseAdmin
     .from("users")
@@ -177,6 +181,7 @@ export default async function PublicProfilePage({ params }: Props) {
       <ProfileClient
         username={username}
         userId={user.id}
+        isOwner={isOwner}
         name={user.name ?? username}
         avatarUrl={user.avatar_url}
         bio={user.bio}

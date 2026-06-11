@@ -58,6 +58,7 @@ type ProfileProps = {
   widgets: Record<string, boolean>;
   socialLinks?: SocialLinks;
   recordView: (userId: string) => Promise<void>;
+  isOwner?: boolean;
 };
 
 /* ─── Badge icon map (lucide icons instead of emojis) ─── */
@@ -526,6 +527,7 @@ export default function ProfileClient(props: ProfileProps) {
     widgets,
     socialLinks,
     recordView,
+    isOwner,
   } = props;
 
   // Ziyareti bir kez kaydet
@@ -577,6 +579,14 @@ export default function ProfileClient(props: ProfileProps) {
               <span className="text-sm font-medium text-zinc-500 group-hover:text-zinc-300 transition-colors">Dev Analytics</span>
             </Link>
             <div className="flex items-center gap-2">
+              {isOwner && (
+                <a
+                  href="/dashboard"
+                  className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  ← Panele Dön
+                </a>
+              )}
               <a
                 href={`/api/card/${username}`}
                 download={`${username}-dev-card.png`}
