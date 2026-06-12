@@ -216,69 +216,122 @@ export async function GET(
   }
 
   // ══════════════════════════════════════════════
-  // FORMAT: SQUARE (600×600) — dikey, merkezi
+  // FORMAT: SQUARE (600×600) — dikey, sabit bölümler
+  // Her bölümün px yüksekliği sabit — hiçbiri üst üste binemez
   // ══════════════════════════════════════════════
   if (format === "square") {
-    const CELL = 10; const GAP = 3;
-    const WEEKS = 18;
-    const { cells, gridW, gridH } = buildCells(WEEKS, CELL, GAP);
+    // Heatmap: içerik genişliği = 600 - 2×36 = 528px
+    // WEEKS × (CELL+GAP) - GAP = 528  →  CELL=10 GAP=3  →  WEEKS = (528+3)/13 = 40.8 → 40
+    const PAD = 36;
+    const innerW = 600 - PAD * 2; // 528px
+    const CELL = 8; const GAP = 2;
+    const WEEKS = Math.floor((innerW + GAP) / (CELL + GAP)); // ~52 hafta sığar, 26 yeterli
+    const SQ_WEEKS = Math.min(WEEKS, 26);
+    const { cells, gridW, gridH } = buildCells(SQ_WEEKS, CELL, GAP);
 
     return new ImageResponse(
       (
-        <div style={{ background: "#09090b", width: 600, height: 600, display: "flex", flexDirection: "column", position: "relative", overflow: "hidden", fontFamily: "sans-serif" }}>
+        <div style={{
+          background: "#09090b", width: 600, height: 600,
+          display: "flex", flexDirection: "column",
+          position: "relative", overflow: "hidden", fontFamily: "sans-serif",
+        }}>
           <Background w={600} h={600} />
 
-          {/* Content */}
-          <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "36px 40px", position: "relative", zIndex: 10, gap: 0 }}>
+          {/* Tüm içerik tek dikey flex sütunu — padding sabit */}
+          <div style={{
+            display: "flex", flexDirection: "column",
+            width: "100%", height: "100%",
+            padding: `${PAD}px ${PAD}px`,
+            position: "relative", zIndex: 10,
+            boxSizing: "border-box" as const,
+          }}>
 
-            {/* Top bar */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
+            {/* ① Logo + Tema — 26px yükseklik */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 26, flexShrink: 0 }}>
               <LogoPill />
               <ThemePill />
             </div>
 
-            {/* Avatar + identity — merkezi */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginBottom: 28 }}>
+            {/* ② Avatar + İsim — 20px margin top, 80px avatar + 38px metin = ~118px */}
+            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 24, flexShrink: 0 }}>
               {user.avatar_url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.avatar_url} width={96} height={96} alt=""
-                  style={{ borderRadius: 48, border: `3px solid ${hexAlpha(ac, 0.35)}`, boxShadow: `0 0 40px ${hexAlpha(ac, 0.2)}, 0 0 0 6px ${hexAlpha(ac, 0.06)}` }}
+                <img src={user.avatar_url} width={80} height={80} alt=""
+                  style={{ borderRadius: 40, border: `2px solid ${hexAlpha(ac, 0.35)}`, boxShadow: `0 0 28px ${hexAlpha(ac, 0.2)}`, flexShrink: 0 }}
                 />
               )}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#fafafa", fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}>{displayName}</span>
-                <span style={{ color: "#52525b", fontSize: 14 }}>@{username}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                <span style={{ color: "#fafafa", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1, whiteSpace: "nowrap" as const }}>{displayName}</span>
+                <span style={{ color: "#52525b", fontSize: 13, whiteSpace: "nowrap" as const }}>@{username}</span>
+                {/* Tech tags yanında avatar ile aynı hizada */}
+                {techTags.length > 0 && (
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" as const, marginTop: 6 }}>
+                    {techTags.slice(0, 4).map((tag) => (
+                      <span key={tag} style={{ fontSize: 9, color: hexAlpha(ac, 0.85), background: hexAlpha(ac, 0.08), border: `1px solid ${hexAlpha(ac, 0.18)}`, borderRadius: 4, padding: "2px 7px", fontWeight: 500, whiteSpace: "nowrap" as const }}>{tag}</span>
+                    ))}
+                  </div>
+                )}
               </div>
+            </div>
 
-              {/* Tech tags */}
-              {techTags.length > 0 && (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, justifyContent: "center" }}>
-                  {techTags.slice(0, 4).map((tag) => (
-                    <span key={tag} style={{ fontSize: 10, color: hexAlpha(ac, 0.85), background: hexAlpha(ac, 0.08), border: `1px solid ${hexAlpha(ac, 0.18)}`, borderRadius: 5, padding: "3px 9px", fontWeight: 500 }}>{tag}</span>
+            {/* ③ Stats — 4 kutu, 16px margin top */}
+            <div style={{ display: "flex", gap: 7, marginTop: 18, flexShrink: 0 }}>
+              {[
+                { label: "Commit", value: yearlyCommits.toLocaleString("tr-TR") },
+                { label: "Streak", value: `${currentStreak}g` },
+                { label: "Repos",  value: String(repoCount) },
+                { label: "Aktif",  value: `${totalActiveDays}g` },
+              ].map(({ label, value }) => (
+                <div key={label} style={{
+                  display: "flex", flexDirection: "column", gap: 2, flex: 1,
+                  background: "rgba(24,24,27,0.7)", border: "1px solid rgba(39,39,42,0.5)",
+                  borderRadius: 8, padding: "7px 10px",
+                }}>
+                  <span style={{ color: "#52525b", fontSize: 8, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" as const }}>{label}</span>
+                  <span style={{ color: ac, fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}>{value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* ④ Heatmap — tam genişlik, 16px margin top */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 18, flexShrink: 0 }}>
+              <span style={{ color: "#3f3f46", fontSize: 9, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 6 }}>Contributions — Son 6 Ay</span>
+              <svg width={gridW} height={gridH} style={{ display: "block" }}>
+                {cells.map(({ col, row, intensity }) => (
+                  <rect
+                    key={`${col}-${row}`}
+                    x={col * (CELL + GAP)} y={row * (CELL + GAP)}
+                    width={CELL} height={CELL} rx={2}
+                    fill={cellColor(intensity)}
+                  />
+                ))}
+              </svg>
+            </div>
+
+            {/* ⑤ Dil bar — 14px margin top */}
+            {topLangs.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 14, flexShrink: 0 }}>
+                <div style={{ display: "flex", height: 5, borderRadius: 3, overflow: "hidden", gap: 2 }}>
+                  {topLangs.map(([lang, bytes]) => (
+                    <div key={lang} style={{ width: `${(bytes / totalBytes) * 100}%`, height: "100%", borderRadius: 3, backgroundColor: LANG_COLORS[lang] ?? "#6b7280" }} />
                   ))}
                 </div>
-              )}
-            </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+                  {topLangs.map(([lang, bytes]) => (
+                    <div key={lang} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 5, height: 5, borderRadius: 2, backgroundColor: LANG_COLORS[lang] ?? "#6b7280" }} />
+                      <span style={{ fontSize: 9, color: "#71717a" }}>{lang}</span>
+                      <span style={{ fontSize: 8, color: "#3f3f46" }}>{((bytes / totalBytes) * 100).toFixed(0)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            {/* Stats row */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-              <StatBox label="Commit" value={yearlyCommits.toLocaleString("tr-TR")} />
-              <StatBox label="Streak" value={`${currentStreak}g`} />
-              <StatBox label="Repos" value={String(repoCount)} />
-              <StatBox label="Aktif" value={`${totalActiveDays}g`} />
-            </div>
-
-            {/* Heatmap — merkezi */}
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
-              <HeatmapSvg cells={cells} gridW={gridW} gridH={gridH} cellSize={CELL} gap={GAP} />
-            </div>
-
-            {/* Language bar */}
-            {topLangs.length > 0 && <LangBar langs={topLangs} totalB={totalBytes} />}
-
-            {/* Bottom spacer + URL */}
+            {/* ⑥ Alt URL */}
             <div style={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-              <span style={{ color: "#3f3f46", fontSize: 11 }}>devanalytics.app/@{username}</span>
+              <span style={{ color: "#3f3f46", fontSize: 10 }}>devanalytics.app/@{username}</span>
             </div>
           </div>
         </div>
