@@ -66,28 +66,25 @@ export default function DeveloperCard({ username }: { username: string }) {
       </div>
 
       {/* Card preview */}
-      <div className="flex-1 flex flex-col gap-4">
-        {/* Live preview */}
-        <div
-          className="relative w-full rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950"
-          style={{ aspectRatio: format === "square" ? "1/1" : format === "twitter" ? "3/1" : "1200/630" }}
-        >
+      <div className="flex-1 min-h-0 flex flex-col gap-3">
+        {/* Live preview — sabit yükseklik, görsel içine sığar */}
+        <div className="relative w-full rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center" style={{ height: 160 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             key={cardUrl}
             src={cardUrl}
             alt="Developer Card"
-            className="w-full h-full object-cover"
+            className="max-w-full max-h-full object-contain rounded-lg"
           />
         </div>
 
         {/* Format seçici */}
-        <div className="flex rounded-lg border border-zinc-800 bg-zinc-950 p-0.5">
+        <div className="flex rounded-lg border border-zinc-800 bg-zinc-950 p-0.5 shrink-0">
           {FORMATS.map((f) => (
             <button
               key={f.id}
               onClick={() => setFormat(f.id)}
-              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors flex flex-col items-center gap-0.5 ${
+              className={`flex-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors flex flex-col items-center gap-0.5 ${
                 format === f.id
                   ? "bg-zinc-800 text-zinc-100"
                   : "text-zinc-500 hover:text-zinc-300"
@@ -100,30 +97,30 @@ export default function DeveloperCard({ username }: { username: string }) {
         </div>
 
         {/* Aksiyon butonları */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button
             onClick={handleDownload}
             disabled={downloading}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: theme.accent, color: "#09090b" }}
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5" />
             {downloading ? "İndiriliyor..." : "PNG İndir"}
           </button>
 
           <button
             onClick={handleCopy}
-            className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+            className="flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
           >
             {copied ? (
               <>
-                <Check className="w-4 h-4 text-emerald-400" />
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-emerald-400">Kopyalandı</span>
               </>
             ) : (
               <>
-                <Share2 className="w-4 h-4" />
-                Linki Kopyala
+                <Share2 className="w-3.5 h-3.5" />
+                Kopyala
               </>
             )}
           </button>
@@ -134,9 +131,9 @@ export default function DeveloperCard({ username }: { username: string }) {
           href={twitterUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium border border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+          className="shrink-0 flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-medium border border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
         >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.726-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
           </svg>
           Twitter&apos;da Paylaş
