@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
+import { Share2, Download, Check, ChevronDown } from "lucide-react";
 
 type LangEntry = { lang: string; bytes: number; pct: number; color: string };
 type BigCommit = { message: string; additions: number; deletions: number; date: string };
@@ -176,9 +177,20 @@ function CountUp({ value, active, suffix = "", prefix = "" }: {
   return <>{prefix}{v.toLocaleString("tr-TR")}{suffix}</>;
 }
 
+// Available years for selector (2022 → current year)
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from(
+  { length: CURRENT_YEAR - 2022 + 1 },
+  (_, i) => CURRENT_YEAR - i
+);
+
 export default function WrappedClient({ data, isOwner }: { data: WrappedData; isOwner?: boolean }) {
   const [slide, setSlide] = useState(0);
   const [started, setStarted] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [yearOpen, setYearOpen] = useState(false);
+  const confettiFired = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const ac = data.accentColor;
@@ -190,7 +202,58 @@ export default function WrappedClient({ data, isOwner }: { data: WrappedData; is
 
   function copy() {
     navigator.clipboard.writeText(shareUrl).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
+
+  // Confetti on last slide
+  useEffect(() => {
+    if (slide === 9 && !confettiFired.current) {
+      confettiFired.current = true;
+      import("canvas-confetti").then(({ default: confetti }) => {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.5 },
+          colors: [ac, "#ffffff", "#a1a1aa"],
+        });
+        setTimeout(() => confetti({
+          particleCount: 60,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.6 },
+          colors: [ac, "#ffffff"],
+        }), 300);
+        setTimeout(() => confetti({
+          particleCount: 60,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.6 },
+          colors: [ac, "#ffffff"],
+        }), 500);
+      });
+    }
+    if (slide !== 9) confettiFired.current = false;
+  }, [slide, ac]);
+
+  // Share current slide as PNG
+  const shareSlide = useCallback(async () => {
+    setSharing(true);
+    try {
+      const url = `/api/wrapped-slide/${data.username}/${data.year}/${slide}`;
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${data.username}-${data.year}-wrapped-slide${slide + 1}.png`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSharing(false);
+    }
+  }, [data.username, data.year, slide]);
 
   const SLIDES = [
     // 0 — Kapak
@@ -475,12 +538,25 @@ export default function WrappedClient({ data, isOwner }: { data: WrappedData; is
             </div>
           ))}
         </div>
-        <div className="flex gap-3 justify-center">
+        <div className="flex gap-3 justify-center flex-wrap">
           <button
             onClick={copy}
-            className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+            className="flex items-center gap-2 rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
           >
-            Linki Kopyala
+            {copied ? <Check size={14} /> : <Share2 size={14} />}
+            {copied ? "Kopyalandı!" : "Linki Paylaş"}
+          </button>
+          <button
+            onClick={shareSlide}
+            disabled={sharing}
+            className="flex items-center gap-2 rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
+          >
+            {sharing ? (
+              <div className="w-3 h-3 border border-zinc-500 border-t-zinc-200 rounded-full animate-spin" />
+            ) : (
+              <Download size={14} />
+            )}
+            PNG İndir
           </button>
           <a
             href={`/u/${data.username}`}
@@ -527,10 +603,8 @@ export default function WrappedClient({ data, isOwner }: { data: WrappedData; is
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
-      {/* Navbar — server component olarak page.tsx'den render ediliyor */}
-
-      {/* Progress bar */}
-      <div className="flex gap-1 px-6 py-3 shrink-0">
+      {/* Progress bar + year selector row */}
+      <div className="flex items-center gap-3 px-6 py-3 shrink-0">
         {SLIDES.map((_, i) => (
           <button
             key={i}
@@ -539,6 +613,31 @@ export default function WrappedClient({ data, isOwner }: { data: WrappedData; is
             style={{ backgroundColor: i <= slide ? ac : "#27272a" }}
           />
         ))}
+
+        {/* Year selector */}
+        <div className="relative shrink-0 ml-2">
+          <button
+            onClick={() => setYearOpen((v) => !v)}
+            className="flex items-center gap-1 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+          >
+            {data.year}
+            <ChevronDown size={12} className={`transition-transform ${yearOpen ? "rotate-180" : ""}`} />
+          </button>
+          {yearOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl overflow-hidden">
+              {AVAILABLE_YEARS.map((y) => (
+                <a
+                  key={y}
+                  href={`/u/${data.username}/${y}`}
+                  className="block px-4 py-2 text-sm transition-colors hover:bg-zinc-800"
+                  style={{ color: y === data.year ? ac : "#a1a1aa", fontWeight: y === data.year ? 700 : 400 }}
+                >
+                  {y}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Slide alanı */}
@@ -556,6 +655,23 @@ export default function WrappedClient({ data, isOwner }: { data: WrappedData; is
           }}
         />
         {SLIDES}
+
+        {/* Per-slide share button */}
+        {started && (
+          <button
+            onClick={shareSlide}
+            disabled={sharing}
+            className="absolute top-4 right-4 flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-sm px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-all disabled:opacity-50"
+            title="Bu anı PNG olarak indir"
+          >
+            {sharing ? (
+              <div className="w-3 h-3 border border-zinc-500 border-t-zinc-200 rounded-full animate-spin" />
+            ) : (
+              <Download size={13} />
+            )}
+            Bu anı paylaş
+          </button>
+        )}
       </div>
 
       {/* Navigasyon butonları */}
