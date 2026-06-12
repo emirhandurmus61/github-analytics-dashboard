@@ -34,12 +34,15 @@ function buildGrid(data: DayData[]) {
   return weeks;
 }
 
-function getMonthLabels(weeks: { date: string; count: number }[][]) {
-  const labels: { label: string; col: number }[] = [];
+function getMonthLabels(weeks: { date: string; count: number }[][], cellSize: number, gap: number) {
+  const labels: { label: string; left: number }[] = [];
   let last = -1;
   weeks.forEach((w, col) => {
     const m = new Date(w[0].date).getMonth();
-    if (m !== last) { labels.push({ label: MONTHS[m], col }); last = m; }
+    if (m !== last) {
+      labels.push({ label: MONTHS[m], left: col * (cellSize + gap) });
+      last = m;
+    }
   });
   return labels;
 }
@@ -47,36 +50,29 @@ function getMonthLabels(weeks: { date: string; count: number }[][]) {
 function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, string, string, string] }) {
   const weeks = buildGrid(data);
   const max = Math.max(...data.map((d) => d.commit_count), 1);
-  const monthLabels = getMonthLabels(weeks);
   const total = data.reduce((s, d) => s + d.commit_count, 0);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [cellSize, setCellSize] = useState(13);
-  const gap = 3;
+  // cellSize: container genişliğinden hesaplanır, scroll olmaz
+  const [cellSize, setCellSize] = useState(11);
+  const gap = 2;
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
     const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0]?.contentRect ?? {};
-      // Mobil: genişliğe göre hücre boyutunu ayarla
-      const isMobileView = window.innerWidth < 768;
-      if (isMobileView) {
-        // Tüm haftaları (53) sığdır — minWidth overflow-x-auto ile scroll eder
-        const sizeFromW = Math.floor((width - 36 - gap * 52) / 53);
-        setCellSize(Math.max(10, Math.min(sizeFromW, 13)));
-      } else {
-        // Desktop: yüksekliğe göre
-        const availH = (height ?? 200) - 42;
-        const size = Math.floor((availH - gap * 6) / 7);
-        setCellSize(Math.max(12, Math.min(size, 36)));
-      }
+      const w = entries[0]?.contentRect.width ?? 300;
+      // Toplam genişlik = dayLabel(28px) + gap(4px) + weeks * (cell + gap) - gap
+      // weeks.length haftayı sığdır
+      const available = w - 28 - 4 - gap * (weeks.length - 1);
+      const size = Math.floor(available / weeks.length);
+      setCellSize(Math.max(8, Math.min(size, 18)));
     });
-
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [weeks.length]);
+
+  const monthLabels = getMonthLabels(weeks, cellSize, gap);
 
   function getColor(count: number) {
     if (count === 0) return "#1a1a1e";
@@ -88,7 +84,7 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 h-full flex flex-col">
       <div className="flex items-center justify-between shrink-0 mb-3">
         <div className="flex items-center gap-2">
           <Grid3X3 className="w-4 h-4 text-zinc-500" />
@@ -97,50 +93,64 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
         <span className="text-xs text-zinc-600 tabular-nums">{total.toLocaleString("tr-TR")} commit</span>
       </div>
 
-      <div ref={containerRef} className="overflow-x-auto flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0" style={{ minWidth: weeks.length * (cellSize + gap) + 36, width: "max-content" }}>
-          {/* Month labels */}
-          <div className="relative mb-1 ml-9 flex" style={{ height: 16 }}>
-            {monthLabels.map(({ label, col }) => (
-              <span key={`${label}-${col}`} className="absolute text-xs text-zinc-600" style={{ left: col * (cellSize + gap) }}>
-                {label}
-              </span>
+      {/* Container: genişliği ölç, scroll YOK */}
+      <div ref={containerRef} className="flex-1 min-h-0 flex flex-col">
+        {/* Month labels */}
+        <div className="relative shrink-0 mb-1" style={{ height: 14, paddingLeft: 32 }}>
+          {monthLabels.map(({ label, left }) => (
+            <span
+              key={`${label}-${left}`}
+              className="absolute text-[10px] text-zinc-600"
+              style={{ left: 32 + left }}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+
+        {/* Grid */}
+        <div className="flex shrink-0" style={{ gap: 4 }}>
+          {/* Day labels */}
+          <div className="flex flex-col" style={{ gap, width: 28, paddingTop: 0 }}>
+            {DAYS.map((day, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-end text-[10px] text-zinc-600"
+                style={{ height: cellSize }}
+              >
+                {day}
+              </div>
             ))}
           </div>
 
-          {/* Grid */}
-          <div className="flex gap-0">
-            <div className="mr-2 flex flex-col justify-between py-0" style={{ gap }}>
-              {DAYS.map((day, i) => (
-                <span key={i} className="text-xs text-zinc-600 flex items-center" style={{ height: cellSize }}>
-                  {day}
-                </span>
-              ))}
-            </div>
-            <div className="flex" style={{ gap }}>
-              {weeks.map((week, wi) => (
-                <div key={wi} className="flex flex-col" style={{ gap }}>
-                  {week.map((day) => (
-                    <div
-                      key={day.date}
-                      title={`${day.date}: ${day.count} commit`}
-                      className="rounded-[3px] hover:opacity-80 transition-opacity"
-                      style={{ width: cellSize, height: cellSize, backgroundColor: getColor(day.count) }}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className="mt-3 flex items-center justify-end gap-1.5">
-            <span className="text-xs text-zinc-600">Az</span>
-            {["#1a1a1e", ...shades].map((c) => (
-              <div key={c} className="rounded-[3px]" style={{ width: cellSize, height: cellSize, backgroundColor: c }} />
+          {/* Cells */}
+          <div className="flex flex-1" style={{ gap }}>
+            {weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-1 flex-col" style={{ gap }}>
+                {week.map((day) => (
+                  <div
+                    key={day.date}
+                    title={`${day.date}: ${day.count} commit`}
+                    className="rounded-[2px] hover:opacity-80 transition-opacity w-full"
+                    style={{ height: cellSize, backgroundColor: getColor(day.count) }}
+                  />
+                ))}
+              </div>
             ))}
-            <span className="text-xs text-zinc-600">Cok</span>
           </div>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-2 flex items-center justify-end gap-1 shrink-0">
+          <span className="text-[10px] text-zinc-600">Az</span>
+          {["#1a1a1e", ...shades].map((c) => (
+            <div
+              key={c}
+              className="rounded-[2px]"
+              style={{ width: cellSize, height: cellSize, backgroundColor: c }}
+            />
+          ))}
+          <span className="text-[10px] text-zinc-600">Çok</span>
         </div>
       </div>
     </div>

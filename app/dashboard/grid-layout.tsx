@@ -185,12 +185,6 @@ export function SortableWidget({ id, children }: SortableWidgetProps) {
         gridRow: `span ${cfg.rowSpan}`,
       };
 
-  // Mobil: sabit yükseklik yok, kart içeriğine göre uzar
-  // Desktop: gridAutoRows CELL_SIZE ile sabit hücre yüksekliği
-  const heightStyle = isMobile
-    ? { minHeight: getMobileMinHeight(id) }
-    : { height: "100%" };
-
   return (
     <div
       ref={setNodeRef}
@@ -230,8 +224,10 @@ export function SortableWidget({ id, children }: SortableWidgetProps) {
         </>
       )}
 
-      {/* Content */}
-      <div className="w-full overflow-hidden" style={heightStyle}>
+      {/* Content:
+          - Desktop: h-full → grid hücresini doldur
+          - Mobil: h-auto → kart kendi içeriği kadar büyür, boşluk yok */}
+      <div className={isMobile ? "w-full" : "w-full h-full overflow-hidden"}>
         {children}
       </div>
     </div>
