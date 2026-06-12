@@ -214,7 +214,7 @@ export default async function WrappedPage({ params }: Props) {
 
   return (
     <ThemeProvider accent={accent}>
-      <Navbar variant="minimal" />
+      <Navbar />
       <WrappedClient data={wrappedData} isOwner={isOwner} />
     </ThemeProvider>
   );

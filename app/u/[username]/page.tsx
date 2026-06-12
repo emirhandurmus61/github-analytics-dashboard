@@ -186,7 +186,7 @@ export default async function PublicProfilePage({ params }: Props) {
 
   return (
     <ThemeProvider accent={accent}>
-      <Navbar variant="minimal" />
+      <Navbar />
       <ProfileClient
         username={username}
         userId={user.id}

@@ -2,18 +2,16 @@ import Image from "next/image";
 import { auth, signOut } from "@/lib/auth";
 
 type NavbarProps = {
-  variant?: "default" | "minimal";
   username?: string;
   avatarUrl?: string | null;
   displayName?: string | null;
 };
 
 export default async function Navbar({
-  variant = "default",
   username: propUsername,
   avatarUrl: propAvatar,
   displayName: propName,
-}: NavbarProps) {
+}: NavbarProps = {}) {
   const session = await auth();
   const isLoggedIn = !!session;
   const username = propUsername ?? session?.user?.username ?? "";
@@ -38,31 +36,11 @@ export default async function Navbar({
         {isLoggedIn ? (
           <div className="flex items-center gap-1">
             {/* Nav linkleri — desktop */}
-            {variant === "default" && (
-              <nav className="hidden items-center gap-0.5 sm:flex">
-                <NavLink href="/dashboard">Dashboard</NavLink>
-                <NavLink href="/dashboard/settings">Ayarlar</NavLink>
-                <NavLink href={`/u/${username}`}>Profil</NavLink>
-                <NavLink href={`/u/${username}/${currentYear}`}>Wrapped</NavLink>
-                <a
-                  href={`/api/card/${username}`}
-                  download={`${username}-dev-card.png`}
-                  className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800/60 hover:text-zinc-300"
-                >
-                  Kart
-                </a>
-              </nav>
-            )}
-
-            {/* Minimal variant — sadece geri butonu */}
-            {variant === "minimal" && (
-              <a
-                href="/dashboard"
-                className="mr-2 rounded-lg px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800/60 hover:text-zinc-300"
-              >
-                Dashboard
-              </a>
-            )}
+            <nav className="hidden items-center gap-0.5 sm:flex">
+              <NavLink href="/dashboard/settings">Ayarlar</NavLink>
+              <NavLink href={`/u/${username}`}>Profil</NavLink>
+              <NavLink href={`/u/${username}/${currentYear}`}>Wrapped</NavLink>
+            </nav>
 
             {/* Kullanıcı + çıkış */}
             <div className="flex items-center gap-2 ml-1 sm:ml-2 pl-2 sm:pl-3 border-l border-zinc-800/60">
