@@ -69,6 +69,9 @@ export async function saveProfileSettings(
   const socialWebsite = (formData.get("social_website") as string | null)?.trim().slice(0, 200) || null;
   const socialDiscord = (formData.get("social_discord") as string | null)?.trim().slice(0, 50) || null;
 
+  // Gizlilik — Liderlik tablosu opt-in
+  const leaderboardOptIn = formData.get("leaderboard_opt_in") === "on";
+
   // Ana alanlar
   const { error } = await supabaseAdmin
     .from("users")
@@ -85,6 +88,7 @@ export async function saveProfileSettings(
       social_linkedin: socialLinkedin,
       social_website: socialWebsite,
       social_discord: socialDiscord,
+      leaderboard_opt_in: leaderboardOptIn,
     })
     .eq("username", session.user.username);
 

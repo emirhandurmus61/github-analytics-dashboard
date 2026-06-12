@@ -45,6 +45,7 @@ export default async function Navbar({
               <NavLink href="/dashboard/settings">Ayarlar</NavLink>
               <NavLink href={`/u/${username}`}>Profil</NavLink>
               <NavLink href={`/u/${username}/${currentYear}`}>Wrapped</NavLink>
+              <NavLink href="/leaderboard">Sıralama</NavLink>
             </nav>
 
             {/* Desktop: kullanıcı + çıkış */}

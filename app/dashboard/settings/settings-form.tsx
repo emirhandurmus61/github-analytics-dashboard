@@ -39,6 +39,7 @@ type Props = {
   socialLinkedin: string | null;
   socialWebsite: string | null;
   socialDiscord: string | null;
+  leaderboardOptIn: boolean;
 };
 
 const NAV_ITEMS = [
@@ -48,6 +49,7 @@ const NAV_ITEMS = [
   { id: "profil-sayfasi", label: "Profil Sayfası", icon: "◫" },
   { id: "badge", label: "Badge", icon: "◆" },
   { id: "readme-widgets", label: "README Widgets", icon: "◉" },
+  { id: "gizlilik", label: "Gizlilik", icon: "◌" },
 ] as const;
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -72,6 +74,7 @@ export default function SettingsForm({
   socialLinkedin,
   socialWebsite,
   socialDiscord,
+  leaderboardOptIn,
 }: Props) {
   const [state, formAction, pending] = useActionState(saveProfileSettings, initialState);
 
@@ -98,6 +101,7 @@ export default function SettingsForm({
   const [tagInput, setTagInput] = useState(techTags.join(", "));
   const [activeSection, setActiveSection] = useState("gorunum");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [optIn, setOptIn] = useState(leaderboardOptIn);
 
   // Başarı toast
   useEffect(() => {
@@ -642,6 +646,42 @@ export default function SettingsForm({
           {/* ── README WIDGETS ── */}
           <Section id="readme-widgets" title="README Widgets" desc="GitHub profiline veya herhangi bir README'ye ekle — her saat otomatik güncellenir." accentBorder={accentBorder}>
             <ReadmeWidgets username={username} accentColor={accent} accentBg={accentBg} accentBorder={accentBorder} />
+          </Section>
+
+          {/* ── GİZLİLİK ── */}
+          <Section id="gizlilik" title="Gizlilik" desc="Hangi verilerinin herkese açık gösterileceğini kontrol et." accentBorder={accentBorder}>
+            <div className="space-y-4">
+              <div
+                className="flex items-start justify-between gap-4 rounded-xl border p-4"
+                style={{ borderColor: optIn ? `${accent}30` : "#27272a", backgroundColor: optIn ? `${accent}08` : "transparent" }}
+              >
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-zinc-200">Liderlik Tablosuna Katıl</p>
+                  <p className="text-xs text-zinc-500">
+                    Açılırsa haftalık commit, streak ve rozet sayın{" "}
+                    <a href="/leaderboard" target="_blank" className="underline" style={{ color: accent }}>
+                      liderlik tablosunda
+                    </a>{" "}
+                    görünür. İstediğin zaman kapatabilirsin.
+                  </p>
+                </div>
+                {/* Toggle switch */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={optIn}
+                  onClick={() => setOptIn((v) => !v)}
+                  className="relative shrink-0 h-6 w-11 rounded-full transition-colors"
+                  style={{ backgroundColor: optIn ? accent : "#3f3f46" }}
+                >
+                  <span
+                    className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
+                    style={{ transform: optIn ? "translateX(20px)" : "translateX(0)" }}
+                  />
+                </button>
+                <input type="hidden" name="leaderboard_opt_in" value={optIn ? "on" : "off"} />
+              </div>
+            </div>
           </Section>
 
           {/* ── Sticky Kaydet ── */}

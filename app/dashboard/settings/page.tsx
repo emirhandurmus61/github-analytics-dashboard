@@ -29,7 +29,7 @@ export default async function SettingsPage() {
 
   const { data: user } = await supabaseAdmin
     .from("users")
-    .select("id, bio, pinned_repo_name, public_widgets, widget_order, theme_accent, currently_working_on, yearly_goal, tech_tags, social_twitter, social_linkedin, social_website, social_discord")
+    .select("id, bio, pinned_repo_name, public_widgets, widget_order, theme_accent, currently_working_on, yearly_goal, tech_tags, social_twitter, social_linkedin, social_website, social_discord, leaderboard_opt_in")
     .eq("username", username)
     .single();
 
@@ -109,6 +109,7 @@ export default async function SettingsPage() {
         socialLinkedin={user.social_linkedin ?? null}
         socialWebsite={user.social_website ?? null}
         socialDiscord={user.social_discord ?? null}
+        leaderboardOptIn={user.leaderboard_opt_in === true}
       />
     </div>
   );
