@@ -29,7 +29,7 @@ export default async function SettingsPage() {
 
   const { data: user } = await supabaseAdmin
     .from("users")
-    .select("id, bio, pinned_repo_name, public_widgets, widget_order, theme_accent, currently_working_on, yearly_goal, tech_tags, social_twitter, social_linkedin, social_website, social_discord, leaderboard_opt_in")
+    .select("id, bio, pinned_repo_name, public_widgets, widget_order, theme_accent, currently_working_on, yearly_goal, tech_tags, social_twitter, social_linkedin, social_website, social_discord")
     .eq("username", username)
     .single();
 
@@ -40,10 +40,11 @@ export default async function SettingsPage() {
   let profileReadmeDb: string | null = null;
   let githubReadmeDb: string | null = null;
   let readmeSourceDb: "github" | "custom" = "github";
+  let leaderboardOptInDb = false;
   try {
     const { data: extra } = await supabaseAdmin
       .from("users")
-      .select("pinned_repos, profile_readme, github_readme, readme_source")
+      .select("pinned_repos, profile_readme, github_readme, readme_source, leaderboard_opt_in")
       .eq("id", user.id)
       .single();
     if (extra) {
@@ -51,6 +52,7 @@ export default async function SettingsPage() {
       profileReadmeDb = extra.profile_readme ?? null;
       githubReadmeDb = extra.github_readme ?? null;
       readmeSourceDb = extra.readme_source === "custom" ? "custom" : "github";
+      leaderboardOptInDb = extra.leaderboard_opt_in === true;
     }
   } catch {
     // Kolonlar henuz yok
@@ -109,7 +111,7 @@ export default async function SettingsPage() {
         socialLinkedin={user.social_linkedin ?? null}
         socialWebsite={user.social_website ?? null}
         socialDiscord={user.social_discord ?? null}
-        leaderboardOptIn={user.leaderboard_opt_in === true}
+        leaderboardOptIn={leaderboardOptInDb}
       />
     </div>
   );

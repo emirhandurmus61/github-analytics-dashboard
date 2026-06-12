@@ -88,7 +88,6 @@ export async function saveProfileSettings(
       social_linkedin: socialLinkedin,
       social_website: socialWebsite,
       social_discord: socialDiscord,
-      leaderboard_opt_in: leaderboardOptIn,
     })
     .eq("username", session.user.username);
 
@@ -106,6 +105,7 @@ export async function saveProfileSettings(
         pinned_repos: pinnedRepos,
         profile_readme: profileReadme || null,
         readme_source: readmeSource,
+        leaderboard_opt_in: leaderboardOptIn,
       })
       .eq("username", session.user.username);
   } catch {
