@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useState, useRef } from "react";
+import { useActionState, useState, useRef, useEffect } from "react";
 import { saveProfileSettings } from "./actions";
 import { THEMES, type ThemeAccent } from "@/lib/themes";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, Check, Copy } from "lucide-react";
 import {
   WIDGET_KEYS,
   WIDGET_LABELS,
@@ -41,6 +41,14 @@ type Props = {
   socialDiscord: string | null;
 };
 
+const NAV_ITEMS = [
+  { id: "gorunum", label: "Görünüm", icon: "◐" },
+  { id: "profil", label: "Profil", icon: "◈" },
+  { id: "sosyal", label: "Sosyal", icon: "◎" },
+  { id: "profil-sayfasi", label: "Profil Sayfası", icon: "◫" },
+  { id: "badge", label: "Badge", icon: "◆" },
+] as const;
+
 const initialState: { error?: string; success?: boolean } = {};
 
 export default function SettingsForm({
@@ -66,36 +74,54 @@ export default function SettingsForm({
 }: Props) {
   const [state, formAction, pending] = useActionState(saveProfileSettings, initialState);
 
-  // Tema
   const [selectedTheme, setSelectedTheme] = useState<ThemeAccent>(currentTheme);
   const previewColors = THEMES[selectedTheme];
 
-  // Pinned repos (max 3)
   const [selectedPinned, setSelectedPinned] = useState<string[]>(
     pinnedRepos.length > 0 ? pinnedRepos : (pinnedRepo ? [pinnedRepo] : [])
   );
 
-  // Profile README
   const [selectedReadmeSource, setSelectedReadmeSource] = useState<"github" | "custom">(readmeSource);
   const [readme, setReadme] = useState(profileReadme ?? "");
 
-  // Widget görünürlük
   const [visibleWidgets, setVisibleWidgets] = useState<Set<WidgetKey>>(
-    new Set(
-      WIDGET_KEYS.filter((k) => widgets[k])
-    )
+    new Set(WIDGET_KEYS.filter((k) => widgets[k]))
   );
 
-  // Widget sırası
   const [order, setOrder] = useState<WidgetKey[]>(() => {
-    // widgetOrder içinde olmayan key'leri sona ekle
     const existing = widgetOrder.filter((k) => WIDGET_KEYS.includes(k));
     const missing = WIDGET_KEYS.filter((k) => !existing.includes(k));
     return [...existing, ...missing];
   });
 
-  // Tech tags
   const [tagInput, setTagInput] = useState(techTags.join(", "));
+  const [activeSection, setActiveSection] = useState("gorunum");
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // Başarı toast
+  useEffect(() => {
+    if (state?.success) {
+      setShowSuccess(true);
+      const t = setTimeout(() => setShowSuccess(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [state]);
+
+  // IntersectionObserver ile aktif section takibi
+  useEffect(() => {
+    const sections = NAV_ITEMS.map((n) => document.getElementById(n.id)).filter(Boolean);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length > 0) {
+          setActiveSection(visible[0].target.id);
+        }
+      },
+      { rootMargin: "-30% 0px -60% 0px", threshold: 0 }
+    );
+    sections.forEach((s) => s && observer.observe(s));
+    return () => observer.disconnect();
+  }, []);
 
   function moveUp(index: number) {
     if (index === 0) return;
@@ -126,475 +152,644 @@ export default function SettingsForm({
     });
   }
 
+  const accent = previewColors.accent;
+  const accentBg = previewColors.accentBg;
+  const accentBorder = previewColors.accentBorder;
+
   return (
-    <div className="space-y-6">
-      <form action={formAction} className="space-y-6">
+    <div className="relative">
+      {/* Toast */}
+      <div
+        className="fixed top-20 right-6 z-50 transition-all duration-300"
+        style={{
+          opacity: showSuccess ? 1 : 0,
+          transform: showSuccess ? "translateY(0)" : "translateY(-8px)",
+          pointerEvents: showSuccess ? "auto" : "none",
+        }}
+      >
+        <div
+          className="flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm shadow-xl backdrop-blur-sm"
+          style={{ backgroundColor: accentBg, borderColor: accentBorder, color: accent }}
+        >
+          <Check className="h-4 w-4 shrink-0" />
+          <span className="font-medium">Profil güncellendi</span>
+        </div>
+      </div>
 
-        {/* ── Tema Rengi ── */}
-        <Section title="Tema Rengi" desc="Tüm vurgu noktaları bu renkle boyalanır — dashboard ve public profilinde.">
-          <div className="flex flex-wrap gap-4">
-            {(Object.entries(THEMES) as [ThemeAccent, typeof THEMES[ThemeAccent]][]).map(([key, theme]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setSelectedTheme(key)}
-                className="flex flex-col items-center gap-2 group"
-              >
-                <div
-                  className="h-9 w-9 rounded-full transition-all duration-200"
-                  style={{
-                    backgroundColor: theme.accent,
-                    boxShadow: selectedTheme === key
-                      ? `0 0 0 3px #09090b, 0 0 0 5px ${theme.accent}`
-                      : "none",
-                    transform: selectedTheme === key ? "scale(1.15)" : "scale(1)",
-                  }}
-                />
-                <span className="text-xs transition-colors" style={{ color: selectedTheme === key ? theme.accent : "#71717a" }}>
-                  {theme.label}
-                </span>
-              </button>
-            ))}
-          </div>
+      {/* Hata */}
+      {state?.error && (
+        <div className="mb-6 flex items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-400 shrink-0" />
+          {state.error}
+        </div>
+      )}
 
-          {/* Canlı önizleme */}
-          <div
-            className="rounded-xl border p-4 space-y-3 transition-all duration-300 mt-2"
-            style={{ backgroundColor: previewColors.accentBg, borderColor: previewColors.accentBorder }}
-          >
-            <p className="text-xs text-zinc-500">Önizleme</p>
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col items-center">
-                <span className="text-2xl font-bold" style={{ color: previewColors.accent }}>7</span>
-                <span className="text-xs text-zinc-600">Streak 🔥</span>
-              </div>
-              <div className="flex-1 space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-600">Haftalık Hedef</span>
-                  <span style={{ color: previewColors.accent }}>14 / 20</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-                  <div className="h-full rounded-full transition-all duration-300" style={{ width: "70%", backgroundColor: previewColors.accentMid }} />
-                </div>
-              </div>
-              <div className="flex gap-0.5">
-                {previewColors.shades.map((shade, i) => (
-                  <div key={i} className="h-4 w-4 rounded-sm" style={{ backgroundColor: shade }} />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <input type="hidden" name="theme_accent" value={selectedTheme} />
-        </Section>
-
-        {/* ── Profil Bilgileri ── */}
-        <Section title="Profil Bilgileri" desc="Public profilinde adının altında görünür.">
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="bio">
-              Biyografi <span className="text-zinc-700">(maks. 200 karakter)</span>
-            </label>
-            <textarea
-              id="bio"
-              name="bio"
-              defaultValue={bio ?? ""}
-              maxLength={200}
-              rows={3}
-              placeholder="Kendini kısaca tanıt..."
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1.5">
-              One Cikan Repolar <span className="text-zinc-700">(maks. 3)</span>
-            </label>
-            <div className="space-y-2">
-              {[0, 1, 2].map((i) => (
-                <select
-                  key={i}
-                  value={selectedPinned[i] ?? ""}
-                  onChange={(e) => {
-                    setSelectedPinned((prev) => {
-                      const next = [...prev];
-                      if (e.target.value) {
-                        next[i] = e.target.value;
-                      } else {
-                        next.splice(i, 1);
-                      }
-                      return next.filter(Boolean);
-                    });
-                  }}
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-500 focus:outline-none"
-                >
-                  <option value="">{i === 0 ? "— Repo sec —" : "— Opsiyonel —"}</option>
-                  {repos
-                    .filter((r) => !selectedPinned.includes(r.name) || selectedPinned[i] === r.name)
-                    .map((r) => (
-                      <option key={r.name} value={r.name}>{r.name}</option>
-                    ))}
-                </select>
-              ))}
-            </div>
-            <input type="hidden" name="pinned_repos" value={JSON.stringify(selectedPinned)} />
-            {/* Backward compat */}
-            <input type="hidden" name="pinned_repo" value={selectedPinned[0] ?? ""} />
-          </div>
-        </Section>
-
-        {/* ── Profil README ── */}
-        <Section title="Profil README" desc="Profilinde gorunecek README kaynagini sec.">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedReadmeSource("github")}
-              className="flex-1 rounded-lg border px-3 py-2.5 text-sm transition-colors text-left"
-              style={
-                selectedReadmeSource === "github"
-                  ? { borderColor: previewColors.accentBorder, color: previewColors.accent, backgroundColor: previewColors.accentBg }
-                  : { borderColor: "#3f3f46", color: "#71717a" }
-              }
-            >
-              <span className="font-medium block">GitHub README</span>
-              <span className="text-xs opacity-70 block mt-0.5">
-                {githubReadme ? "Sync ile otomatik guncellenir" : "Henuz cekilmedi — sync yap"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedReadmeSource("custom")}
-              className="flex-1 rounded-lg border px-3 py-2.5 text-sm transition-colors text-left"
-              style={
-                selectedReadmeSource === "custom"
-                  ? { borderColor: previewColors.accentBorder, color: previewColors.accent, backgroundColor: previewColors.accentBg }
-                  : { borderColor: "#3f3f46", color: "#71717a" }
-              }
-            >
-              <span className="font-medium block">Ozel README</span>
-              <span className="text-xs opacity-70 block mt-0.5">Kendi icerigini yaz</span>
-            </button>
-          </div>
-          <input type="hidden" name="readme_source" value={selectedReadmeSource} />
-
-          {selectedReadmeSource === "github" ? (
-            githubReadme ? (
-              <div className="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm text-zinc-400 max-h-60 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
-                {githubReadme.slice(0, 500)}{githubReadme.length > 500 ? "..." : ""}
-              </div>
-            ) : (
-              <p className="text-xs text-zinc-600">
-                GitHub profilinde README bulunamadi. <code className="text-zinc-500">{username}/{username}</code> reposunu olusturup sync yap.
-              </p>
-            )
-          ) : (
-            <ReadmeEditor
-              value={readme}
-              onChange={setReadme}
-              accentColor={previewColors.accent}
-              accentBorder={previewColors.accentBorder}
-              accentBg={previewColors.accentBg}
-            />
-          )}
-        </Section>
-
-        {/* ── F.3 Özel Bölümler ── */}
-        <Section title="Özel Bölümler" desc="Profil sayfanda standart istatistiklerin yanında kişisel bilgiler göster.">
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="currently_working_on">
-              Şu an üzerinde çalıştığım <span className="text-zinc-700">(maks. 150 karakter)</span>
-            </label>
-            <input
-              id="currently_working_on"
-              name="currently_working_on"
-              type="text"
-              defaultValue={currentlyWorkingOn ?? ""}
-              maxLength={150}
-              placeholder="Örn: Bir CLI aracı geliştiriyorum — Rust ile..."
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="yearly_goal">
-              Bu yıl hedefim <span className="text-zinc-700">(maks. 150 karakter)</span>
-            </label>
-            <input
-              id="yearly_goal"
-              name="yearly_goal"
-              type="text"
-              defaultValue={yearlyGoal ?? ""}
-              maxLength={150}
-              placeholder="Örn: Açık kaynak projeye katkı sağlamak..."
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="tech_tags">
-              Favori araçlar / teknolojiler{" "}
-              <span className="text-zinc-700">(virgülle ayır, maks. 12)</span>
-            </label>
-            <input
-              id="tech_tags"
-              name="tech_tags"
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              placeholder="TypeScript, Neovim, Docker, Postgres..."
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
-            />
-            {/* Tag önizleme */}
-            {tagInput.trim() && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {tagInput.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 12).map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border px-2.5 py-0.5 text-xs"
-                    style={{ borderColor: previewColors.accentBorder, color: previewColors.accent, backgroundColor: previewColors.accentBg }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </Section>
-
-        {/* ── H.4 Sosyal Linkler ── */}
-        <Section title="Sosyal Linkler" desc="Public profilinde adının altında küçük ikonlar olarak görünür.">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="social_twitter">
-                Twitter / X
-              </label>
-              <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 focus-within:border-zinc-500">
-                <span className="text-xs text-zinc-600 shrink-0">x.com/</span>
-                <input
-                  id="social_twitter"
-                  name="social_twitter"
-                  type="text"
-                  defaultValue={socialTwitter ?? ""}
-                  maxLength={50}
-                  placeholder="kullanici_adi"
-                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="social_linkedin">
-                LinkedIn
-              </label>
-              <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 focus-within:border-zinc-500">
-                <span className="text-xs text-zinc-600 shrink-0">linkedin.com/in/</span>
-                <input
-                  id="social_linkedin"
-                  name="social_linkedin"
-                  type="text"
-                  defaultValue={socialLinkedin ?? ""}
-                  maxLength={80}
-                  placeholder="kullanici-adi"
-                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="social_website">
-                Kişisel Site
-              </label>
-              <input
-                id="social_website"
-                name="social_website"
-                type="url"
-                defaultValue={socialWebsite ?? ""}
-                maxLength={200}
-                placeholder="https://..."
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-500 mb-1.5" htmlFor="social_discord">
-                Discord
-              </label>
-              <input
-                id="social_discord"
-                name="social_discord"
-                type="text"
-                defaultValue={socialDiscord ?? ""}
-                maxLength={50}
-                placeholder="kullanici#0000"
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
-              />
-            </div>
-          </div>
-        </Section>
-
-        {/* ── F.2 Widget Düzeni ── */}
-        <Section title="Profil Widget Düzeni" desc="Public profilinde hangi bölümler görünsün ve hangi sırada?">
-
-          {/* Preset butonları */}
-          <div>
-            <p className="text-xs text-zinc-500 mb-2">Hazır düzen</p>
-            <div className="flex flex-wrap gap-2">
-              {(Object.entries(PRESETS) as [WidgetPreset, typeof PRESETS[WidgetPreset]][]).map(([key, preset]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => applyPreset(key)}
-                  className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-left hover:border-zinc-600 transition-colors"
-                >
-                  <p className="text-xs font-medium text-zinc-300">{preset.label}</p>
-                  <p className="text-xs text-zinc-600 mt-0.5">{preset.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Sıralama listesi */}
-          <div className="space-y-2">
-            <p className="text-xs text-zinc-500">Sıra & Görünürlük</p>
-            {order.map((key, i) => {
-              const visible = visibleWidgets.has(key);
+      <div className="flex gap-8">
+        {/* ── Sol Nav ── */}
+        <aside className="hidden lg:block w-44 shrink-0">
+          <nav className="sticky top-24 space-y-0.5">
+            <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Ayarlar</p>
+            {NAV_ITEMS.map((item) => {
+              const isActive = activeSection === item.id;
               return (
-                <div
-                  key={key}
-                  className="flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors"
-                  style={{
-                    borderColor: visible ? previewColors.accentBorder : "#3f3f46",
-                    backgroundColor: visible ? previewColors.accentBg : "transparent",
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition-all duration-150"
+                  style={
+                    isActive
+                      ? { color: accent, backgroundColor: accentBg }
+                      : { color: "#52525b" }
+                  }
                 >
-                  {/* Sıra numarası */}
-                  <span className="w-5 shrink-0 text-center text-xs text-zinc-600">{i + 1}</span>
-
-                  {/* Label */}
                   <span
-                    className="flex-1 text-sm"
-                    style={{ color: visible ? previewColors.accent : "#71717a" }}
+                    className="text-sm leading-none"
+                    style={{ color: isActive ? accent : "#3f3f46" }}
                   >
-                    {WIDGET_LABELS[key]}
+                    {item.icon}
                   </span>
-
-                  {/* Görünürlük toggle */}
-                  <button
-                    type="button"
-                    onClick={() => toggleWidget(key)}
-                    className="rounded-lg px-2.5 py-1 text-xs transition-colors border"
-                    style={
-                      visible
-                        ? { borderColor: previewColors.accentBorder, color: previewColors.accent, backgroundColor: previewColors.accentBg }
-                        : { borderColor: "#3f3f46", color: "#71717a" }
-                    }
-                  >
-                    {visible ? "Görünür" : "Gizli"}
-                  </button>
-
-                  {/* Ok butonları */}
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => moveUp(i)}
-                      disabled={i === 0}
-                      className="rounded px-1.5 py-0.5 text-xs text-zinc-600 hover:text-zinc-300 disabled:opacity-20 transition-colors"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveDown(i)}
-                      disabled={i === order.length - 1}
-                      className="rounded px-1.5 py-0.5 text-xs text-zinc-600 hover:text-zinc-300 disabled:opacity-20 transition-colors"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                </div>
+                  <span className={isActive ? "font-medium" : ""}>{item.label}</span>
+                  {isActive && (
+                    <span
+                      className="ml-auto h-1 w-1 rounded-full"
+                      style={{ backgroundColor: accent }}
+                    />
+                  )}
+                </a>
               );
             })}
+          </nav>
+        </aside>
+
+        {/* ── İçerik ── */}
+        <form action={formAction} className="min-w-0 flex-1 space-y-4 pb-32">
+
+          {/* ── GÖRÜNÜM ── */}
+          <Section id="gorunum" title="Görünüm" desc="Tema rengin dashboard ve public profilinde her yerde uygulanır." accentBorder={accentBorder}>
+            {/* Tema grid */}
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {(Object.entries(THEMES) as [ThemeAccent, typeof THEMES[ThemeAccent]][]).map(([key, theme]) => {
+                const isSelected = selectedTheme === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setSelectedTheme(key)}
+                    className="group flex flex-col items-center gap-2.5 rounded-xl border p-3 transition-all duration-200"
+                    style={
+                      isSelected
+                        ? { borderColor: theme.accentBorder, backgroundColor: theme.accentBg }
+                        : { borderColor: "#27272a", backgroundColor: "transparent" }
+                    }
+                  >
+                    <div
+                      className="h-8 w-8 rounded-full transition-transform duration-200"
+                      style={{
+                        backgroundColor: theme.accent,
+                        transform: isSelected ? "scale(1.1)" : "scale(1)",
+                        boxShadow: isSelected ? `0 0 12px ${theme.accent}40` : "none",
+                      }}
+                    />
+                    <span
+                      className="text-[11px] font-medium"
+                      style={{ color: isSelected ? theme.accent : "#52525b" }}
+                    >
+                      {theme.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Önizleme */}
+            <div
+              className="rounded-xl border p-5 transition-all duration-300"
+              style={{ backgroundColor: accentBg, borderColor: accentBorder }}
+            >
+              <p className="mb-4 text-[10px] font-semibold uppercase tracking-widest" style={{ color: accent }}>
+                Önizleme
+              </p>
+              <div className="flex items-center gap-5">
+                {/* Streak */}
+                <div className="flex flex-col items-center gap-1 rounded-xl border px-4 py-3" style={{ borderColor: accentBorder, backgroundColor: "rgba(0,0,0,0.3)" }}>
+                  <span className="text-[10px] text-zinc-600">Streak 🔥</span>
+                  <span className="text-2xl font-bold tabular-nums" style={{ color: accent }}>12</span>
+                  <span className="text-[10px] text-zinc-600">gün</span>
+                </div>
+
+                {/* Progress */}
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <div className="mb-1.5 flex justify-between text-[11px]">
+                      <span className="text-zinc-500">Haftalık Hedef</span>
+                      <span style={{ color: accent }}>14 / 20</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: "70%", backgroundColor: accent }}
+                      />
+                    </div>
+                  </div>
+                  {/* Heatmap dots */}
+                  <div className="flex gap-1">
+                    {previewColors.shades.map((shade, i) => (
+                      <div
+                        key={i}
+                        className="h-3.5 w-3.5 rounded-sm"
+                        style={{ backgroundColor: shade }}
+                      />
+                    ))}
+                    <div className="h-3.5 w-3.5 rounded-sm bg-zinc-800" />
+                    <div className="h-3.5 w-3.5 rounded-sm bg-zinc-800" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <input type="hidden" name="theme_accent" value={selectedTheme} />
+          </Section>
+
+          {/* ── PROFİL ── */}
+          <Section id="profil" title="Profil" desc="Public profilinde görünen kişisel bilgiler." accentBorder={accentBorder}>
+            {/* Bio */}
+            <Field label="Biyografi" hint="maks. 200 karakter">
+              <div className="relative">
+                <textarea
+                  name="bio"
+                  defaultValue={bio ?? ""}
+                  maxLength={200}
+                  rows={3}
+                  placeholder="Kendini kısaca tanıt..."
+                  className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-700 transition-colors focus:border-zinc-600 focus:outline-none"
+                />
+              </div>
+            </Field>
+
+            {/* Şu an üzerinde çalıştığım */}
+            <Field label="Şu an üzerinde çalışıyorum" hint="maks. 150 karakter">
+              <input
+                name="currently_working_on"
+                type="text"
+                defaultValue={currentlyWorkingOn ?? ""}
+                maxLength={150}
+                placeholder="Örn: Rust ile bir CLI aracı geliştiriyorum..."
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-700 transition-colors focus:border-zinc-600 focus:outline-none"
+              />
+            </Field>
+
+            {/* Bu yıl hedefim */}
+            <Field label="Bu yıl hedefim" hint="maks. 150 karakter">
+              <input
+                name="yearly_goal"
+                type="text"
+                defaultValue={yearlyGoal ?? ""}
+                maxLength={150}
+                placeholder="Örn: Açık kaynak projeye katkı sağlamak..."
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-700 transition-colors focus:border-zinc-600 focus:outline-none"
+              />
+            </Field>
+
+            {/* Tech tags */}
+            <Field label="Favori araçlar & teknolojiler" hint="virgülle ayır, maks. 12">
+              <input
+                name="tech_tags"
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                placeholder="TypeScript, Neovim, Docker, Postgres..."
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-700 transition-colors focus:border-zinc-600 focus:outline-none"
+              />
+              {tagInput.trim() && (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {tagInput.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 12).map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
+                      style={{ borderColor: accentBorder, color: accent, backgroundColor: accentBg }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Field>
+
+            {/* Pinned repos */}
+            <Field label="Öne çıkan repolar" hint="maks. 3">
+              <div className="space-y-2">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="relative">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-700">
+                      {i + 1}
+                    </span>
+                    <select
+                      value={selectedPinned[i] ?? ""}
+                      onChange={(e) => {
+                        setSelectedPinned((prev) => {
+                          const next = [...prev];
+                          if (e.target.value) {
+                            next[i] = e.target.value;
+                          } else {
+                            next.splice(i, 1);
+                          }
+                          return next.filter(Boolean);
+                        });
+                      }}
+                      className="w-full appearance-none rounded-xl border border-zinc-800 bg-zinc-900 py-3 pl-8 pr-4 text-sm text-zinc-100 transition-colors focus:border-zinc-600 focus:outline-none"
+                    >
+                      <option value="">{i === 0 ? "— Repo seç —" : "— Opsiyonel —"}</option>
+                      {repos
+                        .filter((r) => !selectedPinned.includes(r.name) || selectedPinned[i] === r.name)
+                        .map((r) => (
+                          <option key={r.name} value={r.name}>{r.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <input type="hidden" name="pinned_repos" value={JSON.stringify(selectedPinned)} />
+              <input type="hidden" name="pinned_repo" value={selectedPinned[0] ?? ""} />
+            </Field>
+          </Section>
+
+          {/* ── SOSYAL ── */}
+          <Section id="sosyal" title="Sosyal Linkler" desc="Public profilinde ikonlar olarak görünür." accentBorder={accentBorder}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Twitter / X">
+                <PrefixInput prefix="x.com/" name="social_twitter" defaultValue={socialTwitter ?? ""} placeholder="kullanici_adi" maxLength={50} />
+              </Field>
+              <Field label="LinkedIn">
+                <PrefixInput prefix="linkedin.com/in/" name="social_linkedin" defaultValue={socialLinkedin ?? ""} placeholder="kullanici-adi" maxLength={80} />
+              </Field>
+              <Field label="Kişisel Site">
+                <input
+                  name="social_website"
+                  type="url"
+                  defaultValue={socialWebsite ?? ""}
+                  maxLength={200}
+                  placeholder="https://..."
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-700 transition-colors focus:border-zinc-600 focus:outline-none"
+                />
+              </Field>
+              <Field label="Discord">
+                <input
+                  name="social_discord"
+                  type="text"
+                  defaultValue={socialDiscord ?? ""}
+                  maxLength={50}
+                  placeholder="kullanici#0000"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-700 transition-colors focus:border-zinc-600 focus:outline-none"
+                />
+              </Field>
+            </div>
+          </Section>
+
+          {/* ── PROFİL SAYFASI ── */}
+          <Section id="profil-sayfasi" title="Profil Sayfası" desc="Public profilindeki widget'lar ve README içeriği." accentBorder={accentBorder}>
+
+            {/* README kaynak seçimi */}
+            <div>
+              <p className="mb-2.5 text-xs text-zinc-500">README Kaynağı</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(["github", "custom"] as const).map((src) => {
+                  const isSelected = selectedReadmeSource === src;
+                  return (
+                    <button
+                      key={src}
+                      type="button"
+                      onClick={() => setSelectedReadmeSource(src)}
+                      className="rounded-xl border p-4 text-left transition-all duration-150"
+                      style={
+                        isSelected
+                          ? { borderColor: accentBorder, backgroundColor: accentBg }
+                          : { borderColor: "#27272a" }
+                      }
+                    >
+                      <span
+                        className="block text-xs font-semibold"
+                        style={{ color: isSelected ? accent : "#a1a1aa" }}
+                      >
+                        {src === "github" ? "GitHub README" : "Özel README"}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-zinc-600">
+                        {src === "github"
+                          ? (githubReadme ? "Sync ile otomatik güncellenir" : "Henüz çekilmedi — sync yap")
+                          : "Kendi içeriğini yaz"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <input type="hidden" name="readme_source" value={selectedReadmeSource} />
+            </div>
+
+            {/* README içerik */}
+            {selectedReadmeSource === "github" ? (
+              githubReadme ? (
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-500 font-mono leading-relaxed max-h-52 overflow-y-auto whitespace-pre-wrap">
+                  {githubReadme.slice(0, 500)}{githubReadme.length > 500 ? "…" : ""}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-600">
+                  GitHub profilinde README bulunamadı.{" "}
+                  <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-500">{username}/{username}</code>{" "}
+                  reposunu oluşturup sync yap.
+                </p>
+              )
+            ) : (
+              <ReadmeEditor
+                value={readme}
+                onChange={setReadme}
+                accentColor={accent}
+                accentBorder={accentBorder}
+                accentBg={accentBg}
+              />
+            )}
+
+            {/* Divider */}
+            <div className="border-t border-zinc-800" />
+
+            {/* Widget preset */}
+            <div>
+              <p className="mb-2.5 text-xs text-zinc-500">Hazır Düzen</p>
+              <div className="flex flex-wrap gap-2">
+                {(Object.entries(PRESETS) as [WidgetPreset, typeof PRESETS[WidgetPreset]][]).map(([key, preset]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => applyPreset(key)}
+                    className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-left transition-colors hover:border-zinc-700"
+                  >
+                    <p className="text-xs font-semibold text-zinc-300">{preset.label}</p>
+                    <p className="mt-0.5 text-[11px] text-zinc-600">{preset.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Widget sıralama */}
+            <div>
+              <p className="mb-2.5 text-xs text-zinc-500">Sıra & Görünürlük</p>
+              <div className="space-y-2">
+                {order.map((key, i) => {
+                  const visible = visibleWidgets.has(key);
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-150"
+                      style={{
+                        borderColor: visible ? accentBorder : "#27272a",
+                        backgroundColor: visible ? accentBg : "transparent",
+                      }}
+                    >
+                      {/* Sıra */}
+                      <span
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
+                        style={visible
+                          ? { color: accent, backgroundColor: `${accent}20` }
+                          : { color: "#3f3f46", backgroundColor: "#18181b" }
+                        }
+                      >
+                        {i + 1}
+                      </span>
+
+                      {/* Label */}
+                      <span
+                        className="flex-1 text-sm"
+                        style={{ color: visible ? "#e4e4e7" : "#52525b" }}
+                      >
+                        {WIDGET_LABELS[key]}
+                      </span>
+
+                      {/* Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggleWidget(key)}
+                        className="rounded-lg border px-3 py-1 text-[11px] font-medium transition-all duration-150"
+                        style={
+                          visible
+                            ? { borderColor: accentBorder, color: accent, backgroundColor: `${accent}15` }
+                            : { borderColor: "#3f3f46", color: "#52525b" }
+                        }
+                      >
+                        {visible ? "Görünür" : "Gizli"}
+                      </button>
+
+                      {/* Ok butonları */}
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => moveUp(i)}
+                          disabled={i === 0}
+                          className="flex h-5 w-5 items-center justify-center rounded text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-20"
+                        >
+                          <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 6 6">
+                            <path d="M3 0L6 6H0z" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveDown(i)}
+                          disabled={i === order.length - 1}
+                          className="flex h-5 w-5 items-center justify-center rounded text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-20"
+                        >
+                          <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 6 6">
+                            <path d="M3 6L0 0h6z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Gizli input'lar */}
+            <input type="hidden" name="widget_order" value={JSON.stringify(order)} />
+            {WIDGET_KEYS.map((key) =>
+              visibleWidgets.has(key)
+                ? <input key={key} type="hidden" name={`widget_${key}`} value="on" />
+                : null
+            )}
+          </Section>
+
+          {/* ── BADGE ── */}
+          <Section id="badge" title="README Badge" desc="GitHub README'ne ekle — veriler otomatik güncellenir." accentBorder={accentBorder}>
+            {/* Badge önizleme */}
+            <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={badgeUrl} alt="Dev Analytics Badge" className="block" />
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="mb-2 text-xs text-zinc-500">Markdown</p>
+                <CopyBox value={`[![Dev Analytics](${badgeUrl})](https://devanalytics.app/u/${username})`} accentColor={accent} accentBg={accentBg} accentBorder={accentBorder} />
+              </div>
+              <div>
+                <p className="mb-2 text-xs text-zinc-500">HTML</p>
+                <CopyBox value={`<a href="https://devanalytics.app/u/${username}"><img src="${badgeUrl}" alt="Dev Analytics"></a>`} accentColor={accent} accentBg={accentBg} accentBorder={accentBorder} />
+              </div>
+            </div>
+          </Section>
+
+          {/* ── Sticky Kaydet ── */}
+          <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-xl">
+            <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+              <p className="text-xs text-zinc-600">
+                Değişiklikler kaydedilene kadar uygulanmaz.
+              </p>
+              <button
+                type="submit"
+                disabled={pending}
+                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-150 disabled:opacity-50"
+                style={{ backgroundColor: accent, color: "#09090b" }}
+              >
+                {pending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Kaydediliyor...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Kaydet
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-
-          {/* Gizli input'lar */}
-          <input type="hidden" name="widget_order" value={JSON.stringify(order)} />
-          {WIDGET_KEYS.map((key) => (
-            visibleWidgets.has(key)
-              ? <input key={key} type="hidden" name={`widget_${key}`} value="on" />
-              : null
-          ))}
-        </Section>
-
-        {/* ── Kaydet ── */}
-        <div className="flex items-center gap-4">
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-lg px-5 py-2.5 text-sm font-medium disabled:opacity-50 transition-colors"
-            style={{ backgroundColor: previewColors.accent, color: "#09090b" }}
-          >
-            {pending ? "Kaydediliyor..." : "Kaydet"}
-          </button>
-          {state?.success && (
-            <span className="text-sm" style={{ color: previewColors.accent }}>Profil güncellendi.</span>
-          )}
-          {state?.error && (
-            <span className="text-sm text-red-400">{state.error}</span>
-          )}
-        </div>
-      </form>
-
-      {/* ── Badge ── */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-        <h2 className="text-sm font-medium text-zinc-300">README Badge</h2>
-        <p className="text-xs text-zinc-500">
-          GitHub README'ne ekle — streak, haftalık commit ve en aktif dil otomatik güncellenir.
-        </p>
-        <div className="rounded-lg overflow-hidden border border-zinc-700">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={badgeUrl} alt="Dev Analytics Badge" className="block" />
-        </div>
-        <div className="space-y-2">
-          <p className="text-xs text-zinc-500">Markdown:</p>
-          <CopyBox value={`[![Dev Analytics](${badgeUrl})](https://devanalytics.app/u/${username})`} />
-        </div>
-        <div className="space-y-2">
-          <p className="text-xs text-zinc-500">HTML:</p>
-          <CopyBox value={`<a href="https://devanalytics.app/u/${username}"><img src="${badgeUrl}" alt="Dev Analytics"></a>`} />
-        </div>
+        </form>
       </div>
     </div>
   );
 }
 
+// ── Alt bileşenler ───────────────────────────────────────────────────────────
+
 function Section({
+  id,
   title,
   desc,
   children,
+  accentBorder,
 }: {
+  id: string;
   title: string;
   desc: string;
   children: React.ReactNode;
+  accentBorder: string;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-      <div>
-        <h2 className="text-sm font-medium text-zinc-300">{title}</h2>
-        <p className="mt-0.5 text-xs text-zinc-500">{desc}</p>
+    <section
+      id={id}
+      className="scroll-mt-24 rounded-2xl border border-zinc-800 bg-zinc-900/60 overflow-hidden"
+    >
+      {/* Üst accent çizgisi */}
+      <div className="h-px w-full" style={{ background: `linear-gradient(to right, ${accentBorder}, transparent)` }} />
+      <div className="p-6 space-y-5">
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-100">{title}</h2>
+          <p className="mt-0.5 text-xs text-zinc-500">{desc}</p>
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline gap-1.5">
+        <label className="text-xs font-medium text-zinc-400">{label}</label>
+        {hint && <span className="text-[10px] text-zinc-700">{hint}</span>}
       </div>
       {children}
     </div>
   );
 }
 
-function CopyBox({ value }: { value: string }) {
+function PrefixInput({
+  prefix,
+  name,
+  defaultValue,
+  placeholder,
+  maxLength,
+}: {
+  prefix: string;
+  name: string;
+  defaultValue: string;
+  placeholder: string;
+  maxLength: number;
+}) {
   return (
-    <div className="flex gap-2">
-      <code className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-400 overflow-x-auto whitespace-nowrap">
+    <div className="flex items-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 transition-colors focus-within:border-zinc-600">
+      <span className="shrink-0 border-r border-zinc-800 bg-zinc-900/50 px-3 py-3 text-[11px] text-zinc-600">
+        {prefix}
+      </span>
+      <input
+        name={name}
+        type="text"
+        defaultValue={defaultValue}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        className="flex-1 bg-transparent px-3 py-3 text-sm text-zinc-100 placeholder-zinc-700 focus:outline-none"
+      />
+    </div>
+  );
+}
+
+function CopyBox({
+  value,
+  accentColor,
+  accentBg,
+  accentBorder,
+}: {
+  value: string;
+  accentColor: string;
+  accentBg: string;
+  accentBorder: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="flex items-stretch gap-2">
+      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-xs text-zinc-500">
         {value}
       </code>
       <button
         type="button"
-        onClick={() => navigator.clipboard.writeText(value)}
-        className="shrink-0 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-600 transition-colors"
+        onClick={handleCopy}
+        className="flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all duration-200"
+        style={
+          copied
+            ? { borderColor: accentBorder, color: accentColor, backgroundColor: accentBg }
+            : { borderColor: "#3f3f46", color: "#71717a" }
+        }
       >
-        Kopyala
+        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        {copied ? "Kopyalandı" : "Kopyala"}
       </button>
     </div>
   );
@@ -625,10 +820,9 @@ function ReadmeEditor({
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error ?? "Yukleme basarisiz");
+        alert(data.error ?? "Yükleme başarısız");
         return;
       }
-      // Insert markdown image at cursor position
       const textarea = textareaRef.current;
       const imageMarkdown = `\n![${file.name}](${data.url})\n`;
       if (textarea) {
@@ -636,7 +830,6 @@ function ReadmeEditor({
         const before = value.slice(0, start);
         const after = value.slice(start);
         onChange(before + imageMarkdown + after);
-        // Set cursor after inserted text
         requestAnimationFrame(() => {
           textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
           textarea.focus();
@@ -645,7 +838,7 @@ function ReadmeEditor({
         onChange(value + imageMarkdown);
       }
     } catch {
-      alert("Yukleme sirasinda hata olustu");
+      alert("Yükleme sırasında hata oluştu");
     } finally {
       setUploading(false);
     }
@@ -654,14 +847,11 @@ function ReadmeEditor({
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith("image/")) {
-      handleUpload(file);
-    }
+    if (file && file.type.startsWith("image/")) handleUpload(file);
   }
 
   function handlePaste(e: React.ClipboardEvent) {
-    const items = e.clipboardData.items;
-    for (const item of items) {
+    for (const item of e.clipboardData.items) {
       if (item.type.startsWith("image/")) {
         e.preventDefault();
         const file = item.getAsFile();
@@ -671,99 +861,62 @@ function ReadmeEditor({
     }
   }
 
+  function insertAround(before: string, after: string, fallback: string) {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = value.slice(start, end);
+    const inserted = selected ? `${before}${selected}${after}` : `${before}${fallback}${after}`;
+    onChange(value.slice(0, start) + inserted + value.slice(end));
+  }
+
+  function insertAt(text: string) {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    onChange(value.slice(0, start) + text + value.slice(start));
+  }
+
+  const TOOLBAR = [
+    { label: "B", title: "Kalın", action: () => insertAround("**", "**", "kalın metin"), cls: "font-bold" },
+    { label: "I", title: "İtalik", action: () => insertAround("*", "*", "italik metin"), cls: "italic" },
+    { label: "H", title: "Başlık", action: () => insertAt("\n### "), cls: "" },
+    { label: "<>", title: "Kod", action: () => insertAround("`", "`", "kod"), cls: "font-mono" },
+    { label: "•", title: "Liste", action: () => insertAt("\n- "), cls: "" },
+  ];
+
+  const charPct = (value.length / 2000) * 100;
+
   return (
-    <div>
+    <div className="space-y-2">
       {/* Toolbar */}
-      <div className="flex items-center gap-1 mb-2 p-1 rounded-lg border border-zinc-800 bg-zinc-800/50 w-fit">
-        <button
-          type="button"
-          onClick={() => {
-            const textarea = textareaRef.current;
-            if (!textarea) return;
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const selected = value.slice(start, end);
-            const wrapped = selected ? `**${selected}**` : "**kalin metin**";
-            onChange(value.slice(0, start) + wrapped + value.slice(end));
-          }}
-          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors font-bold"
-          title="Kalin"
-        >
-          B
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const textarea = textareaRef.current;
-            if (!textarea) return;
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const selected = value.slice(start, end);
-            const wrapped = selected ? `*${selected}*` : "*italik metin*";
-            onChange(value.slice(0, start) + wrapped + value.slice(end));
-          }}
-          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors italic"
-          title="Italik"
-        >
-          I
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const textarea = textareaRef.current;
-            if (!textarea) return;
-            const start = textarea.selectionStart;
-            onChange(value.slice(0, start) + "\n### " + value.slice(start));
-          }}
-          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors"
-          title="Baslik"
-        >
-          H
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const textarea = textareaRef.current;
-            if (!textarea) return;
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const selected = value.slice(start, end);
-            const wrapped = selected ? `\`${selected}\`` : "`kod`";
-            onChange(value.slice(0, start) + wrapped + value.slice(end));
-          }}
-          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors font-mono"
-          title="Kod"
-        >
-          {"<>"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const textarea = textareaRef.current;
-            if (!textarea) return;
-            const start = textarea.selectionStart;
-            onChange(value.slice(0, start) + "\n- " + value.slice(start));
-          }}
-          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 rounded transition-colors"
-          title="Liste"
-        >
-          •
-        </button>
-        <div className="w-px h-4 bg-zinc-700 mx-0.5" />
+      <div className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 p-1.5">
+        {TOOLBAR.map((btn) => (
+          <button
+            key={btn.label}
+            type="button"
+            onClick={btn.action}
+            title={btn.title}
+            className={`rounded-lg px-2.5 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200 ${btn.cls}`}
+          >
+            {btn.label}
+          </button>
+        ))}
+        <div className="mx-1 h-4 w-px bg-zinc-800" />
         <button
           type="button"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50 hover:bg-zinc-800"
           style={{ color: accentColor }}
-          title="Gorsel yukle"
+          title="Görsel yükle"
         >
-          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline">Gorsel</span>
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+          <span className="hidden sm:inline">Görsel</span>
         </button>
       </div>
 
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -776,7 +929,6 @@ function ReadmeEditor({
         }}
       />
 
-      {/* Textarea */}
       <textarea
         ref={textareaRef}
         name="profile_readme"
@@ -787,14 +939,24 @@ function ReadmeEditor({
         onPaste={handlePaste}
         rows={10}
         maxLength={2000}
-        placeholder={"### Merhaba!\n\nBen bir yazilim gelistiriciyim.\n\n- Su an **proje adi** uzerinde calisiyorum\n- **Rust** ogreniyorum\n\n![banner](https://example.com/banner.png)"}
-        className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none resize-y font-mono leading-relaxed"
+        placeholder={"### Merhaba!\n\nBen bir yazılım geliştiriciyim.\n\n- Şu an **proje** üzerinde çalışıyorum\n- **Rust** öğreniyorum"}
+        className="w-full resize-y rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 font-mono text-sm leading-relaxed text-zinc-100 placeholder-zinc-700 transition-colors focus:border-zinc-600 focus:outline-none"
       />
-      <div className="flex items-center justify-between mt-1">
-        <p className="text-[10px] text-zinc-600">
-          Gorsel: surukle-birak, yapistir veya Gorsel butonunu kullan
-        </p>
-        <p className="text-[10px] text-zinc-600 tabular-nums">{value.length}/2000</p>
+
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-zinc-700">Görsel: sürükle-bırak, yapıştır veya Görsel butonunu kullan</p>
+        <div className="flex items-center gap-2">
+          <div className="h-1 w-16 overflow-hidden rounded-full bg-zinc-800">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${charPct}%`,
+                backgroundColor: charPct > 90 ? "#f87171" : accentColor,
+              }}
+            />
+          </div>
+          <span className="text-[10px] tabular-nums text-zinc-700">{value.length}/2000</span>
+        </div>
       </div>
     </div>
   );
