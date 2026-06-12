@@ -10,7 +10,7 @@ import {
   Star, GitFork, MapPin, Calendar, Activity, Code2, Target,
   Sparkles, Award, ChevronRight, Download, ExternalLink,
   BookOpen, Timer, TrendingUp, Layers, Hash, ArrowRight,
-  Link as LinkIcon, MessageCircle,
+  Link as LinkIcon, MessageCircle, Share2, Check,
 } from "lucide-react";
 import type { Badge } from "@/lib/badges";
 
@@ -512,6 +512,92 @@ function ActivitySparkline({ data }: { data: DayData[] }) {
   );
 }
 
+/* ─── Profile share buttons ─── */
+
+function ProfileShareButtons({ username }: { username: string }) {
+  const theme = useThemeColors();
+  const [downloading, setDownloading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const cardUrl = `/api/card/${username}?format=og`;
+  const tweetText = encodeURIComponent(
+    `GitHub istatistiklerime bakın! 🚀 Dev Analytics`
+  );
+  const profileUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/u/${username}`
+    : `/u/${username}`;
+  const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(profileUrl)}`;
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const res = await fetch(cardUrl);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${username}-devcard.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(profileUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2 animate-profile-slide-up" style={{ animationDelay: "200ms" }}>
+      <button
+        onClick={handleDownload}
+        disabled={downloading}
+        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ borderColor: `${theme.accent}30`, color: theme.accent, backgroundColor: `${theme.accent}10` }}
+        title="Developer Card'ı PNG olarak indir"
+      >
+        <Download className="w-3 h-3" />
+        {downloading ? "İndiriliyor..." : "Kartı İndir"}
+      </button>
+
+      <a
+        href={twitterUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all hover:scale-105 hover:border-zinc-600"
+        style={{ borderColor: "#27272a", color: "#71717a" }}
+        title="Twitter'da paylaş"
+      >
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.726-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+        </svg>
+        Paylaş
+      </a>
+
+      <button
+        onClick={handleCopy}
+        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all hover:scale-105 hover:border-zinc-600"
+        style={{ borderColor: "#27272a", color: "#71717a" }}
+        title="Profil linkini kopyala"
+      >
+        {copied ? (
+          <>
+            <Check className="w-3 h-3 text-emerald-400" />
+            <span className="text-emerald-400">Kopyalandı!</span>
+          </>
+        ) : (
+          <>
+            <Share2 className="w-3 h-3" />
+            Link Kopyala
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    MAIN PROFILE COMPONENT
    ═══════════════════════════════════════════════════ */
@@ -674,6 +760,9 @@ export default function ProfileClient(props: ProfileProps) {
                 </div>
               )}
             </div>
+
+            {/* Developer Card paylaşım butonları */}
+            <ProfileShareButtons username={username} />
 
             {/* Sparkline (desktop) */}
             <div className="hidden lg:block w-48 animate-profile-slide-up shrink-0" style={{ animationDelay: "160ms" }}>

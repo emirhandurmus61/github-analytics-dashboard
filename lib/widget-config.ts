@@ -23,7 +23,8 @@ export type WidgetId =
   | "hour-heatmap"
   | "repo-list"
   | "repo-health"
-  | "profile-views";
+  | "profile-views"
+  | "developer-card";
 
 export interface WidgetConfig {
   id: WidgetId;
@@ -98,5 +99,8 @@ export const DEFAULT_WIDGET_CONFIGS: WidgetConfig[] = [
   { id: "repo-health",   label: "Repo Saglik",         colSpan: 4, rowSpan: 3, minCol: 2, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
 
   // Profil görüntülenme 2x2
-  { id: "profile-views", label: "Profil Görüntülenme", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
+  { id: "profile-views",   label: "Profil Görüntülenme", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
+
+  // Developer Card 2x3
+  { id: "developer-card", label: "Developer Card",      colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
 ];

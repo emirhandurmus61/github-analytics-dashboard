@@ -21,11 +21,23 @@ function hexToRgb(hex: string) {
   };
 }
 
+// Format → dimensions
+const FORMATS = {
+  og: { width: 1200, height: 630 },       // default — LinkedIn / Open Graph
+  square: { width: 600, height: 600 },     // Instagram / Discord
+  twitter: { width: 1500, height: 500 },   // Twitter/X banner
+} as const;
+type CardFormat = keyof typeof FORMATS;
+
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+  const url = new URL(req.url);
+  const formatParam = url.searchParams.get("format") ?? "og";
+  const format: CardFormat = (formatParam in FORMATS ? formatParam : "og") as CardFormat;
+  const { width, height } = FORMATS[format];
 
   const { data: user } = await supabaseAdmin
     .from("users")
@@ -100,8 +112,8 @@ export async function GET(
   }
   const peakHour = hourCounts.indexOf(Math.max(...hourCounts));
 
-  // Heatmap grid (last 30 weeks)
-  const WEEKS = 30;
+  // Heatmap grid — week count adapts to format
+  const WEEKS = format === "twitter" ? 44 : format === "square" ? 20 : 30;
   const today = new Date();
   const dayOfWeek = (today.getDay() + 6) % 7;
   const gridStart = new Date(today);
@@ -136,8 +148,8 @@ export async function GET(
       <div
         style={{
           background: "#09090b",
-          width: 1200,
-          height: 630,
+          width,
+          height,
           display: "flex",
           position: "relative",
           overflow: "hidden",
@@ -446,8 +458,12 @@ export async function GET(
       </div>
     ),
     {
-      width: 1200,
-      height: 630,
+      width,
+      height,
+      headers: {
+        "Cache-Control": "public, max-age=3600, s-maxage=3600",
+        "Content-Disposition": `inline; filename="${username}-devcard.png"`,
+      },
     }
   );
 }

@@ -25,6 +25,7 @@ import { generateInsights } from "@/lib/insights";
 import DashboardGrid, { SortableWidget } from "./dashboard-grid";
 import { DEFAULT_WIDGET_CONFIGS } from "@/lib/widget-config";
 import ProfileViewsCard from "./profile-views-card";
+import DeveloperCard from "./developer-card";
 import AutoSync from "./auto-sync";
 
 type Props = {
@@ -718,6 +719,11 @@ export default async function DashboardPage({ searchParams }: Props) {
             {/* Repo sağlık */}
             <SortableWidget key="repo-health" id="repo-health" data-widget-id="repo-health">
               <RepoHealthList repos={repoHealthData} />
+            </SortableWidget>
+
+            {/* Developer Card */}
+            <SortableWidget key="developer-card" id="developer-card" data-widget-id="developer-card">
+              <DeveloperCard username={session?.user?.username ?? ""} />
             </SortableWidget>
 
           </DashboardGrid>
