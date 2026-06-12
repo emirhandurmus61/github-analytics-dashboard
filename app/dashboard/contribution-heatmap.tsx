@@ -51,7 +51,7 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
   const total = data.reduce((s, d) => s + d.commit_count, 0);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [cellSize, setCellSize] = useState(18);
+  const [cellSize, setCellSize] = useState(13);
   const gap = 3;
 
   useEffect(() => {
@@ -59,12 +59,19 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
     if (!el) return;
 
     const observer = new ResizeObserver((entries) => {
-      const height = entries[0]?.contentRect.height ?? 0;
-      // Available height for cells: total minus month labels (18px) minus legend (24px)
-      const availH = height - 42;
-      // 7 rows with 6 gaps
-      const size = Math.floor((availH - gap * 6) / 7);
-      setCellSize(Math.max(12, Math.min(size, 36)));
+      const { width, height } = entries[0]?.contentRect ?? {};
+      // Mobil: genişliğe göre hücre boyutunu ayarla
+      const isMobileView = window.innerWidth < 768;
+      if (isMobileView) {
+        // Tüm haftaları (53) sığdır — minWidth overflow-x-auto ile scroll eder
+        const sizeFromW = Math.floor((width - 36 - gap * 52) / 53);
+        setCellSize(Math.max(10, Math.min(sizeFromW, 13)));
+      } else {
+        // Desktop: yüksekliğe göre
+        const availH = (height ?? 200) - 42;
+        const size = Math.floor((availH - gap * 6) / 7);
+        setCellSize(Math.max(12, Math.min(size, 36)));
+      }
     });
 
     observer.observe(el);
@@ -91,7 +98,7 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
       </div>
 
       <div ref={containerRef} className="overflow-x-auto flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0" style={{ minWidth: weeks.length * (cellSize + gap) + 36 }}>
+        <div className="flex-1 min-h-0" style={{ minWidth: weeks.length * (cellSize + gap) + 36, width: "max-content" }}>
           {/* Month labels */}
           <div className="relative mb-1 ml-9 flex" style={{ height: 16 }}>
             {monthLabels.map(({ label, col }) => (

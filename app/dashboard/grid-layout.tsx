@@ -51,6 +51,7 @@ import {
 
 interface GridCtx {
   editing: boolean;
+  isMobile: boolean;
   configs: WidgetConfig[];
   setColSpan: (id: WidgetId, v: number) => void;
   setRowSpan: (id: WidgetId, v: number) => void;
@@ -59,6 +60,7 @@ interface GridCtx {
 
 const GridContext = createContext<GridCtx>({
   editing: false,
+  isMobile: false,
   configs: DEFAULT_WIDGET_CONFIGS,
   setColSpan: () => {},
   setRowSpan: () => {},
@@ -167,13 +169,27 @@ interface SortableWidgetProps {
 }
 
 export function SortableWidget({ id, children }: SortableWidgetProps) {
-  const { editing, configs } = useContext(GridContext);
+  const { editing, isMobile, configs } = useContext(GridContext);
   const cfg = configs.find((c) => c.id === id);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id, disabled: !editing });
+    useSortable({ id, disabled: !editing || isMobile });
 
   if (!cfg || !cfg.visible) return null;
+
+  // Mobilde span yok — her kart tam genişlikte, doğal yükseklikte
+  const desktopStyle = isMobile
+    ? {}
+    : {
+        gridColumn: `span ${cfg.colSpan}`,
+        gridRow: `span ${cfg.rowSpan}`,
+      };
+
+  // Mobil: sabit yükseklik yok, kart içeriğine göre uzar
+  // Desktop: gridAutoRows CELL_SIZE ile sabit hücre yüksekliği
+  const heightStyle = isMobile
+    ? { minHeight: getMobileMinHeight(id) }
+    : { height: "100%" };
 
   return (
     <div
@@ -181,8 +197,7 @@ export function SortableWidget({ id, children }: SortableWidgetProps) {
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        gridColumn: `span ${cfg.colSpan}`,
-        gridRow: `span ${cfg.rowSpan}`,
+        ...desktopStyle,
       }}
       className={`
         relative rounded-2xl overflow-hidden
@@ -190,10 +205,9 @@ export function SortableWidget({ id, children }: SortableWidgetProps) {
         transition-[opacity,transform] duration-150
       `}
     >
-      {/* Edit overlay */}
-      {editing && (
+      {/* Edit overlay — sadece desktop */}
+      {editing && !isMobile && (
         <>
-          {/* Drag zone */}
           <div
             {...attributes}
             {...listeners}
@@ -210,23 +224,37 @@ export function SortableWidget({ id, children }: SortableWidgetProps) {
               </span>
             </div>
           </div>
-
-          {/* Resize handles */}
           <ResizeHandle id={id} dir="e" />
           <ResizeHandle id={id} dir="s" />
           <ResizeHandle id={id} dir="se" />
         </>
       )}
 
-      {/* Content — fills the grid cell, scrolls on overflow */}
-      <div className="h-full w-full overflow-auto custom-scroll">
+      {/* Content */}
+      <div className="w-full overflow-hidden" style={heightStyle}>
         {children}
       </div>
     </div>
   );
 }
 
-/* ─── Grid Background (edit mode) ────────────────────────── */
+/* Mobilde her kart tipi için makul minimum yükseklik */
+function getMobileMinHeight(id: WidgetId): number {
+  const tall: WidgetId[] = [
+    "heatmap", "lang-evolution", "velocity", "rhythm",
+    "commit-quality", "hour-heatmap", "repo-list", "repo-health",
+    "month-compare", "badges",
+  ];
+  const medium: WidgetId[] = [
+    "goal", "streak", "code-stats", "insights", "activity-bar", "lang-dist",
+    "profile-views",
+  ];
+  if (tall.includes(id)) return 320;
+  if (medium.includes(id)) return 220;
+  return 160;
+}
+
+/* ─── Grid Background (edit mode, desktop only) ───────────── */
 
 function GridBackground({ totalRows }: { totalRows: number }) {
   const cells = 4 * Math.max(totalRows, 10);
@@ -242,10 +270,7 @@ function GridBackground({ totalRows }: { totalRows: number }) {
         }}
       >
         {Array.from({ length: cells }).map((_, i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-dashed border-zinc-800/50"
-          />
+          <div key={i} className="rounded-xl border border-dashed border-zinc-800/50" />
         ))}
       </div>
     </div>
@@ -274,7 +299,6 @@ function EditToolbar({
         className="pointer-events-auto w-full max-w-3xl mx-4 mb-4 rounded-2xl border border-zinc-700/50 bg-zinc-900/85 backdrop-blur-xl shadow-2xl shadow-black/40"
         style={{ boxShadow: "0 -4px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(63,63,70,0.3)" }}
       >
-        {/* Widget visibility — expandable panel */}
         {expanded && (
           <div className="px-4 pt-4 pb-2 border-b border-zinc-800/60">
             <div className="flex items-center justify-between mb-3">
@@ -310,9 +334,7 @@ function EditToolbar({
           </div>
         )}
 
-        {/* Main bar */}
         <div className="flex items-center gap-3 px-4 py-3">
-          {/* Done button */}
           <button
             onClick={onDone}
             className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium
@@ -323,12 +345,10 @@ function EditToolbar({
             Bitti
           </button>
 
-          {/* Hint */}
           <span className="text-xs text-zinc-500 hidden sm:block flex-1 min-w-0">
-            Kartlari surukle, kenar ve koselerden boyutlandir
+            Kartları sürükle, kenar ve köşelerden boyutlandır
           </span>
 
-          {/* Toggle widget visibility panel */}
           <button
             onClick={() => setExpanded((v) => !v)}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium
@@ -338,14 +358,13 @@ function EditToolbar({
             Widgetlar
           </button>
 
-          {/* Reset */}
           <button
             onClick={onReset}
             className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400
               transition-colors rounded-lg px-3 py-1.5 hover:bg-zinc-800/50 shrink-0"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Sifirla
+            Sıfırla
           </button>
         </div>
       </div>
@@ -366,6 +385,15 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
   const [activeId, setActiveId] = useState<WidgetId | null>(null);
   const [order, setOrder] = useState(widgetIds);
   const [hydrated, setHydrated] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Mobil tespiti
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     const saved = load();
@@ -374,12 +402,7 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
       const merged: WidgetConfig[] = [];
       for (const s of saved.configs) {
         const def = DEFAULT_WIDGET_CONFIGS.find((d) => d.id === s.id);
-        if (def) merged.push({
-          ...def,
-          colSpan: s.colSpan,
-          rowSpan: s.rowSpan,
-          visible: s.visible,
-        });
+        if (def) merged.push({ ...def, colSpan: s.colSpan, rowSpan: s.rowSpan, visible: s.visible });
       }
       for (const def of DEFAULT_WIDGET_CONFIGS) {
         if (!savedMap.has(def.id)) merged.push(def);
@@ -427,17 +450,13 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
     try { localStorage.removeItem(KEY); } catch {}
   }, [widgetIds]);
 
-  // Estimate total rows for background grid
   const totalRows = useMemo(() => {
     let rows = 0;
     let colUsed = 0;
     for (const id of order) {
       const cfg = configs.find((c) => c.id === id);
       if (!cfg || !cfg.visible) continue;
-      if (colUsed + cfg.colSpan > 4) {
-        rows += 1;
-        colUsed = 0;
-      }
+      if (colUsed + cfg.colSpan > 4) { rows += 1; colUsed = 0; }
       colUsed += cfg.colSpan;
       rows = Math.max(rows, cfg.rowSpan);
     }
@@ -464,20 +483,37 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
     });
   }
 
+  // SSR / hydration öncesi: mobil-safe tek kolon
   if (!hydrated) {
     return (
-      <div
-        className="widget-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-        style={{ gap: GRID_GAP, gridAutoRows: CELL_SIZE }}
-      >
+      <div className="flex flex-col gap-3 md:widget-grid md:grid md:grid-cols-4" style={{ gap: GRID_GAP }}>
         {children}
       </div>
     );
   }
 
+  // Mobil: sürükle/bırak yok, edit yok, tek kolon, auto yükseklik
+  if (isMobile) {
+    return (
+      <GridContext.Provider value={{ editing: false, isMobile: true, configs, setColSpan, setRowSpan, toggleVisible }}>
+        <div className="flex flex-col" style={{ gap: GRID_GAP }}>
+          {order.map((id) => {
+            let match: React.ReactNode = null;
+            React.Children.forEach(children, (child) => {
+              if (React.isValidElement(child) && (child.props as Record<string, unknown>).id === id) {
+                match = child;
+              }
+            });
+            return match;
+          })}
+        </div>
+      </GridContext.Provider>
+    );
+  }
+
+  // Desktop: tam grid sistemi
   return (
-    <GridContext.Provider value={{ editing, configs, setColSpan, setRowSpan, toggleVisible }}>
-      {/* Edit button (top) */}
+    <GridContext.Provider value={{ editing, isMobile: false, configs, setColSpan, setRowSpan, toggleVisible }}>
       {!editing && (
         <div className="flex items-center mb-4">
           <button
@@ -487,12 +523,11 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
               transition-all duration-200 select-none"
           >
             <Pencil className="w-4 h-4" />
-            Duzenle
+            Düzenle
           </button>
         </div>
       )}
 
-      {/* Sticky bottom toolbar (edit mode) */}
       {editing && (
         <EditToolbar
           configs={configs}
@@ -513,7 +548,7 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
             {editing && <GridBackground totalRows={totalRows} />}
 
             <div
-              className="widget-grid relative z-10 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
+              className="widget-grid relative z-10 grid grid-cols-4"
               style={{ gap: GRID_GAP, gridAutoRows: CELL_SIZE }}
             >
               {order.map((id) => {

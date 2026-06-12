@@ -554,21 +554,27 @@ export default async function DashboardPage({ searchParams }: Props) {
       <AutoSync lastSyncedAt={dbUser?.last_synced_at ?? null} />
 
       {/* Başlık */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-100 sm:text-2xl">
-            Merhaba, {session?.user?.name?.split(" ")[0]}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            {lastSynced ? `Son senkronizasyon: ${lastSynced}` : "Senkronizasyonu başlat."}
-          </p>
+      <div className="mb-4 sm:mb-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-semibold text-zinc-100 sm:text-2xl">
+              Merhaba, {session?.user?.name?.split(" ")[0]}
+            </h1>
+            <p className="mt-0.5 text-xs text-zinc-500 sm:text-sm">
+              {lastSynced ? `Son sync: ${lastSynced}` : "Senkronizasyonu başlat."}
+            </p>
+          </div>
+          {hasSynced && (
+            <div className="flex items-center gap-2 shrink-0">
+              <SyncButton label="Yenile" />
+            </div>
+          )}
         </div>
         {hasSynced && (
-          <div className="flex items-center gap-3">
+          <div className="mt-3">
             <Suspense>
               <Filters hideForks={hideForks} dateRange={dateRange} />
             </Suspense>
-            <SyncButton label="Yenile" />
           </div>
         )}
       </div>

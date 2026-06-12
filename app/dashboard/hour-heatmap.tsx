@@ -27,11 +27,10 @@ export default function HourHeatmap({ data }: Props) {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
-      const h = entries[0]?.contentRect.height ?? 0;
-      // Available: total minus hour labels (16px) minus legend (24px)
-      const avail = h - 40;
+      const { height } = entries[0]?.contentRect ?? {};
+      const avail = (height ?? 200) - 40;
       const size = Math.floor((avail - gap * 6) / 7);
-      setRowH(Math.max(16, Math.min(size, 42)));
+      setRowH(Math.max(14, Math.min(size, 42)));
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -59,7 +58,7 @@ export default function HourHeatmap({ data }: Props) {
       </div>
 
       <div ref={containerRef} className="overflow-x-auto flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0" style={{ minWidth: 480 }}>
+        <div className="flex-1 min-h-0" style={{ minWidth: 360, width: "max-content" }}>
           {/* Hour labels */}
           <div className="mb-1 flex pl-10">
             {Array.from({ length: 24 }, (_, i) => (
