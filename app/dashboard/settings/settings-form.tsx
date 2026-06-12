@@ -47,6 +47,7 @@ const NAV_ITEMS = [
   { id: "sosyal", label: "Sosyal", icon: "◎" },
   { id: "profil-sayfasi", label: "Profil Sayfası", icon: "◫" },
   { id: "badge", label: "Badge", icon: "◆" },
+  { id: "readme-widgets", label: "README Widgets", icon: "◉" },
 ] as const;
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -638,6 +639,11 @@ export default function SettingsForm({
             </div>
           </Section>
 
+          {/* ── README WIDGETS ── */}
+          <Section id="readme-widgets" title="README Widgets" desc="GitHub profiline veya herhangi bir README'ye ekle — her saat otomatik güncellenir." accentBorder={accentBorder}>
+            <ReadmeWidgets username={username} accentColor={accent} accentBg={accentBg} accentBorder={accentBorder} />
+          </Section>
+
           {/* ── Sticky Kaydet ── */}
           <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-xl">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -957,6 +963,111 @@ function ReadmeEditor({
           </div>
           <span className="text-[10px] tabular-nums text-zinc-700">{value.length}/2000</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── README Widgets ─────────────────────────────────────────────────────────── */
+
+const WIDGET_ITEMS = [
+  {
+    id: "streak",
+    label: "Streak Widget",
+    desc: "Günlük commit serisi, en uzun streak ve son 14 günlük mini bar chart.",
+    path: (u: string) => `/api/widget/streak/${u}`,
+  },
+  {
+    id: "stats",
+    label: "Stats Widget",
+    desc: "Yıllık commit, streak, repo sayısı ve toplam yıldız — 4 sütunlu kompakt kart.",
+    path: (u: string) => `/api/widget/stats/${u}`,
+  },
+  {
+    id: "langs",
+    label: "Top Languages",
+    desc: "En çok kullandığın 5 programlama dili ve yüzdeleri.",
+    path: (u: string) => `/api/widget/langs/${u}`,
+  },
+  {
+    id: "heatmap",
+    label: "Contribution Heatmap",
+    desc: "Son 52 haftanın katkı ısı haritası — temanın rengiyle.",
+    path: (u: string) => `/api/widget/heatmap/${u}`,
+  },
+] as const;
+
+function ReadmeWidgets({
+  username,
+  accentColor,
+  accentBg,
+  accentBorder,
+}: {
+  username: string;
+  accentColor: string;
+  accentBg: string;
+  accentBorder: string;
+}) {
+  const [active, setActive] = useState<string>("streak");
+  const current = WIDGET_ITEMS.find((w) => w.id === active)!;
+  const base = typeof window !== "undefined" ? window.location.origin : "https://devanalytics.app";
+  const imgUrl = `${base}${current.path(username)}`;
+  const profileUrl = `${base}/u/${username}`;
+
+  const mdSnippet = `[![${current.label}](${imgUrl})](${profileUrl})`;
+  const htmlSnippet = `<a href="${profileUrl}"><img src="${imgUrl}" alt="${current.label}"></a>`;
+
+  return (
+    <div className="space-y-5">
+      {/* Widget seçici tablar */}
+      <div className="flex flex-wrap gap-2">
+        {WIDGET_ITEMS.map((w) => (
+          <button
+            key={w.id}
+            type="button"
+            onClick={() => setActive(w.id)}
+            className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-all"
+            style={
+              active === w.id
+                ? { borderColor: accentBorder, color: accentColor, backgroundColor: accentBg }
+                : { borderColor: "#27272a", color: "#71717a" }
+            }
+          >
+            {w.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Açıklama */}
+      <p className="text-xs text-zinc-500">{current.desc}</p>
+
+      {/* Önizleme */}
+      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 p-4 flex items-center justify-center min-h-[80px]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img key={imgUrl} src={imgUrl} alt={current.label} className="max-w-full block" />
+      </div>
+
+      {/* Snippet'ler */}
+      <div className="space-y-3">
+        <div>
+          <p className="mb-2 text-xs text-zinc-500">Markdown (GitHub README)</p>
+          <CopyBox value={mdSnippet} accentColor={accentColor} accentBg={accentBg} accentBorder={accentBorder} />
+        </div>
+        <div>
+          <p className="mb-2 text-xs text-zinc-500">HTML</p>
+          <CopyBox value={htmlSnippet} accentColor={accentColor} accentBg={accentBg} accentBorder={accentBorder} />
+        </div>
+      </div>
+
+      {/* Tüm widgetları ekle */}
+      <div>
+        <p className="mb-2 text-xs text-zinc-500">Hepsini birden ekle (Markdown)</p>
+        <CopyBox
+          value={WIDGET_ITEMS.map((w) => `[![${w.label}](${base}${w.path(username)})](${profileUrl})`).join("\n")}
+          accentColor={accentColor}
+          accentBg={accentBg}
+          accentBorder={accentBorder}
+        />
       </div>
     </div>
   );
