@@ -224,7 +224,11 @@ export async function GET(req: NextRequest) {
   const utcHour = new Date().getUTCHours();
   if (utcHour === 17) {
     try {
-      const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+      const baseUrl =
+        process.env.NEXT_PUBLIC_BASE_URL
+        ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+        ?? process.env.NEXTAUTH_URL
+        ?? "http://localhost:3000";
       await fetch(`${baseUrl}/api/push-send`, {
         method: "POST",
         headers: {

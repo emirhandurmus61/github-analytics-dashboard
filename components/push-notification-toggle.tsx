@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Bell, BellOff, BellRing, Loader2, AlertTriangle, XCircle } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 
@@ -67,11 +68,16 @@ export default function PushNotificationToggle({
   const isDenied = state === "denied";
   const isUnsupported = state === "unsupported";
 
-  // Push API sadece HTTPS veya localhost'ta çalışır
-  const isInsecure = typeof window !== "undefined"
-    && location.protocol !== "https:"
-    && location.hostname !== "localhost"
-    && location.hostname !== "127.0.0.1";
+  // Push API sadece HTTPS veya localhost'ta çalışır — state "unsupported" değilse ve
+  // state artık "loading" değilse kontrol et (hydration mismatch'i önlemek için)
+  const [isInsecure, setIsInsecure] = useState(false);
+  useEffect(() => {
+    setIsInsecure(
+      location.protocol !== "https:"
+      && location.hostname !== "localhost"
+      && location.hostname !== "127.0.0.1"
+    );
+  }, []);
 
   return (
     <div className="space-y-4">
