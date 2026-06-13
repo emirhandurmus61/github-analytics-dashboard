@@ -40,7 +40,7 @@ export default async function SettingsPage() {
   let profileReadmeDb: string | null = null;
   let githubReadmeDb: string | null = null;
   let readmeSourceDb: "github" | "custom" = "github";
-  let leaderboardOptInDb = false;
+  let leaderboardOptInDb = true; // varsayılan: listede görünür
   try {
     const { data: extra } = await supabaseAdmin
       .from("users")
@@ -52,7 +52,8 @@ export default async function SettingsPage() {
       profileReadmeDb = extra.profile_readme ?? null;
       githubReadmeDb = extra.github_readme ?? null;
       readmeSourceDb = extra.readme_source === "custom" ? "custom" : "github";
-      leaderboardOptInDb = extra.leaderboard_opt_in === true;
+      // Açıkça false yapılmışsa opt-out, NULL veya true ise opt-in
+      leaderboardOptInDb = extra.leaderboard_opt_in !== false;
     }
   } catch {
     // Kolonlar henuz yok

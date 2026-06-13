@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Trophy, Flame, Star, Users, ChevronRight } from "lucide-react";
+import { Trophy, Flame, Award, Users, ChevronRight, Medal, EyeOff, Eye } from "lucide-react";
 import { toggleLeaderboardOptIn } from "./actions";
 import type { LeaderboardEntry, LeaderboardCategory } from "./page";
 
@@ -14,12 +14,12 @@ const LANG_COLORS: Record<string, string> = {
   Swift: "#F05138", Kotlin: "#7F52FF", Ruby: "#701516",
 };
 
-const MEDAL = ["🥇", "🥈", "🥉"];
+const RANK_COLORS = ["#f59e0b", "#94a3b8", "#cd7c2f"];
 
 const CATEGORIES: { id: LeaderboardCategory; label: string; icon: React.ReactNode; desc: string }[] = [
   { id: "weekly", label: "Bu Hafta", icon: <Flame size={15} />, desc: "commit" },
   { id: "streak", label: "Streak", icon: <Trophy size={15} />, desc: "gün" },
-  { id: "badges", label: "Rozetler", icon: <Star size={15} />, desc: "rozet" },
+  { id: "badges", label: "Rozetler", icon: <Award size={15} />, desc: "rozet" },
 ];
 
 function EntryRow({
@@ -33,8 +33,6 @@ function EntryRow({
   valueKey: keyof LeaderboardEntry;
   valueSuffix: string;
 }) {
-  const medal = MEDAL[entry.rank - 1];
-
   return (
     <Link
       href={`/u/${entry.username}`}
@@ -45,9 +43,9 @@ function EntryRow({
       }}
     >
       {/* Rank */}
-      <div className="w-8 shrink-0 text-center">
-        {medal ? (
-          <span className="text-lg">{medal}</span>
+      <div className="w-8 shrink-0 text-center flex items-center justify-center">
+        {entry.rank <= 3 ? (
+          <Medal size={18} style={{ color: RANK_COLORS[entry.rank - 1] }} />
         ) : (
           <span className="text-sm font-bold text-zinc-600">#{entry.rank}</span>
         )}
@@ -155,7 +153,7 @@ export default function LeaderboardClient({
               <h1 className="text-xl font-bold text-zinc-100">Liderlik Tablosu</h1>
             </div>
             <p className="text-sm text-zinc-500">
-              Opt-in katılımcılar arasında sıralama
+              Tüm geliştiriciler arasında sıralama
             </p>
           </div>
 
@@ -166,16 +164,19 @@ export default function LeaderboardClient({
               disabled={isPending}
               className="shrink-0 flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all disabled:opacity-50"
               style={{
-                borderColor: optedIn ? "#22c55e40" : "#3f3f46",
-                backgroundColor: optedIn ? "#22c55e10" : "transparent",
-                color: optedIn ? "#22c55e" : "#71717a",
+                borderColor: optedIn ? "#3f3f46" : "#ef444440",
+                backgroundColor: optedIn ? "transparent" : "#ef444408",
+                color: optedIn ? "#71717a" : "#ef4444",
               }}
             >
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: optedIn ? "#22c55e" : "#52525b" }}
-              />
-              {isPending ? "..." : optedIn ? "Listede görünüyorsun" : "Listeye katıl"}
+              {isPending ? (
+                <span className="w-3.5 h-3.5 border border-current rounded-full border-t-transparent animate-spin" />
+              ) : optedIn ? (
+                <EyeOff size={14} />
+              ) : (
+                <Eye size={14} />
+              )}
+              {isPending ? "..." : optedIn ? "Listeden çıkar" : "Listeye geri dön"}
             </button>
           )}
         </div>
@@ -202,11 +203,13 @@ export default function LeaderboardClient({
         {/* List */}
         {entries.length === 0 ? (
           <div className="text-center py-20 space-y-3">
-            <p className="text-4xl">🏆</p>
-            <p className="text-zinc-400 font-medium">Henüz kimse katılmadı</p>
+            <div className="flex justify-center">
+              <Trophy size={40} className="text-zinc-700" />
+            </div>
+            <p className="text-zinc-400 font-medium">Henüz veri yok</p>
             <p className="text-sm text-zinc-600">
               {currentUsername
-                ? "Listenin ilk sırası seni bekliyor!"
+                ? "Senkronizasyon tamamlandıktan sonra veriler burada görünür."
                 : "Giriş yap ve listeye katıl."}
             </p>
             {!currentUsername && (

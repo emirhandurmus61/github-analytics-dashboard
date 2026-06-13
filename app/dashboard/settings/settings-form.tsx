@@ -658,11 +658,11 @@ export default function SettingsForm({
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-zinc-200">Liderlik Tablosuna Katıl</p>
                   <p className="text-xs text-zinc-500">
-                    Açılırsa haftalık commit, streak ve rozet sayın{" "}
+                    Haftalık commit, streak ve rozet sayın{" "}
                     <a href="/leaderboard" target="_blank" className="underline" style={{ color: accent }}>
                       liderlik tablosunda
                     </a>{" "}
-                    görünür. İstediğin zaman kapatabilirsin.
+                    varsayılan olarak görünür. Kapatarak gizleyebilirsin.
                   </p>
                 </div>
                 {/* Toggle switch */}

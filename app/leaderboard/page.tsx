@@ -140,17 +140,25 @@ export default async function LeaderboardPage() {
   const session = await auth();
   const currentUsername = session?.user?.username ?? null;
 
-  // Opt-in olan tüm kullanıcıları çek
+  // leaderboard_opt_in = false olarak açıkça kapatmayanları (NULL veya true) herkesi göster
   let optInUsers: { id: string; username: string; name: string | null; avatar_url: string | null; theme_accent: string | null }[] = [];
-  try {
-    const { data } = await supabaseAdmin
+  {
+    const { data, error } = await supabaseAdmin
       .from("users")
       .select("id, username, name, avatar_url, theme_accent")
-      .eq("leaderboard_opt_in", true)
+      .neq("leaderboard_opt_in", false)
       .not("username", "is", null);
-    optInUsers = data ?? [];
-  } catch {
-    // leaderboard_opt_in kolonu henüz yoksa boş döner
+
+    if (error) {
+      // leaderboard_opt_in kolonu henüz yoksa filtre olmadan tüm kullanıcıları çek
+      const { data: allData } = await supabaseAdmin
+        .from("users")
+        .select("id, username, name, avatar_url, theme_accent")
+        .not("username", "is", null);
+      optInUsers = allData ?? [];
+    } else {
+      optInUsers = data ?? [];
+    }
   }
 
   if (optInUsers.length === 0) {
@@ -201,17 +209,16 @@ export default async function LeaderboardPage() {
   const streaks = buildEntries("currentStreak");
   const badges = buildEntries("badgeCount");
 
-  // Mevcut kullanıcının opt-in durumu
-  let isOptedIn = false;
+  // Mevcut kullanıcının opt-out durumu — varsayılan: listede görünür (true)
+  let isOptedIn = true;
   if (currentUsername) {
-    try {
-      const { data: me } = await supabaseAdmin
-        .from("users")
-        .select("leaderboard_opt_in")
-        .eq("username", currentUsername)
-        .single();
-      isOptedIn = me?.leaderboard_opt_in === true;
-    } catch { /* kolonu yok */ }
+    const { data: me } = await supabaseAdmin
+      .from("users")
+      .select("leaderboard_opt_in")
+      .eq("username", currentUsername)
+      .single();
+    // Açıkça false yapılmışsa opt-out, NULL veya true ise opt-in
+    if (me) isOptedIn = me.leaderboard_opt_in !== false;
   }
 
   return (
