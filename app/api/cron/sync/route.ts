@@ -219,5 +219,24 @@ export async function GET(req: NextRequest) {
   }
 
   const duration = Math.round((Date.now() - startedAt) / 1000);
+
+  // Akşam 20:00 civarındaysa streak bildirimi gönder (UTC+3 → 17:00 UTC)
+  const utcHour = new Date().getUTCHours();
+  if (utcHour === 17) {
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+      await fetch(`${baseUrl}/api/push-send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cron-secret": process.env.CRON_SECRET!,
+        },
+        body: JSON.stringify({ type: "streak" }),
+      });
+    } catch {
+      // Push gönderimi başarısız — sync'i etkilemez
+    }
+  }
+
   return NextResponse.json({ synced: users.length, duration, results });
 }

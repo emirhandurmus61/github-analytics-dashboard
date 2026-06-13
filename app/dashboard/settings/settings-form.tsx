@@ -4,6 +4,7 @@ import { useActionState, useState, useRef, useEffect } from "react";
 import { saveProfileSettings } from "./actions";
 import { THEMES, type ThemeAccent } from "@/lib/themes";
 import { ImagePlus, Loader2, Check, Copy } from "lucide-react";
+import PushNotificationToggle from "@/components/push-notification-toggle";
 import {
   WIDGET_KEYS,
   WIDGET_LABELS,
@@ -49,6 +50,7 @@ const NAV_ITEMS = [
   { id: "profil-sayfasi", label: "Profil Sayfası", icon: "◫" },
   { id: "badge", label: "Badge", icon: "◆" },
   { id: "readme-widgets", label: "README Widgets", icon: "◉" },
+  { id: "bildirimler", label: "Bildirimler", icon: "◎" },
   { id: "gizlilik", label: "Gizlilik", icon: "◌" },
 ] as const;
 
@@ -102,6 +104,9 @@ export default function SettingsForm({
   const [activeSection, setActiveSection] = useState("gorunum");
   const [showSuccess, setShowSuccess] = useState(false);
   const [optIn, setOptIn] = useState(leaderboardOptIn);
+  const [pushPrefs, setPushPrefs] = useState({
+    streak: true, goal: true, badge: true, summary: true, hour: 20,
+  });
 
   // Başarı toast
   useEffect(() => {
@@ -646,6 +651,15 @@ export default function SettingsForm({
           {/* ── README WIDGETS ── */}
           <Section id="readme-widgets" title="README Widgets" desc="GitHub profiline veya herhangi bir README'ye ekle — her saat otomatik güncellenir." accentBorder={accentBorder}>
             <ReadmeWidgets username={username} accentColor={accent} accentBg={accentBg} accentBorder={accentBorder} />
+          </Section>
+
+          {/* ── BİLDİRİMLER ── */}
+          <Section id="bildirimler" title="Bildirimler" desc="Push bildirimleriyle streak'ini ve hedeflerini takip et. Uygulama kapalıyken bile çalışır." accentBorder={accentBorder}>
+            <PushNotificationToggle
+              accent={accent}
+              prefs={pushPrefs}
+              onPrefsChange={setPushPrefs}
+            />
           </Section>
 
           {/* ── GİZLİLİK ── */}
