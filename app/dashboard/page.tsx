@@ -28,9 +28,11 @@ import ProfileViewsCard from "./profile-views-card";
 import DeveloperCard from "./developer-card";
 import DeveloperDNACard from "./developer-dna";
 import PercentileRankCard from "./percentile-rank";
+import AdvancedGoalsCard from "./advanced-goals";
 import AutoSync from "./auto-sync";
 import { calcDeveloperDNA, type DeveloperDNA } from "@/lib/developer-dna";
 import { calcPercentileRank, type PercentileData } from "@/lib/percentile";
+import { type UserGoal } from "@/lib/goals";
 
 type Props = {
   searchParams: Promise<{ range?: string; hideForks?: string }>;
@@ -98,6 +100,9 @@ export default async function DashboardPage({ searchParams }: Props) {
   let profileViewsTotal = 0;
   let developerDna: DeveloperDNA | null = null;
   let percentileData: PercentileData | null = null;
+  let userGoals: UserGoal[] = [];
+  let goalAchievements: string[] = [];
+  let goalMetrics = { todayCommits: 0, weeklyPRs: 0, monthlyActiveDays: 0, quarterlyNewRepos: 0 };
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -548,6 +553,75 @@ export default async function DashboardPage({ searchParams }: Props) {
       // Platform genelinde yeterli veri yoksa sessizce geç
     }
 
+    // Gelişmiş hedefler
+    try {
+      const [goalsRes, achievementsRes] = await Promise.all([
+        supabaseAdmin
+          .from("user_goals")
+          .select("id, type, target, chain_order, completed_at, is_active")
+          .eq("user_id", dbUser.id)
+          .eq("is_active", true)
+          .order("chain_order", { ascending: true }),
+        supabaseAdmin
+          .from("goal_achievements")
+          .select("achieved_on")
+          .eq("user_id", dbUser.id),
+      ]);
+
+      userGoals = (goalsRes.data ?? []).map((g) => ({
+        id: g.id,
+        type: g.type,
+        target: g.target,
+        chainOrder: g.chain_order,
+        completedAt: g.completed_at,
+        isActive: g.is_active,
+      }));
+
+      goalAchievements = (achievementsRes.data ?? []).map((a) => a.achieved_on);
+
+      // Metrikler
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+      const quarterStart = (() => {
+        const now = new Date();
+        const qMonth = Math.floor(now.getMonth() / 3) * 3;
+        return new Date(now.getFullYear(), qMonth, 1).toISOString().slice(0, 10);
+      })();
+
+      const [todayStats, weekPRs, monthStats, quarterRepos] = await Promise.all([
+        supabaseAdmin
+          .from("daily_stats")
+          .select("commit_count")
+          .eq("user_id", dbUser.id)
+          .eq("date", todayStr)
+          .single(),
+        supabaseAdmin
+          .from("pull_requests")
+          .select("id", { count: "exact", head: true })
+          .in("repo_id", ownIds)
+          .gte("created_at", sinceDate),
+        supabaseAdmin
+          .from("daily_stats")
+          .select("date, commit_count")
+          .eq("user_id", dbUser.id)
+          .gte("date", monthStart),
+        supabaseAdmin
+          .from("repositories")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", dbUser.id)
+          .gte("created_at", quarterStart),
+      ]);
+
+      goalMetrics = {
+        todayCommits: todayStats.data?.commit_count ?? 0,
+        weeklyPRs: weekPRs.count ?? 0,
+        monthlyActiveDays: (monthStats.data ?? []).filter((d) => d.commit_count > 0).length,
+        quarterlyNewRepos: quarterRepos.count ?? 0,
+      };
+    } catch {
+      // Tablo henüz yoksa sessizce geç
+    }
+
     // Haftalık hedef
     weeklyGoal = dbUser.weekly_commit_goal ?? 20;
 
@@ -802,6 +876,15 @@ export default async function DashboardPage({ searchParams }: Props) {
                 <PercentileRankCard data={percentileData} />
               </SortableWidget>
             )}
+
+            {/* Gelişmiş Hedefler */}
+            <SortableWidget key="advanced-goals" id="advanced-goals" data-widget-id="advanced-goals">
+              <AdvancedGoalsCard
+                goals={userGoals}
+                achievements={goalAchievements}
+                metrics={goalMetrics}
+              />
+            </SortableWidget>
 
           </DashboardGrid>
         </div>
