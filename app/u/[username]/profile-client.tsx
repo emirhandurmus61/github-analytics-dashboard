@@ -11,6 +11,8 @@ import {
   Sparkles, Award, ChevronRight, Download, ExternalLink,
   BookOpen, Timer, TrendingUp, Layers, Hash, ArrowRight,
   Link as LinkIcon, MessageCircle, Share2, Check,
+  Sunrise, Sun, Sunset, Clock, GitCommit, Shuffle,
+  Compass, AlignLeft, Minus, Blend, FolderGit2, LayoutGrid, Map,
 } from "lucide-react";
 import type { Badge } from "@/lib/badges";
 import type { DeveloperDNA } from "@/lib/developer-dna";
@@ -305,6 +307,104 @@ function StatCard({
           <AnimatedNumber value={value} />
         </p>
         {sub && <p className="text-[10px] text-zinc-600 mt-0.5 uppercase tracking-wider">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Developer DNA section ─── */
+
+const DNA_DIM_META: Record<string, { icon: React.ReactNode; color: string; score: number; desc: string }> = {
+  "Gece Kuşu":        { icon: <Moon className="w-3.5 h-3.5" />,       color: "#818cf8", score: 85, desc: "Gece yarısı–sabah 6 arası en verimli haldeydin. Sessiz saatlerde derine dalıyorsun." },
+  "Sabahçı":          { icon: <Sunrise className="w-3.5 h-3.5" />,    color: "#fb923c", score: 75, desc: "Sabah erken saatlerde en üretken dönemin başlıyor. Günü kodla açıyorsun." },
+  "Öğleden Sonracı":  { icon: <Sun className="w-3.5 h-3.5" />,        color: "#fbbf24", score: 60, desc: "Öğleden sonra ritme giriyorsun — toplantılar, planlama derken asıl iş başlıyor." },
+  "Akşamcı":          { icon: <Sunset className="w-3.5 h-3.5" />,     color: "#f97316", score: 70, desc: "Gün bittikten sonra gerçek verimlilik saatlerin başlıyor. Akşam commitlerin artıyor." },
+  "Her Saatte":       { icon: <Clock className="w-3.5 h-3.5" />,      color: "#94a3b8", score: 50, desc: "Gün boyunca dengeli dağılım — ihtiyaç duydukça, zamanı gelince kodluyorsun." },
+  "Küçük & Sık":      { icon: <GitCommit className="w-3.5 h-3.5" />,  color: "#34d399", score: 80, desc: "Sık ama küçük commitler atıyorsun. CI dostu, geri alması kolay, gözden geçirmesi rahat." },
+  "Büyük & Seyrek":   { icon: <Zap className="w-3.5 h-3.5" />,        color: "#60a5fa", score: 65, desc: "Az sayıda ama kapsamlı commit. Büyük özellikleri tamamlayıp tek seferde gönderiyorsun." },
+  "Patlama Yapan":    { icon: <TrendingUp className="w-3.5 h-3.5" />, color: "#f43f5e", score: 90, desc: "Kısa sürede çok commit — sprint veya hackathon tarzı yoğun çalışma dönemlerin var." },
+  "Dengeli":          { icon: <Shuffle className="w-3.5 h-3.5" />,    color: "#a78bfa", score: 55, desc: "Küçük ve büyük commit arasında doğal denge. Duruma göre adapte olan esnek bir stil." },
+  "Uzman":            { icon: <Code2 className="w-3.5 h-3.5" />,      color: "#22d3ee", score: 95, desc: "Tek dilde derin uzmanlık. Ekosistemi, idiomları ve en iyi pratikleri içselleştirdin." },
+  "Poliglot":         { icon: <Globe className="w-3.5 h-3.5" />,      color: "#4ade80", score: 85, desc: "5+ farklı dil kullanıyorsun. Geniş teknik bakış açısı ve yüksek adaptasyon kabiliyeti." },
+  "Geçiş Aşamasında": { icon: <Layers className="w-3.5 h-3.5" />,    color: "#fb923c", score: 60, desc: "Birincil dilinden yeniye geçiyorsun — aktif bir öğrenme ve dönüşüm sürecinin içindesin." },
+  "Keşifçi":          { icon: <Compass className="w-3.5 h-3.5" />,    color: "#f59e0b", score: 70, desc: "2–4 dil arasında dengeli dağılım. Birden fazla alanda yetkin olmayı tercih ediyorsun." },
+  "Konvansiyonalist": { icon: <AlignLeft className="w-3.5 h-3.5" />, color: "#a78bfa", score: 90, desc: "feat:, fix:, chore: gibi conventional commit formatını tutarlı kullanıyorsun. Changelog otomasyonu için ideal." },
+  "Minimalist":       { icon: <Minus className="w-3.5 h-3.5" />,      color: "#94a3b8", score: 40, desc: "Kısa ve öz mesajlar. Hızlısın ama geçmişe bakınca bağlam kaybolabiliyor." },
+  "Anlatıcı":         { icon: <BookOpen className="w-3.5 h-3.5" />,   color: "#34d399", score: 80, desc: "Ayrıntılı commit mesajları yazıyorsun. Neden'i de anlatan, ekip çalışmasına değer katan bir stil." },
+  "Karma":            { icon: <Blend className="w-3.5 h-3.5" />,      color: "#fbbf24", score: 60, desc: "Tutarlı bir format yok ama kasıtlı bir çeşitlilik de değil. Duruma göre şekillenen doğal akış." },
+  "Tek Proje":        { icon: <FolderGit2 className="w-3.5 h-3.5" />, color: "#22d3ee", score: 90, desc: "Commitlerinin büyük çoğunluğu tek projede. Derin odak ve süreklilik — monorepo dostu çalışma tarzı." },
+  "Çok Ön Yüz":       { icon: <LayoutGrid className="w-3.5 h-3.5" />, color: "#a78bfa", score: 70, desc: "2–5 repo arasında dengeli dağılım. Birden fazla projeyi aynı anda götürebilen, context-switch yapabilen birisin." },
+};
+
+function DeveloperDNASection({ dna, accent, accentBorder }: {
+  dna: import("@/lib/developer-dna").DeveloperDNA;
+  accent: string;
+  accentBorder: string;
+}) {
+  const dims = [
+    { label: "Çalışma Zamanı", value: dna.workTime },
+    { label: "Commit Ritmi",   value: dna.commitRhythm },
+    { label: "Dil Profili",    value: dna.langProfile },
+    { label: "Mesaj Stili",    value: dna.msgQuality },
+    { label: "Odak Stili",     value: dna.focusStyle },
+  ];
+
+  return (
+    <div
+      className="rounded-2xl border overflow-hidden"
+      style={{ borderColor: accentBorder }}
+    >
+      {/* Üst banner — developer type */}
+      <div
+        className="px-5 py-4 flex items-center gap-3"
+        style={{ background: `linear-gradient(135deg, ${accent}15 0%, ${accent}06 100%)`, borderBottom: `1px solid ${accentBorder}` }}
+      >
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0"
+          style={{ backgroundColor: `${accent}20`, color: accent, boxShadow: `0 0 14px ${accent}25` }}
+        >
+          <Map className="w-4 h-4" />
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Geliştirici Tipi</p>
+          <p className="text-sm font-bold mt-0.5" style={{ color: accent }}>{dna.developerType}</p>
+        </div>
+      </div>
+
+      {/* 5 boyut grid */}
+      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        {dims.map(({ label, value }) => {
+          const meta = DNA_DIM_META[value] ?? { icon: <Code2 className="w-3.5 h-3.5" />, color: "#6b7280", score: 50, desc: "" };
+          return (
+            <div
+              key={label}
+              title={meta.desc}
+              className="rounded-xl border p-3 flex flex-col gap-2 cursor-default group transition-all hover:scale-[1.02]"
+              style={{ borderColor: `${meta.color}25`, backgroundColor: `${meta.color}06` }}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="flex h-6 w-6 items-center justify-center rounded-lg shrink-0"
+                  style={{ backgroundColor: `${meta.color}18`, color: meta.color }}
+                >
+                  {meta.icon}
+                </div>
+                <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wide">{label}</span>
+              </div>
+              <p className="text-xs font-semibold leading-tight" style={{ color: meta.color }}>{value}</p>
+              <div className="h-0.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${meta.score}%`, background: `linear-gradient(90deg, ${meta.color}60, ${meta.color})` }}
+                />
+              </div>
+              {/* Tooltip benzeri açıklama hover'da */}
+              <p className="text-[10px] text-zinc-600 leading-tight line-clamp-2 group-hover:text-zinc-500 transition-colors">
+                {meta.desc}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -880,35 +980,7 @@ export default function ProfileClient(props: ProfileProps) {
               <Code2 className="w-4 h-4 text-zinc-500" />
               <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">Developer DNA</h2>
             </div>
-            <div
-              className="rounded-2xl border p-4 flex flex-wrap items-center gap-3"
-              style={{ borderColor: `${theme.accent}25`, backgroundColor: `${theme.accent}06` }}
-            >
-              {/* Developer tipi — ana etiket */}
-              <div
-                className="flex items-center gap-2 rounded-xl px-3 py-1.5"
-                style={{ backgroundColor: `${theme.accent}18`, color: theme.accent }}
-              >
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                <span className="text-sm font-semibold">{developerDna.developerType}</span>
-              </div>
-              {/* 5 boyut rozeti */}
-              {[
-                developerDna.workTime,
-                developerDna.commitRhythm,
-                developerDna.langProfile,
-                developerDna.msgQuality,
-                developerDna.focusStyle,
-              ].map((dim) => (
-                <span
-                  key={dim}
-                  className="rounded-lg border px-2.5 py-1 text-xs text-zinc-400"
-                  style={{ borderColor: "#27272a" }}
-                >
-                  {dim}
-                </span>
-              ))}
-            </div>
+            <DeveloperDNASection dna={developerDna} accent={theme.accent} accentBorder={theme.accentBorder} />
           </div>
         )}
 

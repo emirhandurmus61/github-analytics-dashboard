@@ -773,9 +773,6 @@ export default async function DashboardPage({ searchParams }: Props) {
               <SortableWidget key="developer-dna" id="developer-dna" data-widget-id="developer-dna">
                 <DeveloperDNACard
                   dna={developerDna}
-                  accentColor={accentColor}
-                  accentBg={accentBg}
-                  accentBorder={accentBorder}
                   username={session?.user?.username ?? ""}
                 />
               </SortableWidget>
