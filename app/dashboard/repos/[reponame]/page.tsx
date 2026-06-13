@@ -2,27 +2,26 @@ import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { calcRepoHealth, HEALTH_COLORS } from "@/lib/repo-health";
+import RepoDetailClient from "./repo-detail-client";
 
 type Props = { params: Promise<{ reponame: string }> };
-
-const LANG_COLORS: Record<string, string> = {
-  TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572A5",
-  Rust: "#dea584", Go: "#00ADD8", CSS: "#563d7c", HTML: "#e34c26",
-  Java: "#b07219", "C++": "#f34b7d", "C#": "#178600", C: "#555555",
-};
 
 export default async function RepoDetailPage({ params }: Props) {
   const { reponame } = await params;
   const session = await auth();
 
   const { data: dbUser } = await supabaseAdmin
-    .from("users").select("id").eq("username", session?.user?.username ?? "").single();
+    .from("users")
+    .select("id")
+    .eq("username", session?.user?.username ?? "")
+    .single();
 
   if (!dbUser) notFound();
 
   const { data: repo } = await supabaseAdmin
     .from("repositories")
-    .select("id, name, full_name, description, language, stars, forks, created_at")
+    .select("id, name, full_name, description, language, stars, forks, created_at, is_archived")
     .eq("user_id", dbUser.id)
     .eq("name", reponame)
     .single();
@@ -30,15 +29,16 @@ export default async function RepoDetailPage({ params }: Props) {
   if (!repo) notFound();
 
   const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [commitsRes, langsRes, dailyRes, hourRes] = await Promise.all([
+  const [allCommitsRes, langsRes, prsRes, issuesRes] = await Promise.all([
+    // Tüm commitler — heatmap, scatter, timeline için
     supabaseAdmin
       .from("commits")
       .select("sha, message, committed_at, additions, deletions")
       .eq("repo_id", repo.id)
       .gte("committed_at", oneYearAgo)
-      .order("committed_at", { ascending: false })
-      .limit(10),
+      .order("committed_at", { ascending: false }),
 
     supabaseAdmin
       .from("repo_languages")
@@ -46,205 +46,145 @@ export default async function RepoDetailPage({ params }: Props) {
       .eq("repo_id", repo.id)
       .order("bytes", { ascending: false }),
 
-    // Günlük commit sayısı (son 30 gün)
     supabaseAdmin
-      .from("commits")
-      .select("committed_at")
+      .from("pull_requests")
+      .select("github_id, title, state, merged, created_at, merged_at, closed_at, additions, deletions, changed_files")
       .eq("repo_id", repo.id)
-      .gte("committed_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      .order("created_at", { ascending: false }),
 
-    // Saat dağılımı
     supabaseAdmin
-      .from("commits")
-      .select("committed_at")
+      .from("issues")
+      .select("github_id, title, state, created_at, closed_at")
       .eq("repo_id", repo.id)
-      .gte("committed_at", oneYearAgo),
+      .order("created_at", { ascending: false }),
   ]);
 
-  const commits = commitsRes.data ?? [];
+  const commits = allCommitsRes.data ?? [];
   const langs = langsRes.data ?? [];
-  const totalBytes = langs.reduce((s, l) => s + l.bytes, 0);
+  const prs = prsRes.data ?? [];
+  const issues = issuesRes.data ?? [];
 
-  // Günlük aktivite (son 30 gün)
-  const dailyMap = new Map<string, number>();
-  for (const { committed_at } of dailyRes.data ?? []) {
-    const date = committed_at.slice(0, 10);
-    dailyMap.set(date, (dailyMap.get(date) ?? 0) + 1);
+  // ── 52 haftalık heatmap ──
+  const commitDateMap = new Map<string, number>();
+  for (const c of commits) {
+    const d = c.committed_at.slice(0, 10);
+    commitDateMap.set(d, (commitDateMap.get(d) ?? 0) + 1);
   }
-  const last30 = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(Date.now() - (29 - i) * 86400000);
+  const today = new Date();
+  const dow = (today.getDay() + 6) % 7; // 0=Mon
+  const heatmapStart = new Date(today);
+  heatmapStart.setDate(today.getDate() - dow - 52 * 7 + 1);
+  const heatmapDays: { date: string; count: number }[] = [];
+  for (let i = 0; i < 52 * 7 + dow + 1; i++) {
+    const d = new Date(heatmapStart);
+    d.setDate(heatmapStart.getDate() + i);
     const date = d.toISOString().slice(0, 10);
-    return { date, count: dailyMap.get(date) ?? 0 };
-  });
-  const maxDay = Math.max(...last30.map((d) => d.count), 1);
+    heatmapDays.push({ date, count: commitDateMap.get(date) ?? 0 });
+  }
+  const heatmapMax = Math.max(...heatmapDays.map((d) => d.count), 1);
 
-  // Saate göre dağılım
+  // ── Scatter: tarih × additions (top 200) ──
+  const scatterData = commits
+    .filter((c) => (c.additions ?? 0) + (c.deletions ?? 0) > 0)
+    .slice(0, 200)
+    .map((c) => ({
+      date: c.committed_at.slice(0, 10),
+      additions: c.additions ?? 0,
+      deletions: c.deletions ?? 0,
+      message: c.message.slice(0, 60),
+      sha: c.sha.slice(0, 7),
+    }));
+
+  // ── Saat dağılımı ──
   const hourMap = new Map<number, number>();
-  for (const { committed_at } of hourRes.data ?? []) {
-    const h = new Date(committed_at).getHours();
+  for (const c of commits) {
+    const h = new Date(c.committed_at).getHours();
     hourMap.set(h, (hourMap.get(h) ?? 0) + 1);
   }
-  const maxHour = Math.max(...Array.from(hourMap.values()), 1);
 
-  const totalCommits = (hourRes.data ?? []).length;
+  // ── PR metrikleri ──
+  const mergedPrs = prs.filter((p) => p.merged && p.merged_at);
+  const avgMergeHours = mergedPrs.length > 0
+    ? Math.round(
+        mergedPrs.reduce((s, p) => {
+          const open = new Date(p.created_at).getTime();
+          const close = new Date(p.merged_at!).getTime();
+          return s + (close - open) / 3600000;
+        }, 0) / mergedPrs.length
+      )
+    : null;
+
+  // ── Issue trend (son 12 ay, açık/kapalı) ──
+  const MONTH_LABELS = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+  const issueTrend = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - 11 + i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = `${MONTH_LABELS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+    const opened = issues.filter((is) => is.created_at.startsWith(ym)).length;
+    const closed = issues.filter((is) => is.closed_at?.startsWith(ym)).length;
+    return { label, opened, closed };
+  });
+
+  // ── Büyük commit timeline (top 10) ──
+  const bigCommits = [...commits]
+    .filter((c) => (c.additions ?? 0) + (c.deletions ?? 0) > 0)
+    .sort((a, b) => ((b.additions ?? 0) + (b.deletions ?? 0)) - ((a.additions ?? 0) + (a.deletions ?? 0)))
+    .slice(0, 10)
+    .map((c) => ({
+      sha: c.sha.slice(0, 7),
+      message: c.message.split("\n")[0].slice(0, 80),
+      date: c.committed_at.slice(0, 10),
+      additions: c.additions ?? 0,
+      deletions: c.deletions ?? 0,
+    }));
+
+  // ── Repo sağlık skoru ──
+  const lastCommitDate = commits[0]?.committed_at ?? null;
+  const commitCount90d = commits.filter((c) => c.committed_at >= ninetyDaysAgo).length;
+  const openIssues = issues.filter((i) => i.state === "open").length;
+  const health = calcRepoHealth({
+    lastCommitDate,
+    commitCount90d,
+    stars: repo.stars,
+    forks: repo.forks,
+    openIssues,
+    totalIssues: issues.length,
+    isArchived: (repo as { is_archived?: boolean }).is_archived ?? false,
+  });
+
+  // ── Özet sayılar ──
   const totalAdded = commits.reduce((s, c) => s + (c.additions ?? 0), 0);
   const totalDeleted = commits.reduce((s, c) => s + (c.deletions ?? 0), 0);
+  const totalBytes = langs.reduce((s, l) => s + l.bytes, 0);
 
   return (
-    <div className="space-y-6">
-      {/* Geri */}
-      <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Dashboard
-      </Link>
-
-      {/* Repo başlık */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            {repo.language && (
-              <div className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: LANG_COLORS[repo.language] ?? "#6b7280" }} />
-            )}
-            <h1 className="text-2xl font-semibold text-zinc-100">{repo.name}</h1>
-          </div>
-          {repo.description && (
-            <p className="mt-1 text-sm text-zinc-500">{repo.description}</p>
-          )}
-        </div>
-        <a
-          href={`https://github.com/${repo.full_name}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
-        >
-          GitHub'da Aç ↗
-        </a>
-      </div>
-
-      {/* Özet kartlar */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Toplam Commit (1 yıl)" value={totalCommits} />
-        <StatCard label="Eklenen Satır" value={`+${totalAdded}`} color="text-emerald-400" />
-        <StatCard label="Silinen Satır" value={`-${totalDeleted}`} color="text-red-400" />
-        <StatCard label="⭐ Star" value={repo.stars} />
-      </div>
-
-      {/* Günlük aktivite + Saat dağılımı */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Son 30 gün */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="mb-4 text-sm font-medium text-zinc-400">Son 30 Gün Aktivite</h2>
-          <div className="flex h-20 items-end gap-1">
-            {last30.map((d) => (
-              <div
-                key={d.date}
-                title={`${d.date}: ${d.count} commit`}
-                className="flex-1 rounded-sm bg-emerald-500 opacity-80 hover:opacity-100 transition-opacity"
-                style={{ height: `${Math.max((d.count / maxDay) * 100, d.count > 0 ? 8 : 2)}%` }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Saat dağılımı */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="mb-4 text-sm font-medium text-zinc-400">Saate Göre Commit</h2>
-          <div className="flex h-20 items-end gap-0.5">
-            {Array.from({ length: 24 }, (_, h) => {
-              const count = hourMap.get(h) ?? 0;
-              return (
-                <div
-                  key={h}
-                  title={`${String(h).padStart(2, "0")}:00 — ${count} commit`}
-                  className="flex-1 rounded-sm bg-blue-500 opacity-80 hover:opacity-100 transition-opacity"
-                  style={{ height: `${Math.max((count / maxHour) * 100, count > 0 ? 6 : 2)}%` }}
-                />
-              );
-            })}
-          </div>
-          <div className="mt-1 flex justify-between text-xs text-zinc-700">
-            <span>00:00</span>
-            <span>12:00</span>
-            <span>23:00</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Dil dağılımı + Son commitler */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Dil dağılımı */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="mb-4 text-sm font-medium text-zinc-400">Dil Dağılımı</h2>
-          {langs.length === 0 ? (
-            <p className="text-sm text-zinc-600">Veri yok</p>
-          ) : (
-            <div className="space-y-3">
-              {langs.map(({ language, bytes }) => {
-                const pct = totalBytes > 0 ? ((bytes / totalBytes) * 100).toFixed(1) : "0";
-                const color = LANG_COLORS[language] ?? "#6b7280";
-                return (
-                  <div key={language}>
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-zinc-300">{language}</span>
-                      <span className="text-zinc-500">{pct}%</span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Son commitler */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="mb-4 text-sm font-medium text-zinc-400">Son Commitler</h2>
-          {commits.length === 0 ? (
-            <p className="text-sm text-zinc-600">Commit bulunamadı</p>
-          ) : (
-            <div className="space-y-2.5">
-              {commits.map((c) => (
-                <a
-                  key={c.sha}
-                  href={`https://github.com/${repo.full_name}/commit/${c.sha}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block rounded-lg px-3 py-2.5 transition-colors hover:bg-zinc-800"
-                >
-                  <p className="truncate text-sm text-zinc-300">{c.message}</p>
-                  <div className="mt-1 flex items-center gap-3 text-xs text-zinc-600">
-                    <span>{new Date(c.committed_at).toLocaleDateString("tr-TR")}</span>
-                    {(c.additions > 0 || c.deletions > 0) && (
-                      <>
-                        <span className="text-emerald-600">+{c.additions}</span>
-                        <span className="text-red-600">-{c.deletions}</span>
-                      </>
-                    )}
-                    <span className="font-mono">{c.sha.slice(0, 7)}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value, color = "text-zinc-100" }: {
-  label: string; value: number | string; color?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${color}`}>
-        {typeof value === "number" ? value.toLocaleString("tr-TR") : value}
-      </p>
-    </div>
+    <RepoDetailClient
+      repo={{
+        name: repo.name,
+        full_name: repo.full_name,
+        description: repo.description,
+        language: repo.language,
+        stars: repo.stars,
+        forks: repo.forks,
+        created_at: repo.created_at,
+      }}
+      commits={{ total: commits.length, totalAdded, totalDeleted }}
+      langs={langs.map((l) => ({ language: l.language, bytes: l.bytes, pct: totalBytes > 0 ? (l.bytes / totalBytes) * 100 : 0 }))}
+      heatmapDays={heatmapDays}
+      heatmapMax={heatmapMax}
+      scatterData={scatterData}
+      hourMap={Array.from({ length: 24 }, (_, h) => hourMap.get(h) ?? 0)}
+      prs={{
+        total: prs.length,
+        merged: mergedPrs.length,
+        open: prs.filter((p) => p.state === "open").length,
+        avgMergeHours,
+      }}
+      issueTrend={issueTrend}
+      bigCommits={bigCommits}
+      health={health}
+      healthColor={HEALTH_COLORS[health.status]}
+      username={session?.user?.username ?? ""}
+    />
   );
 }
