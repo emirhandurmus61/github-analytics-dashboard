@@ -25,7 +25,8 @@ export type WidgetId =
   | "repo-health"
   | "profile-views"
   | "developer-card"
-  | "developer-dna";
+  | "developer-dna"
+  | "percentile-rank";
 
 export interface WidgetConfig {
   id: WidgetId;
@@ -107,4 +108,7 @@ export const DEFAULT_WIDGET_CONFIGS: WidgetConfig[] = [
 
   // Developer DNA 2x3
   { id: "developer-dna",  label: "Developer DNA",       colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
+
+  // Percentile Rank 2x3
+  { id: "percentile-rank", label: "Sıralaman",          colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
 ];

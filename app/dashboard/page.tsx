@@ -27,8 +27,10 @@ import { DEFAULT_WIDGET_CONFIGS } from "@/lib/widget-config";
 import ProfileViewsCard from "./profile-views-card";
 import DeveloperCard from "./developer-card";
 import DeveloperDNACard from "./developer-dna";
+import PercentileRankCard from "./percentile-rank";
 import AutoSync from "./auto-sync";
 import { calcDeveloperDNA, type DeveloperDNA } from "@/lib/developer-dna";
+import { calcPercentileRank, type PercentileData } from "@/lib/percentile";
 
 type Props = {
   searchParams: Promise<{ range?: string; hideForks?: string }>;
@@ -95,6 +97,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   let profileViewsThisWeek = 0;
   let profileViewsTotal = 0;
   let developerDna: DeveloperDNA | null = null;
+  let percentileData: PercentileData | null = null;
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -530,6 +533,21 @@ export default async function DashboardPage({ searchParams }: Props) {
       });
     }
 
+    // Percentile rank (leaderboard opt-in olmayanlar için de hesaplanır — veri anonim)
+    try {
+      const activeDays365 = heatmapData.filter((d) => d.commit_count > 0).length;
+      const userTopLang = topLanguages[0]?.language ?? null;
+      percentileData = await calcPercentileRank(
+        dbUser.id,
+        commitsRes.count ?? 0,
+        streakData.currentStreak,
+        activeDays365,
+        userTopLang,
+      );
+    } catch {
+      // Platform genelinde yeterli veri yoksa sessizce geç
+    }
+
     // Haftalık hedef
     weeklyGoal = dbUser.weekly_commit_goal ?? 20;
 
@@ -775,6 +793,13 @@ export default async function DashboardPage({ searchParams }: Props) {
                   dna={developerDna}
                   username={session?.user?.username ?? ""}
                 />
+              </SortableWidget>
+            )}
+
+            {/* Yüzdelik Dilim Sıralaması */}
+            {percentileData && (
+              <SortableWidget key="percentile-rank" id="percentile-rank" data-widget-id="percentile-rank">
+                <PercentileRankCard data={percentileData} />
               </SortableWidget>
             )}
 
