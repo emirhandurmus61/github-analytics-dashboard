@@ -3,17 +3,25 @@ import webpush from "web-push";
 import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-);
+function initVapid() {
+  const email = process.env.VAPID_EMAIL;
+  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  if (!email || !pub || !priv) throw new Error("VAPID env vars missing");
+  webpush.setVapidDetails(email, pub, priv);
+}
 
 // Cron'dan veya internal trigger'dan çağrılır
 export async function POST(req: Request) {
   const secret = req.headers.get("x-cron-secret");
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    initVapid();
+  } catch {
+    return NextResponse.json({ error: "VAPID not configured" }, { status: 500 });
   }
 
   const body = await req.json() as { type: "streak" | "goal" | "badge" | "summary"; userId?: string };
