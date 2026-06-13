@@ -4,17 +4,19 @@ import { useState, useEffect, useCallback } from "react";
 
 export type PushState = "unsupported" | "loading" | "denied" | "granted" | "unsubscribed";
 
-async function registerSW(): Promise<ServiceWorkerRegistration> {
-  const reg = await navigator.serviceWorker.register("/sw.js");
-  // Yeni SW'yi hemen aktif et
-  if (reg.installing) {
-    await new Promise<void>((resolve) => {
-      reg.installing!.addEventListener("statechange", function handler() {
-        if (this.state === "activated") { this.removeEventListener("statechange", handler); resolve(); }
-      });
-    });
-  }
-  return navigator.serviceWorker.ready;
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function getSWRegistration(): Promise<ServiceWorkerRegistration> {
+  // Önce var olanı kontrol et
+  const existing = await navigator.serviceWorker.getRegistration("/sw.js");
+  if (existing) return existing;
+  // Yoksa kaydet
+  return navigator.serviceWorker.register("/sw.js");
 }
 
 export function usePushNotifications() {
@@ -33,42 +35,47 @@ export function usePushNotifications() {
       return;
     }
 
-    // Mevcut SW üzerinden abonelik kontrol et
-    navigator.serviceWorker.getRegistration("/sw.js").then((reg) => {
-      if (!reg) { setState("unsubscribed"); return; }
-      reg.pushManager.getSubscription().then((sub) => {
+    getSWRegistration()
+      .then((reg) => reg.pushManager.getSubscription())
+      .then((sub) => {
         if (sub) { setSubscription(sub); setState("granted"); }
         else setState("unsubscribed");
-      });
-    }).catch(() => setState("unsubscribed"));
+      })
+      .catch(() => setState("unsubscribed"));
   }, []);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
     setError(null);
     setState("loading");
     try {
-      // İzin iste
+      // 1. İzin iste
       const permission = await Notification.requestPermission();
       if (permission === "denied") { setState("denied"); return false; }
       if (permission !== "granted") { setState("unsubscribed"); return false; }
 
-      // SW'yi kaydet ve hazır olmasını bekle
-      const reg = await registerSW();
+      // 2. SW kaydet — timeout ile sar (bazı tarayıcılarda takılabilir)
+      const reg = await Promise.race([
+        getSWRegistration(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Service Worker 10 saniyede yüklenemedi")), 10_000)
+        ),
+      ]);
 
-      // Mevcut aboneliği iptal et (stale olabilir)
-      const existing = await reg.pushManager.getSubscription();
-      if (existing) await existing.unsubscribe();
-
-      // Yeni abonelik oluştur
+      // 3. Push subscription oluştur
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidKey) throw new Error("VAPID public key eksik");
+      if (!vapidKey) throw new Error("VAPID public key eksik — .env.local kontrol et");
 
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
-      });
+      const sub = await Promise.race([
+        reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Push subscription zaman aşımına uğradı")), 10_000)
+        ),
+      ]);
 
-      // Sunucuya kaydet
+      // 4. Sunucuya kaydet
       const res = await fetch("/api/push-subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -77,14 +84,14 @@ export function usePushNotifications() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Sunucu hatası: ${res.status}`);
+        throw new Error(body.error ?? `API hatası: ${res.status}`);
       }
 
       setSubscription(sub);
       setState("granted");
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
+      const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
       setState("unsubscribed");
       return false;
@@ -107,7 +114,7 @@ export function usePushNotifications() {
       setState("unsubscribed");
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
+      const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
       setState("granted");
       return false;
@@ -115,11 +122,4 @@ export function usePushNotifications() {
   }, [subscription]);
 
   return { state, subscription, subscribe, unsubscribe, error };
-}
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(base64);
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }

@@ -67,8 +67,24 @@ export default function PushNotificationToggle({
   const isDenied = state === "denied";
   const isUnsupported = state === "unsupported";
 
+  // Push API sadece HTTPS veya localhost'ta çalışır
+  const isInsecure = typeof window !== "undefined"
+    && location.protocol !== "https:"
+    && location.hostname !== "localhost"
+    && location.hostname !== "127.0.0.1";
+
   return (
     <div className="space-y-4">
+      {/* HTTPS uyarısı */}
+      {isInsecure && (
+        <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2.5">
+          <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-300 leading-relaxed">
+            Push bildirimleri yalnızca HTTPS bağlantısında çalışır. Lütfen uygulamayı deploy edilmiş Vercel URL'inden aç.
+          </p>
+        </div>
+      )}
+
       {/* Ana aç/kapat satırı */}
       <div className="flex items-center justify-between gap-4 rounded-xl border border-zinc-700 bg-zinc-800/50 px-4 py-3">
         <div className="flex items-center gap-3 min-w-0">
