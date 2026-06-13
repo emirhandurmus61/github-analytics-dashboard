@@ -13,6 +13,7 @@ import {
   Link as LinkIcon, MessageCircle, Share2, Check,
 } from "lucide-react";
 import type { Badge } from "@/lib/badges";
+import type { DeveloperDNA } from "@/lib/developer-dna";
 
 /* ─── Types ─── */
 
@@ -57,6 +58,7 @@ type ProfileProps = {
   widgetOrder: string[];
   widgets: Record<string, boolean>;
   socialLinks?: SocialLinks;
+  developerDna?: DeveloperDNA | null;
   recordView: (userId: string) => Promise<void>;
   isOwner?: boolean;
 };
@@ -612,6 +614,7 @@ export default function ProfileClient(props: ProfileProps) {
     topLanguages, heatmapData,
     widgets,
     socialLinks,
+    developerDna,
     recordView,
     isOwner,
   } = props;
@@ -868,6 +871,45 @@ export default function ProfileClient(props: ProfileProps) {
         {/* ── Profile README ── */}
         {profileReadme && (
           <ProfileReadme content={profileReadme} />
+        )}
+
+        {/* ── Developer DNA ── */}
+        {developerDna && (
+          <div className="animate-profile-slide-up" style={{ animationDelay: "540ms" }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Code2 className="w-4 h-4 text-zinc-500" />
+              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">Developer DNA</h2>
+            </div>
+            <div
+              className="rounded-2xl border p-4 flex flex-wrap items-center gap-3"
+              style={{ borderColor: `${theme.accent}25`, backgroundColor: `${theme.accent}06` }}
+            >
+              {/* Developer tipi — ana etiket */}
+              <div
+                className="flex items-center gap-2 rounded-xl px-3 py-1.5"
+                style={{ backgroundColor: `${theme.accent}18`, color: theme.accent }}
+              >
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-sm font-semibold">{developerDna.developerType}</span>
+              </div>
+              {/* 5 boyut rozeti */}
+              {[
+                developerDna.workTime,
+                developerDna.commitRhythm,
+                developerDna.langProfile,
+                developerDna.msgQuality,
+                developerDna.focusStyle,
+              ].map((dim) => (
+                <span
+                  key={dim}
+                  className="rounded-lg border px-2.5 py-1 text-xs text-zinc-400"
+                  style={{ borderColor: "#27272a" }}
+                >
+                  {dim}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* ── Badges ── */}

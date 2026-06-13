@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import { WIDGET_KEYS, type WidgetKey } from "@/lib/widgets";
 import { calcBadges } from "@/lib/badges";
+import { calcDeveloperDNA } from "@/lib/developer-dna";
 import type { Metadata } from "next";
 import ProfileClient from "./profile-client";
 import { recordProfileView } from "./actions";
@@ -108,7 +109,9 @@ export default async function PublicProfilePage({ params }: Props) {
   const ids = (repoRows ?? []).map((r) => r.id);
   const ownIds = (repoRows ?? []).filter((r) => !r.is_fork).map((r) => r.id);
 
-  const [reposRes, commitsRes, langsRes, heatmapRes, badgeCommitsRes] = await Promise.all([
+  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [reposRes, commitsRes, langsRes, heatmapRes, badgeCommitsRes, dnaCommitsRes] = await Promise.all([
     supabaseAdmin.from("repositories").select("count", { count: "exact", head: true }).eq("user_id", user.id),
     supabaseAdmin.from("commits").select("count", { count: "exact", head: true }).in("repo_id", ids),
     supabaseAdmin.from("repo_languages").select("language, bytes").in("repo_id", ids),
@@ -116,13 +119,18 @@ export default async function PublicProfilePage({ params }: Props) {
       .from("daily_stats")
       .select("date, commit_count")
       .eq("user_id", user.id)
-      .gte("date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+      .gte("date", oneYearAgo.slice(0, 10))
       .order("date", { ascending: true }),
     supabaseAdmin
       .from("commits")
       .select("committed_at, repo_id, deletions")
       .in("repo_id", ownIds)
-      .gte("committed_at", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()),
+      .gte("committed_at", oneYearAgo),
+    supabaseAdmin
+      .from("commits")
+      .select("committed_at, additions, deletions, message")
+      .in("repo_id", ownIds)
+      .gte("committed_at", oneYearAgo),
   ]);
 
   // Languages
@@ -165,6 +173,51 @@ export default async function PublicProfilePage({ params }: Props) {
     commitDeletions: badgeCommits.map((c) => c.deletions ?? 0),
     languageCount: langMap.size,
   }).filter((b) => b.earned);
+
+  // Developer DNA
+  const dnaCommits = dnaCommitsRes.data ?? [];
+  const dnaHourMap = new Map<string, number>();
+  for (const { committed_at } of dnaCommits) {
+    const d = new Date(committed_at);
+    const key = `${(d.getDay() + 6) % 7}-${d.getHours()}`;
+    dnaHourMap.set(key, (dnaHourMap.get(key) ?? 0) + 1);
+  }
+  const dnaHourData = Array.from(dnaHourMap.entries()).map(([key, count]) => {
+    const [day, hour] = key.split("-").map(Number);
+    return { day, hour, count };
+  });
+
+  const CONVENTIONAL_RE = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+?\))?(!)?:/i;
+  const conventionalCount = dnaCommits.filter((c) => CONVENTIONAL_RE.test(c.message ?? "")).length;
+  const totalMsgLen = dnaCommits.reduce((s, c) => s + (c.message?.length ?? 0), 0);
+
+  const totalLangBytes = Array.from(langMap.values()).reduce((s, v) => s + v, 0);
+  const topLangEntry = Array.from(langMap.entries()).sort((a, b) => b[1] - a[1])[0];
+  const dnaTopLang = topLangEntry?.[0] ?? null;
+  const dnaTopLangBytes = topLangEntry?.[1] ?? 0;
+
+  const dnaAvgAdditions = dnaCommits.length > 0
+    ? dnaCommits.reduce((s, c) => s + (c.additions ?? 0), 0) / dnaCommits.length
+    : 0;
+  const dnaAvgDeletions = dnaCommits.length > 0
+    ? dnaCommits.reduce((s, c) => s + (c.deletions ?? 0), 0) / dnaCommits.length
+    : 0;
+
+  const developerDna = dnaCommits.length >= 5 ? calcDeveloperDNA({
+    hourData: dnaHourData,
+    commitTimestamps: dnaCommits.map((c) => c.committed_at),
+    avgAdditions: dnaAvgAdditions,
+    avgDeletions: dnaAvgDeletions,
+    languageCount: langMap.size,
+    topLangBytes: dnaTopLangBytes,
+    totalLangBytes,
+    topLang: dnaTopLang,
+    conventionalPct: dnaCommits.length > 0 ? Math.round((conventionalCount / dnaCommits.length) * 100) : 0,
+    avgMsgLength: dnaCommits.length > 0 ? Math.round(totalMsgLen / dnaCommits.length) : 0,
+    repoCount: reposRes.count ?? 0,
+    totalCommits: commitsRes.count ?? 0,
+    topRepoCommits: 0,
+  }) : null;
 
   // Pinned repos (new array field, fallback to single pinned_repo_name)
   const pinnedNames: string[] = pinnedReposDb.length > 0
@@ -209,6 +262,7 @@ export default async function PublicProfilePage({ params }: Props) {
         widgetOrder={widgetOrder}
         widgets={widgets}
         socialLinks={socialLinks}
+        developerDna={developerDna}
         recordView={recordProfileView}
       />
     </ThemeProvider>

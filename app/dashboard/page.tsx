@@ -26,7 +26,9 @@ import DashboardGrid, { SortableWidget } from "./dashboard-grid";
 import { DEFAULT_WIDGET_CONFIGS } from "@/lib/widget-config";
 import ProfileViewsCard from "./profile-views-card";
 import DeveloperCard from "./developer-card";
+import DeveloperDNACard from "./developer-dna";
 import AutoSync from "./auto-sync";
+import { calcDeveloperDNA, type DeveloperDNA } from "@/lib/developer-dna";
 
 type Props = {
   searchParams: Promise<{ range?: string; hideForks?: string }>;
@@ -42,7 +44,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const { data: dbUser } = await supabaseAdmin
     .from("users")
-    .select("id, last_synced_at, weekly_commit_goal")
+    .select("id, last_synced_at, weekly_commit_goal, theme_accent")
     .eq("username", session?.user?.username ?? "")
     .single();
 
@@ -92,6 +94,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   let goalHistory: { week_start: string; goal: number; actual: number }[] = [];
   let profileViewsThisWeek = 0;
   let profileViewsTotal = 0;
+  let developerDna: DeveloperDNA | null = null;
 
   if (hasSynced && dbUser) {
     const sinceDate = new Date(
@@ -495,6 +498,38 @@ export default async function DashboardPage({ searchParams }: Props) {
       languageCount: langMap.size,
     });
 
+    // Developer DNA
+    {
+      const commits = allCommitsRes.data ?? [];
+      const avgAdditions = commits.length > 0
+        ? commits.reduce((s, c) => s + (c.additions ?? 0), 0) / commits.length
+        : 0;
+      const avgDeletions = commits.length > 0
+        ? commits.reduce((s, c) => s + (c.deletions ?? 0), 0) / commits.length
+        : 0;
+      const totalLangBytes = topLanguages.reduce((s, l) => s + l.bytes, 0);
+      const topLangBytes = topLanguages[0]?.bytes ?? 0;
+      const topLang = topLanguages[0]?.language ?? null;
+      const totalRepoCommits = repoListData.reduce((s, r) => s + r.commit_count, 0);
+      const topRepoCommits = repoListData[0]?.commit_count ?? 0;
+
+      developerDna = calcDeveloperDNA({
+        hourData,
+        commitTimestamps,
+        avgAdditions,
+        avgDeletions,
+        languageCount: stats.languageCount,
+        topLangBytes,
+        totalLangBytes,
+        topLang,
+        conventionalPct: commitQuality?.conventionalPct ?? 0,
+        avgMsgLength: commitQuality?.avgMsgLength ?? 0,
+        repoCount: stats.repoCount,
+        totalCommits: totalRepoCommits,
+        topRepoCommits,
+      });
+    }
+
     // Haftalık hedef
     weeklyGoal = dbUser.weekly_commit_goal ?? 20;
 
@@ -548,6 +583,13 @@ export default async function DashboardPage({ searchParams }: Props) {
   const lastSynced = dbUser?.last_synced_at
     ? new Date(dbUser.last_synced_at).toLocaleString("tr-TR")
     : null;
+
+  const { THEMES, isValidTheme, DEFAULT_THEME } = await import("@/lib/themes");
+  const themeKey = isValidTheme(dbUser?.theme_accent) ? dbUser!.theme_accent : DEFAULT_THEME;
+  const theme = THEMES[themeKey];
+  const accentColor = theme.accent;
+  const accentBg = theme.accentBg;
+  const accentBorder = theme.accentBorder;
 
   return (
     <div>
@@ -725,6 +767,19 @@ export default async function DashboardPage({ searchParams }: Props) {
             <SortableWidget key="developer-card" id="developer-card" data-widget-id="developer-card">
               <DeveloperCard username={session?.user?.username ?? ""} />
             </SortableWidget>
+
+            {/* Developer DNA */}
+            {developerDna && (
+              <SortableWidget key="developer-dna" id="developer-dna" data-widget-id="developer-dna">
+                <DeveloperDNACard
+                  dna={developerDna}
+                  accentColor={accentColor}
+                  accentBg={accentBg}
+                  accentBorder={accentBorder}
+                  username={session?.user?.username ?? ""}
+                />
+              </SortableWidget>
+            )}
 
           </DashboardGrid>
         </div>

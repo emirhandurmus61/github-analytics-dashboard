@@ -24,7 +24,8 @@ export type WidgetId =
   | "repo-list"
   | "repo-health"
   | "profile-views"
-  | "developer-card";
+  | "developer-card"
+  | "developer-dna";
 
 export interface WidgetConfig {
   id: WidgetId;
@@ -103,4 +104,7 @@ export const DEFAULT_WIDGET_CONFIGS: WidgetConfig[] = [
 
   // Developer Card 2x3
   { id: "developer-card", label: "Developer Card",      colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
+
+  // Developer DNA 2x3
+  { id: "developer-dna",  label: "Developer DNA",       colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
 ];
