@@ -12,7 +12,7 @@ import {
   BookOpen, Timer, TrendingUp, Layers, Hash, ArrowRight,
   Link as LinkIcon, MessageCircle, Share2, Check,
   Sunrise, Sun, Sunset, Clock, GitCommit, Shuffle,
-  Compass, AlignLeft, Minus, Blend, FolderGit2, LayoutGrid, Map,
+  Compass, AlignLeft, Minus, Blend, FolderGit2, LayoutGrid, Map as MapIcon,
 } from "lucide-react";
 import type { Badge } from "@/lib/badges";
 import type { DeveloperDNA } from "@/lib/developer-dna";
@@ -215,7 +215,8 @@ function LanguageDonut({ languages, size = 160 }: { languages: LangData[]; size?
 
 function MiniHeatmap({ data }: { data: DayData[] }) {
   const theme = useThemeColors();
-  const map = new Map(data.map((d) => [d.date, d.commit_count]));
+  const mapEntries = data.map((d): [string, number] => [d.date, d.commit_count]);
+  const map = new Map(mapEntries);
   const max = Math.max(...data.map((d) => d.commit_count), 1);
 
   const today = new Date();
@@ -363,7 +364,7 @@ function DeveloperDNASection({ dna, accent, accentBorder }: {
           className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0"
           style={{ backgroundColor: `${accent}20`, color: accent, boxShadow: `0 0 14px ${accent}25` }}
         >
-          <Map className="w-4 h-4" />
+          <MapIcon className="w-4 h-4" />
         </div>
         <div>
           <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Geliştirici Tipi</p>
