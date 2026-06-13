@@ -16,29 +16,29 @@ export default async function TimelinePage() {
 
   const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Tüm commit'leri repo bilgileriyle birlikte çek
-  const { data: rawCommits } = await supabaseAdmin
-    .from("commits")
-    .select("sha, message, committed_at, additions, deletions, repo_id")
-    .eq("user_id", dbUser.id)
-    .gte("committed_at", oneYearAgo)
-    .order("committed_at", { ascending: false })
-    .limit(2000);
+  // Önce kullanıcının repolarını al
+  const { data: userRepos } = await supabaseAdmin
+    .from("repositories")
+    .select("id, name, language")
+    .eq("user_id", dbUser.id);
+
+  const repoIds = (userRepos ?? []).map((r) => r.id);
+
+  // Commit'leri repo_id üzerinden sorgula
+  const { data: rawCommits } = repoIds.length > 0
+    ? await supabaseAdmin
+        .from("commits")
+        .select("sha, message, committed_at, additions, deletions, repo_id")
+        .in("repo_id", repoIds)
+        .gte("committed_at", oneYearAgo)
+        .order("committed_at", { ascending: false })
+        .limit(2000)
+    : { data: [] };
 
   const commits = rawCommits ?? [];
 
-  // Repo listesini çek (dil filtresi için)
-  const repoIds = [...new Set(commits.map((c) => c.repo_id).filter(Boolean))];
-
-  const { data: rawRepos } = repoIds.length > 0
-    ? await supabaseAdmin
-        .from("repositories")
-        .select("id, name, language")
-        .in("id", repoIds)
-    : { data: [] };
-
   const repoMap = new Map(
-    (rawRepos ?? []).map((r) => [r.id, { name: r.name, language: r.language ?? null }])
+    (userRepos ?? []).map((r) => [r.id, { name: r.name, language: r.language ?? null }])
   );
 
   // Commit'leri repo bilgisiyle zenginleştir
