@@ -15,6 +15,7 @@ export default function MobileMenu({ username, currentYear, avatarUrl, displayNa
 
   const links = [
     { href: "/dashboard/settings", label: "Ayarlar" },
+    { href: "/dashboard/timeline", label: "Zaman Çizelgesi" },
     { href: `/u/${username}`, label: "Profil" },
     { href: `/u/${username}/${currentYear}`, label: "Wrapped" },
     { href: "/leaderboard", label: "Sıralama" },

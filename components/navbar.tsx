@@ -43,6 +43,7 @@ export default async function Navbar({
             {/* Desktop nav */}
             <nav className="hidden items-center gap-0.5 sm:flex">
               <NavLink href="/dashboard/settings">Ayarlar</NavLink>
+              <NavLink href="/dashboard/timeline">Zaman Çizelgesi</NavLink>
               <NavLink href={`/u/${username}`}>Profil</NavLink>
               <NavLink href={`/u/${username}/${currentYear}`}>Wrapped</NavLink>
               <NavLink href="/leaderboard">Sıralama</NavLink>
