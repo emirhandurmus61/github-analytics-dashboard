@@ -27,7 +27,8 @@ export type WidgetId =
   | "developer-card"
   | "developer-dna"
   | "percentile-rank"
-  | "advanced-goals";
+  | "advanced-goals"
+  | "follow-feed";
 
 export interface WidgetConfig {
   id: WidgetId;
@@ -115,4 +116,7 @@ export const DEFAULT_WIDGET_CONFIGS: WidgetConfig[] = [
 
   // Advanced Goals 2x3
   { id: "advanced-goals",  label: "Gelişmiş Hedefler",  colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
+
+  // Follow Feed 2x3
+  { id: "follow-feed",     label: "Takip Akışı",         colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
 ];

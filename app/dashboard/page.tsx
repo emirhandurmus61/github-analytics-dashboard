@@ -30,6 +30,7 @@ import DeveloperDNACard from "./developer-dna";
 import PercentileRankCard from "./percentile-rank";
 import AdvancedGoalsCard from "./advanced-goals";
 import AutoSync from "./auto-sync";
+import FollowFeed from "./follow-feed";
 import { calcDeveloperDNA, type DeveloperDNA } from "@/lib/developer-dna";
 import { calcPercentileRank, type PercentileData } from "@/lib/percentile";
 import { type UserGoal } from "@/lib/goals";
@@ -884,6 +885,11 @@ export default async function DashboardPage({ searchParams }: Props) {
                 achievements={goalAchievements}
                 metrics={goalMetrics}
               />
+            </SortableWidget>
+
+            {/* Takip Akışı */}
+            <SortableWidget key="follow-feed" id="follow-feed" data-widget-id="follow-feed">
+              <FollowFeed />
             </SortableWidget>
 
           </DashboardGrid>

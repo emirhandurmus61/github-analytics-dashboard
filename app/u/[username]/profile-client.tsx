@@ -13,6 +13,7 @@ import {
   Link as LinkIcon, MessageCircle, Share2, Check,
   Sunrise, Sun, Sunset, Clock, GitCommit, Shuffle,
   Compass, AlignLeft, Minus, Blend, FolderGit2, LayoutGrid, Map as MapIcon,
+  UserPlus, UserCheck, Users,
 } from "lucide-react";
 import type { Badge } from "@/lib/badges";
 import type { DeveloperDNA } from "@/lib/developer-dna";
@@ -63,6 +64,7 @@ type ProfileProps = {
   developerDna?: DeveloperDNA | null;
   recordView: (userId: string) => Promise<void>;
   isOwner?: boolean;
+  isLoggedIn?: boolean;
 };
 
 /* ─── Badge icon map (lucide icons instead of emojis) ─── */
@@ -615,6 +617,81 @@ function ActivitySparkline({ data }: { data: DayData[] }) {
   );
 }
 
+/* ─── Follow button ─── */
+
+function FollowButton({ username }: { username: string }) {
+  const theme = useThemeColors();
+  const [following, setFollowing] = useState<boolean | null>(null);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/follow/${username}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setFollowing(d.following ?? false);
+        setFollowerCount(d.followerCount ?? 0);
+      })
+      .catch(() => setFollowing(false));
+  }, [username]);
+
+  async function toggle() {
+    if (following === null || loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/follow/${username}`, { method: "POST" });
+      if (res.status === 401) {
+        window.location.href = "/api/auth/signin";
+        return;
+      }
+      if (res.status === 429) {
+        alert("Günlük takip limitine ulaştınız (20).");
+        return;
+      }
+      const data = await res.json();
+      setFollowing(data.following);
+      setFollowerCount(data.followerCount ?? followerCount);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (following === null) return null;
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={toggle}
+        disabled={loading}
+        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={
+          following
+            ? { borderColor: "rgba(39,39,42,0.6)", color: "#a1a1aa", backgroundColor: "rgba(39,39,42,0.3)" }
+            : { borderColor: `${theme.accent}30`, color: theme.accent, backgroundColor: `${theme.accent}10` }
+        }
+      >
+        {following ? (
+          <>
+            <UserCheck className="w-3 h-3" />
+            Takip Ediliyor
+          </>
+        ) : (
+          <>
+            <UserPlus className="w-3 h-3" />
+            Takip Et
+          </>
+        )}
+      </button>
+      {followerCount > 0 && (
+        <span className="flex items-center gap-1 text-xs text-zinc-600">
+          <Users className="w-3 h-3" />
+          {followerCount.toLocaleString("tr-TR")}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /* ─── Profile share buttons ─── */
 
 function ProfileShareButtons({ username }: { username: string }) {
@@ -718,6 +795,7 @@ export default function ProfileClient(props: ProfileProps) {
     developerDna,
     recordView,
     isOwner,
+    isLoggedIn,
   } = props;
 
   // Ziyareti bir kez kaydet
@@ -865,8 +943,11 @@ export default function ProfileClient(props: ProfileProps) {
               )}
             </div>
 
-            {/* Developer Card paylaşım butonları */}
-            <ProfileShareButtons username={username} />
+            {/* Developer Card paylaşım butonları + Takip Et */}
+            <div className="flex flex-col items-center sm:items-end gap-2">
+              {!isOwner && <FollowButton username={username} />}
+              <ProfileShareButtons username={username} />
+            </div>
 
             {/* Sparkline (desktop) */}
             <div className="hidden lg:block w-48 animate-profile-slide-up shrink-0" style={{ animationDelay: "160ms" }}>

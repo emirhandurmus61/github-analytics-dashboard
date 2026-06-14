@@ -244,6 +244,7 @@ export default async function PublicProfilePage({ params }: Props) {
         username={username}
         userId={user.id}
         isOwner={isOwner}
+        isLoggedIn={!!session}
         name={user.name ?? username}
         avatarUrl={user.avatar_url}
         bio={user.bio}
