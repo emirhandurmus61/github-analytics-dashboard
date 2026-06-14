@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Users, Flame, Award, TrendingUp, RefreshCw } from "lucide-react";
+import { Users, Flame, Award, TrendingUp, RefreshCw, GitCommit, Clock } from "lucide-react";
 
 type ActivityUser = {
   id: string;
@@ -14,7 +14,7 @@ type ActivityUser = {
 
 type Activity = {
   id: string;
-  type: "streak_milestone" | "badge_earned" | "new_record";
+  type: "streak_milestone" | "badge_earned" | "new_record" | "active_today" | "recent_sync";
   payload: Record<string, unknown>;
   created_at: string;
   user: ActivityUser | null;
@@ -30,9 +30,11 @@ function timeAgo(iso: string): string {
 }
 
 const TYPE_META = {
-  streak_milestone: { icon: Flame, color: "#f97316", label: (p: Record<string, unknown>) => `${p.days} günlük streak kırdı` },
-  badge_earned: { icon: Award, color: "#c084fc", label: (p: Record<string, unknown>) => `"${p.badge}" rozetini kazandı` },
-  new_record: { icon: TrendingUp, color: "#34d399", label: (p: Record<string, unknown>) => `Yeni rekor: ${p.value} commit` },
+  streak_milestone: { icon: Flame,      color: "#f97316", label: (p: Record<string, unknown>) => `${p.days} günlük streak` },
+  badge_earned:     { icon: Award,      color: "#c084fc", label: (p: Record<string, unknown>) => `"${p.badge}" rozetini kazandı` },
+  new_record:       { icon: TrendingUp, color: "#34d399", label: (p: Record<string, unknown>) => `Yeni rekor: ${p.value} commit` },
+  active_today:     { icon: GitCommit,  color: "#22d3ee", label: (_p: Record<string, unknown>) => "bugün commit attı" },
+  recent_sync:      { icon: Clock,      color: "#a1a1aa", label: (p: Record<string, unknown>) => `bu ay ${p.commitCount} aktif gün` },
 };
 
 export default function FollowFeed() {
