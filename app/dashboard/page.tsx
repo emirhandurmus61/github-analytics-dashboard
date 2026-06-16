@@ -505,6 +505,13 @@ export default async function DashboardPage({ searchParams }: Props) {
       commitRepoIds: (allCommitsRes.data ?? []).map((c) => c.repo_id),
       commitDeletions: (allCommitsRes.data ?? []).map((c) => c.deletions ?? 0),
       languageCount: langMap.size,
+      totalCommits: stats.commitCount,
+      repoCount: stats.repoCount,
+      mergedPRs: codeStats.mergedPRs,
+      closedIssues: codeStats.closedIssues,
+      linesAdded: codeStats.linesAdded,
+      totalActiveDays: streakData.totalActiveDays,
+      totalStars: (repoRows ?? []).reduce((s, r) => s + (r.stars ?? 0), 0),
     });
 
     // Developer DNA

@@ -2,11 +2,23 @@ export type BadgeId =
   | "first_sync"
   | "streak_7"
   | "streak_30"
+  | "streak_100"
   | "night_owl"
+  | "early_bird"
   | "weekend_warrior"
   | "big_cleanup"
   | "polyglot"
-  | "open_source";
+  | "hexaglot"
+  | "open_source"
+  | "century"
+  | "millennium"
+  | "marathoner"
+  | "collector"
+  | "architect"
+  | "merge_master"
+  | "bug_hunter"
+  | "stargazer"
+  | "dedicated";
 
 export type Badge = {
   id: BadgeId;
@@ -30,6 +42,20 @@ export type BadgeInput = {
   commitDeletions: number[];
   // kaç farklı dil kullanıldı
   languageCount: number;
+  // toplam commit sayısı
+  totalCommits: number;
+  // toplam repo sayısı (fork dahil)
+  repoCount: number;
+  // birleştirilmiş PR sayısı
+  mergedPRs: number;
+  // kapatılan issue sayısı
+  closedIssues: number;
+  // toplam eklenen satır sayısı
+  linesAdded: number;
+  // toplam aktif gün sayısı
+  totalActiveDays: number;
+  // tüm repolardaki toplam yıldız sayısı
+  totalStars: number;
 };
 
 export function calcBadges(input: BadgeInput): Badge[] {
@@ -41,6 +67,13 @@ export function calcBadges(input: BadgeInput): Badge[] {
     commitRepoIds,
     commitDeletions,
     languageCount,
+    totalCommits,
+    repoCount,
+    mergedPRs,
+    closedIssues,
+    linesAdded,
+    totalActiveDays,
+    totalStars,
   } = input;
 
   // Gece commit'leri (22:00–05:59)
@@ -53,6 +86,12 @@ export function calcBadges(input: BadgeInput): Badge[] {
   const weekendCommits = commitTimestamps.filter((ts) => {
     const d = new Date(ts).getDay();
     return d === 0 || d === 6;
+  }).length;
+
+  // Sabah commit'leri (05:00–08:59)
+  const earlyCommits = commitTimestamps.filter((ts) => {
+    const h = new Date(ts).getHours();
+    return h >= 5 && h < 9;
   }).length;
 
   // En büyük tek commit silinmesi
@@ -126,6 +165,102 @@ export function calcBadges(input: BadgeInput): Badge[] {
       description: "Fork projelere 5+ commit",
       emoji: "🌍",
       earned: forkCommits >= 5,
+      rarity: "epic",
+    },
+    {
+      id: "streak_100",
+      name: "Demir İrade",
+      description: "100 günlük commit streak",
+      emoji: "💎",
+      earned: longestStreak >= 100,
+      rarity: "epic",
+    },
+    {
+      id: "early_bird",
+      name: "Erkenci Kuş",
+      description: "Sabah 05:00–09:00 arası 10+ commit",
+      emoji: "🐦",
+      earned: earlyCommits >= 10,
+      rarity: "common",
+    },
+    {
+      id: "hexaglot",
+      name: "Dil Ustası",
+      description: "8+ farklı dil kullanıldı",
+      emoji: "🗣️",
+      earned: languageCount >= 8,
+      rarity: "epic",
+    },
+    {
+      id: "century",
+      name: "Yüzbaşı",
+      description: "100+ commit yapıldı",
+      emoji: "💯",
+      earned: totalCommits >= 100,
+      rarity: "common",
+    },
+    {
+      id: "millennium",
+      name: "Bininci",
+      description: "1000+ commit yapıldı",
+      emoji: "🏆",
+      earned: totalCommits >= 1000,
+      rarity: "epic",
+    },
+    {
+      id: "marathoner",
+      name: "Maratoncu",
+      description: "100+ aktif gün",
+      emoji: "🏃",
+      earned: totalActiveDays >= 100,
+      rarity: "rare",
+    },
+    {
+      id: "collector",
+      name: "Koleksiyoner",
+      description: "10+ repo'ya sahip ol",
+      emoji: "📦",
+      earned: repoCount >= 10,
+      rarity: "common",
+    },
+    {
+      id: "architect",
+      name: "Mimar",
+      description: "100.000+ satır kod eklendi",
+      emoji: "🏗️",
+      earned: linesAdded >= 100000,
+      rarity: "rare",
+    },
+    {
+      id: "merge_master",
+      name: "Birleştirme Ustası",
+      description: "20+ pull request birleştirildi",
+      emoji: "🔀",
+      earned: mergedPRs >= 20,
+      rarity: "rare",
+    },
+    {
+      id: "bug_hunter",
+      name: "Böcek Avcısı",
+      description: "30+ issue kapatıldı",
+      emoji: "🐛",
+      earned: closedIssues >= 30,
+      rarity: "common",
+    },
+    {
+      id: "stargazer",
+      name: "Yıldız Avcısı",
+      description: "Repo'ların toplam 50+ yıldız aldı",
+      emoji: "⭐",
+      earned: totalStars >= 50,
+      rarity: "rare",
+    },
+    {
+      id: "dedicated",
+      name: "Adanmış",
+      description: "365 günlük commit streak",
+      emoji: "👑",
+      earned: longestStreak >= 365,
       rarity: "epic",
     },
   ];

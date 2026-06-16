@@ -133,6 +133,19 @@ export default async function PublicProfilePage({ params }: Props) {
       .gte("committed_at", oneYearAgo),
   ]);
 
+  const [mergedPRsRes, closedIssuesRes] = await Promise.all([
+    supabaseAdmin
+      .from("pull_requests")
+      .select("count", { count: "exact", head: true })
+      .in("repo_id", ownIds)
+      .eq("merged", true),
+    supabaseAdmin
+      .from("issues")
+      .select("count", { count: "exact", head: true })
+      .in("repo_id", ownIds)
+      .eq("state", "closed"),
+  ]);
+
   // Languages
   const langMap = new Map<string, number>();
   for (const row of langsRes.data ?? []) {
@@ -172,6 +185,13 @@ export default async function PublicProfilePage({ params }: Props) {
     commitRepoIds: badgeCommits.map((c) => c.repo_id),
     commitDeletions: badgeCommits.map((c) => c.deletions ?? 0),
     languageCount: langMap.size,
+    totalCommits: stats.commitCount,
+    repoCount: stats.repoCount,
+    mergedPRs: mergedPRsRes.count ?? 0,
+    closedIssues: closedIssuesRes.count ?? 0,
+    linesAdded: (dnaCommitsRes.data ?? []).reduce((s, c) => s + (c.additions ?? 0), 0),
+    totalActiveDays: totalActiveDays,
+    totalStars: (repoRows ?? []).reduce((s, r) => s + (r.stars ?? 0), 0),
   }).filter((b) => b.earned);
 
   // Developer DNA
