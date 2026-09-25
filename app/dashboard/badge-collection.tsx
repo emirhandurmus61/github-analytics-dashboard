@@ -15,7 +15,7 @@ import {
   Check, Target, ChevronRight, ChevronLeft, X, Code, Hammer, Calendar, CalendarDays,
   FolderGit2, GitPullRequest, GitFork, Trash2, Shield, ShieldCheck, Users, Activity,
   Medal, Sun, Mountain, Compass, Search, Wrench, Layers, Milestone, CheckCircle,
-  Landmark, Lightbulb, Sparkles, SlidersHorizontal,
+  Landmark, Lightbulb, Sparkles,
 } from "lucide-react";
 
 type Props = { badges: Badge[] };
@@ -120,7 +120,7 @@ function formatMilestone(val?: number): string {
   return `${val}`;
 }
 
-/* ─── Rozet Detay Modalı (Kaydırma Çubuğu Olmayan Seviye Çizgisi) ────────── */
+/* ─── Rozet Detay Modalı (Bağlantılı Seviye Çizgisi, Sıfır Kaydırma Çubuğu) ─── */
 
 function BadgeDetailModal({
   badge,
@@ -184,25 +184,25 @@ function BadgeDetailModal({
 
       {/* Modal Kart Gövdesi */}
       <div
-        className="relative w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-950 p-6 sm:p-7 shadow-2xl overflow-hidden z-10 max-h-[92vh] flex flex-col"
         style={{
-          boxShadow: `0 0 50px ${rarity.glow}, 0 20px 40px rgba(0,0,0,0.8)`,
+          boxShadow: `0 0 60px ${rarity.glow}, 0 20px 40px rgba(0,0,0,0.85)`,
         }}
       >
         {/* Yumuşak ortam aurası */}
         <div
-          className="absolute -top-24 -left-24 w-60 h-60 rounded-full pointer-events-none blur-3xl opacity-20"
+          className="absolute -top-24 -left-24 w-64 h-64 rounded-full pointer-events-none blur-3xl opacity-25"
           style={{ backgroundColor: rarity.text }}
         />
 
         {/* Üst Bar: Kategori Başlığı & Kapat Butonu */}
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 shrink-0">
+        <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800/80 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-zinc-300">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
               {seriesInfo?.title ?? "Özel Başarı"}
             </span>
             {badge.tier && badge.maxTier && (
-              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400">
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
                 Seviye {badge.tier}/{badge.maxTier}
               </span>
             )}
@@ -210,95 +210,106 @@ function BadgeDetailModal({
 
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:border-zinc-700 transition-colors"
+            className="w-8 h-8 rounded-xl flex items-center justify-center bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:border-zinc-700 transition-colors cursor-pointer"
             title="Kapat (Esc)"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Gövdesi */}
         <div className="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 py-4 space-y-4">
-          {/* Rozet Odak Alanı (Estetik Vektör İkon Vitrini) */}
+          {/* Rozet Odak Alanı (Estetik Madalyon & Vitrin) */}
           <div className="flex flex-col items-center text-center">
             <div
-              className="w-20 h-20 rounded-3xl flex items-center justify-center mb-3 shadow-lg transition-transform"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center mb-3.5 shadow-2xl transition-transform relative"
               style={{
                 backgroundColor: badge.earned ? rarity.badgeBg : "rgba(39, 39, 42, 0.7)",
                 border: `2px solid ${badge.earned ? rarity.border : "rgba(63, 63, 70, 0.5)"}`,
-                boxShadow: badge.earned ? `0 0 30px ${rarity.glow}` : "none",
+                boxShadow: badge.earned ? `0 0 35px ${rarity.glow}` : "none",
                 color: badge.earned ? rarity.text : "#a1a1aa",
               }}
             >
-              <Icon className="w-10 h-10 stroke-[2]" />
+              <Icon className="w-10 h-10 sm:w-12 sm:h-12 stroke-[2]" />
+              {badge.earned ? (
+                <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-lg ring-2 ring-zinc-900">
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </div>
+              ) : (
+                <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700 flex items-center justify-center shadow-lg ring-2 ring-zinc-900">
+                  <Lock className="w-3 h-3 text-zinc-400" />
+                </div>
+              )}
             </div>
 
-            <h3 className="text-xl font-bold text-zinc-100">{badge.name}</h3>
-            <p className="text-xs text-zinc-400 max-w-xs mt-1 leading-relaxed">
+            <h3 className="text-xl sm:text-2xl font-black text-zinc-100 tracking-tight">
+              {badge.name}
+            </h3>
+            <p className="text-xs text-zinc-400 max-w-xs mt-1.5 leading-relaxed">
               {badge.description}
             </p>
 
             {/* Durum Etiketi */}
-            <div className="mt-2.5">
+            <div className="mt-3">
               {badge.earned ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Kazanıldı</span>
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wide">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>BU BAŞARI KAZANILDI</span>
                 </div>
               ) : remaining > 0 ? (
                 <div
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold"
                   style={{
                     color: theme.accent,
                     backgroundColor: `${theme.accent}15`,
                     border: `1px solid ${theme.accent}30`,
                   }}
                 >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>Son {remaining.toLocaleString("tr-TR")} {badge.unit ?? ""} kaldı</span>
+                  <Flame className="w-3.5 h-3.5" />
+                  <span>Son {remaining.toLocaleString("tr-TR")} {badge.unit ?? ""} kaldı!</span>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 text-zinc-300 text-xs font-semibold">
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>Açılmaya hazır</span>
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-zinc-800 text-zinc-300 text-xs font-bold">
+                  <Target className="w-3.5 h-3.5" />
+                  <span>Kilidi Açılmaya Hazır!</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* İlerleme Çubuğu */}
-          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4 space-y-2">
+          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4 space-y-2.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400 font-mono">
+              <span className="text-zinc-300 font-mono font-medium">
                 {current.toLocaleString("tr-TR")} / {target.toLocaleString("tr-TR")} {badge.unit ?? ""}
               </span>
-              <span className="font-bold tabular-nums" style={{ color: theme.accent }}>
+              <span className="font-extrabold text-sm tabular-nums" style={{ color: theme.accent }}>
                 %{progressPct}
               </span>
             </div>
-            <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
+            <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden shadow-inner">
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{
                   width: `${progressPct}%`,
                   backgroundColor: theme.accent,
-                  boxShadow: `0 0 10px ${theme.accent}60`,
+                  boxShadow: `0 0 12px ${theme.accent}70`,
                 }}
               />
             </div>
           </div>
 
-          {/* ─── Kaydırma Çubuğu Olmayan Bağlantılı Seviye Çizgisi ───────── */}
+          {/* ─── Seviye İlerleme Çizgisi (Sıfır Kaydırma Çubuğu) ─────────── */}
           {seriesBadges.length > 1 && (
             <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-zinc-200">Seviye İlerleme Çizgisi</span>
-                <span className="text-zinc-500 text-[11px] font-mono">
+                <span className="font-bold text-zinc-200">Seri Seviye Ağacı</span>
+                <span className="text-zinc-400 text-xs font-mono">
                   {completedCount} / {seriesBadges.length} Tamamlandı
                 </span>
               </div>
 
-              {/* %100 genişliğe oturan bağlantılı aşama düğümleri */}
+              {/* %100 genişliğe oturan aşama düğümleri */}
               <div className="relative flex items-center justify-between w-full px-1 py-1">
                 {/* Arka plan bağlantı çizgisi */}
                 <div className="absolute left-4 right-4 top-4 -translate-y-1/2 h-1 bg-zinc-800 rounded-full z-0" />
@@ -360,28 +371,28 @@ function BadgeDetailModal({
         </div>
 
         {/* Modal Alt Barı: Navigasyon */}
-        <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between shrink-0 text-xs">
+        <div className="pt-3.5 border-t border-zinc-800/80 flex items-center justify-between shrink-0 text-xs">
           <button
             onClick={onPrev}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors cursor-pointer"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-4 h-4" />
             <span>Önceki</span>
           </button>
 
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white transition-colors"
+            className="px-5 py-2 rounded-xl font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-100 hover:text-white transition-colors cursor-pointer"
           >
-            Tamam
+            Kapat
           </button>
 
           <button
             onClick={onNext}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors cursor-pointer"
           >
             <span>Sonraki</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -389,7 +400,7 @@ function BadgeDetailModal({
   );
 }
 
-/* ─── Rozet Kartı (Tek Sıra, Büyütülmüş, Ferah & Tıklanabilir) ────────────── */
+/* ─── Rozet Kartı (Estetik, Hırslandıran, Parlayan & Büyütülmüş) ─────────── */
 
 function BadgeCard({
   badge,
@@ -418,33 +429,41 @@ function BadgeCard({
           onClick();
         }
       }}
-      className={`group flex-none w-[260px] sm:w-[280px] h-full min-h-[220px] rounded-3xl border p-5 flex flex-col justify-between transition-all duration-200 select-none cursor-pointer snap-start relative overflow-hidden ${
+      className={`group flex-none w-[270px] sm:w-[290px] h-full min-h-[240px] rounded-3xl border p-5 flex flex-col justify-between transition-all duration-300 select-none cursor-pointer snap-start relative overflow-hidden ${
         badge.earned
-          ? "border-zinc-800 bg-zinc-900/90 hover:border-zinc-600 hover:shadow-2xl hover:-translate-y-1"
-          : "border-zinc-800/70 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900/80 hover:-translate-y-0.5"
+          ? "border-zinc-800 bg-zinc-900/90 hover:border-zinc-500 hover:shadow-2xl hover:-translate-y-1.5"
+          : "border-zinc-800/80 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900/85 hover:-translate-y-1 hover:shadow-xl"
       }`}
       style={
         badge.earned
           ? {
-              boxShadow: `0 0 24px ${rarity.glow}`,
+              boxShadow: `0 0 28px ${rarity.glow}`,
               borderColor: rarity.border,
+              background: `linear-gradient(145deg, ${rarity.bg} 0%, rgba(24, 24, 27, 0.95) 50%, rgba(24, 24, 27, 0.98) 100%)`,
             }
           : undefined
       }
     >
+      {/* Kart Arkasındaki Ambiyans Işık Halkası */}
+      <div
+        className="absolute -top-16 -right-16 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-25 group-hover:opacity-40 transition-opacity"
+        style={{ backgroundColor: rarity.text }}
+      />
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+
       {/* Üst Bar: Seviye Rozeti & Nadirlik Rozeti */}
-      <div className="flex items-center justify-between w-full mb-1">
+      <div className="flex items-center justify-between w-full mb-1 relative z-10">
         {badge.tier && badge.maxTier ? (
-          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-lg bg-zinc-800/90 text-zinc-300 border border-zinc-700/60">
+          <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-zinc-800/90 text-zinc-300 border border-zinc-700/60 shadow-sm">
             Seviye {badge.tier}/{badge.maxTier}
           </span>
         ) : (
-          <span className="text-xs font-semibold text-zinc-400">Özel Hedef</span>
+          <span className="text-[11px] font-semibold text-zinc-400">Özel Başarı</span>
         )}
 
         {badge.earned ? (
           <span
-            className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full"
+            className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-sm"
             style={{
               backgroundColor: rarity.badgeBg,
               color: rarity.text,
@@ -454,35 +473,45 @@ function BadgeCard({
             {RARITY_LABEL[badge.rarity]}
           </span>
         ) : (
-          <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-400">
+          <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded-full border border-zinc-700/50">
             <Lock className="w-3 h-3 text-zinc-500" />
             <span>Kilitli</span>
           </span>
         )}
       </div>
 
-      {/* Gövde: Büyük Vektör İkon, Başlık ve Net Açıklama */}
-      <div className="flex flex-col items-center my-2 min-w-0">
+      {/* Gövde: Büyütülmüş Vektör Madalyon, İkon, Başlık ve Açıklama */}
+      <div className="flex flex-col items-center my-1.5 min-w-0 relative z-10">
         <div
-          className={`relative flex items-center justify-center w-14 h-14 rounded-2xl mb-3 transition-transform group-hover:scale-105 shadow-md ${
+          className={`relative flex items-center justify-center w-16 h-16 rounded-2xl mb-2.5 transition-all duration-300 group-hover:scale-105 shadow-lg ${
             badge.earned
               ? ""
-              : "bg-zinc-800/80 border border-zinc-700/60 text-zinc-400 group-hover:text-zinc-200"
+              : "bg-gradient-to-b from-zinc-800/80 to-zinc-900/90 border border-zinc-700/60 text-zinc-400 group-hover:border-zinc-500 group-hover:text-zinc-200"
           }`}
           style={
             badge.earned
               ? {
                   backgroundColor: rarity.badgeBg,
                   color: rarity.text,
-                  border: `1px solid ${rarity.badgeBorder}`,
-                  boxShadow: `0 0 16px ${rarity.glow}`,
+                  border: `2px solid ${rarity.badgeBorder}`,
+                  boxShadow: `0 0 20px ${rarity.glow}`,
                 }
               : undefined
           }
         >
-          <Icon className="w-7 h-7 stroke-[2]" />
+          <Icon className="w-8 h-8 stroke-[2]" />
+          {badge.earned ? (
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-md ring-2 ring-zinc-900">
+              <Check className="w-3 h-3 stroke-[3]" />
+            </div>
+          ) : (
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700 flex items-center justify-center shadow-md ring-2 ring-zinc-900">
+              <Lock className="w-2.5 h-2.5 text-zinc-400" />
+            </div>
+          )}
         </div>
-        <p className="text-base font-bold text-zinc-100 leading-tight truncate w-full text-center px-1 group-hover:text-white">
+
+        <p className="text-base sm:text-lg font-extrabold text-zinc-100 leading-tight truncate w-full text-center px-1 group-hover:text-white transition-colors">
           {badge.name}
         </p>
         <p className="text-xs text-zinc-400 text-center line-clamp-2 mt-1 leading-relaxed w-full px-1">
@@ -490,35 +519,49 @@ function BadgeCard({
         </p>
       </div>
 
-      {/* Alt Bar: Kazanıldı Şeridi veya İlerleme Panosu */}
-      <div className="mt-2 pt-2.5 border-t border-zinc-800/80 w-full">
+      {/* Alt Bar: Kazanıldı Şeridi veya Hırslandıran İlerleme Panosu */}
+      <div className="mt-2 pt-2.5 border-t border-zinc-800/80 w-full relative z-10">
         {badge.earned ? (
-          <div className="w-full py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5">
-            <Check className="w-4 h-4 stroke-[2.5]" />
-            <span>Kazanıldı</span>
+          <div className="w-full py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <span>KAZANILDI</span>
           </div>
         ) : (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-mono text-zinc-300">
-              <span className="truncate">
+              <span className="truncate font-medium">
                 {current.toLocaleString("tr-TR")} / {target.toLocaleString("tr-TR")} {badge.unit ?? ""}
               </span>
-              <span className="font-bold tabular-nums" style={{ color: theme.accent }}>
+              <span className="font-extrabold tabular-nums" style={{ color: theme.accent }}>
                 %{progressPct}
               </span>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+            <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden shadow-inner">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
                   width: `${progressPct}%`,
                   backgroundColor: progressPct > 0 ? theme.accent : "#52525b",
+                  boxShadow: progressPct > 0 ? `0 0 10px ${theme.accent}80` : "none",
                 }}
               />
             </div>
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-0.5">
-              <span>{remaining > 0 ? `Kalan: ${remaining.toLocaleString("tr-TR")} ${badge.unit ?? ""}` : "Açılmak üzere"}</span>
-              <span className="text-[var(--accent)] font-medium">Detay →</span>
+            <div className="flex items-center justify-between text-[11px] pt-0.5">
+              {progressPct >= 75 ? (
+                <span className="text-amber-400 font-bold flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5" />
+                  <span>Son {remaining.toLocaleString("tr-TR")} kaldı!</span>
+                </span>
+              ) : remaining > 0 ? (
+                <span className="text-zinc-400 font-medium">
+                  Kalan: {remaining.toLocaleString("tr-TR")} {badge.unit ?? ""}
+                </span>
+              ) : (
+                <span className="text-[var(--accent)] font-bold">Açılmaya hazır!</span>
+              )}
+              <span className="text-zinc-400 group-hover:text-white font-semibold text-xs transition-colors flex items-center gap-0.5">
+                İncele →
+              </span>
             </div>
           </div>
         )}
@@ -527,7 +570,7 @@ function BadgeCard({
   );
 }
 
-/* ─── Ana Rozet Koleksiyonu Bileşeni (Yatay Kaydırılabilir & Tut-Çek) ─────── */
+/* ─── Ana Rozet Koleksiyonu Bileşeni (Kayan Kartlar & Masaüstü Butonları) ─── */
 
 export default function BadgeCollection({ badges }: Props) {
   const theme = useThemeColors();
@@ -535,7 +578,7 @@ export default function BadgeCollection({ badges }: Props) {
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [selectedBadgeId, setSelectedBadgeId] = useState<BadgeId | null>(null);
 
-  // Yatay Slider & Tutup-Çekme (Drag-to-Scroll) mekaniği
+  // Yatay Slider, Ok Butonları & Tutup-Çekme Mekaniği
   const sliderRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const startXRef = useRef(0);
@@ -600,7 +643,7 @@ export default function BadgeCollection({ badges }: Props) {
     return badges.find((b) => b.id === selectedBadgeId) ?? null;
   }, [badges, selectedBadgeId]);
 
-  // Ok butonlarının durumunu güncelle
+  // Ok butonlarının görünürlük ve aktiflik durumunu güncelle
   const updateScrollButtons = useCallback(() => {
     if (!sliderRef.current) return;
     const { scrollLeft, scrollWidth, clientWidth } = sliderRef.current;
@@ -686,34 +729,16 @@ export default function BadgeCollection({ badges }: Props) {
           <div>
             <h2 className="text-sm sm:text-base font-semibold text-zinc-100">Rozet Koleksiyonu</h2>
             <p className="text-xs text-zinc-400">
-              {earned.length} / {total} rozet kazanıldı • Sağa kaydırarak keşfet
+              {earned.length} / {total} rozet kazanıldı • Oklarla veya kaydırarak incele
             </p>
           </div>
         </div>
 
-        {/* Sağ: İlerleme Yüzdesi ve Ok Butonları */}
+        {/* Sağ: İlerleme Yüzdesi */}
         <div className="flex items-center gap-2">
-          <span className="text-base sm:text-lg font-bold tabular-nums mr-1" style={{ color: theme.accent }}>
+          <span className="text-base sm:text-lg font-bold tabular-nums" style={{ color: theme.accent }}>
             %{pct}
           </span>
-          <div className="hidden sm:flex items-center gap-1">
-            <button
-              onClick={() => scrollByAmount(-280)}
-              disabled={!canScrollLeft}
-              className="w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-              title="Sola Kaydır"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => scrollByAmount(280)}
-              disabled={!canScrollRight}
-              className="w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-              title="Sağa Kaydır"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -735,7 +760,7 @@ export default function BadgeCollection({ badges }: Props) {
         <div className="flex items-center gap-1 bg-zinc-950/70 p-1 rounded-xl border border-zinc-800/80">
           <button
             onClick={() => setFilter("all")}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
               filter === "all"
                 ? "bg-zinc-800 text-zinc-100 shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -745,7 +770,7 @@ export default function BadgeCollection({ badges }: Props) {
           </button>
           <button
             onClick={() => setFilter("closest")}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 cursor-pointer ${
               filter === "closest"
                 ? "bg-zinc-800 text-zinc-100 shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -756,7 +781,7 @@ export default function BadgeCollection({ badges }: Props) {
           </button>
           <button
             onClick={() => setFilter("earned")}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
               filter === "earned"
                 ? "bg-zinc-800 text-zinc-100 shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -766,7 +791,7 @@ export default function BadgeCollection({ badges }: Props) {
           </button>
           <button
             onClick={() => setFilter("locked")}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
               filter === "locked"
                 ? "bg-zinc-800 text-zinc-100 shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -795,8 +820,42 @@ export default function BadgeCollection({ badges }: Props) {
         )}
       </div>
 
-      {/* ─── Tek Sıra Sağa Kayan / Tut-Çek Rozet Slider Alanı ───────── */}
-      <div className="flex-1 min-h-0 relative flex items-center">
+      {/* ─── Sağa & Sola Kayan Kart Alanı (Masaüstü Butonları + Tut-Çek) ── */}
+      <div className="flex-1 min-h-0 relative flex items-center group/slider">
+        {/* Sol Kenar Karartması ve Masaüstü Sol Ok Butonu */}
+        <div
+          className={`absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-zinc-900 via-zinc-900/60 to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
+            canScrollLeft ? "opacity-100" : "opacity-0"
+          }`}
+        />
+        <button
+          onClick={() => scrollByAmount(-320)}
+          disabled={!canScrollLeft}
+          className={`absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-zinc-950/90 border border-zinc-700/80 text-zinc-200 hover:text-white hover:scale-110 hover:border-zinc-500 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all cursor-pointer ${
+            canScrollLeft ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
+          title="Sola Kaydır"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        {/* Sağ Kenar Karartması ve Masaüstü Sağ Ok Butonu */}
+        <div
+          className={`absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-zinc-900 via-zinc-900/60 to-transparent pointer-events-none z-10 transition-opacity duration-200 ${
+            canScrollRight ? "opacity-100" : "opacity-0"
+          }`}
+        />
+        <button
+          onClick={() => scrollByAmount(320)}
+          disabled={!canScrollRight}
+          className={`absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-zinc-950/90 border border-zinc-700/80 text-zinc-200 hover:text-white hover:scale-110 hover:border-zinc-500 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all cursor-pointer ${
+            canScrollRight ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
+          title="Sağa Kaydır"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+
         {displayedBadges.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-zinc-400 w-full">
             <Trophy className="w-8 h-8 mb-2 opacity-30 text-zinc-500" />
@@ -809,7 +868,7 @@ export default function BadgeCollection({ badges }: Props) {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className={`flex items-stretch gap-3.5 overflow-x-auto custom-scroll w-full h-full pb-2 pt-1 scroll-smooth snap-x snap-mandatory ${
+            className={`flex items-stretch gap-4 overflow-x-auto custom-scroll w-full h-full pb-2 pt-1 scroll-smooth snap-x snap-mandatory px-1 ${
               isDragging ? "cursor-grabbing" : "cursor-grab"
             }`}
           >
