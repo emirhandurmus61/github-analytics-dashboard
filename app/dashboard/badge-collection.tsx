@@ -113,6 +113,24 @@ const CATEGORIES: { id: CategoryFilter; label: string }[] = [
 
 const HABIT_SERIES: BadgeSeries[] = ["night_owl", "early_bird", "weekend", "open_source", "cleanup"];
 
+const SERIES_KEYS: BadgeSeries[] = [
+  "commits",
+  "streak",
+  "active_days",
+  "repos",
+  "languages",
+  "code_volume",
+  "pull_requests",
+  "issues",
+  "stars",
+  "night_owl",
+  "early_bird",
+  "weekend",
+  "open_source",
+  "cleanup",
+  "special",
+];
+
 function formatMilestone(val?: number): string {
   if (val === undefined || val === null) return "";
   if (val >= 1000000) return `${val / 1000000}M`;
@@ -120,22 +138,18 @@ function formatMilestone(val?: number): string {
   return `${val}`;
 }
 
-/* ─── Rozet Detay Modalı (Bağlantılı Seviye Çizgisi, Sıfır Kaydırma Çubuğu) ─── */
+/* ─── Rozet Detay Modalı (Serinin Tüm Seviyeleri Burada Listelenir) ────────── */
 
 function BadgeDetailModal({
   badge,
   badges,
   onClose,
   onSelectBadge,
-  onNext,
-  onPrev,
 }: {
   badge: Badge;
   badges: Badge[];
   onClose: () => void;
   onSelectBadge: (id: BadgeId) => void;
-  onNext: () => void;
-  onPrev: () => void;
 }) {
   const theme = useThemeColors();
   const rarity = RARITY_COLORS[badge.rarity];
@@ -147,7 +161,7 @@ function BadgeDetailModal({
   const progressPct = Math.min(100, Math.max(0, Math.round((current / target) * 100)));
   const remaining = Math.max(0, target - current);
 
-  // Bu seriye ait tüm seviye rozetleri (sıralı)
+  // Bu seriye ait tüm seviye rozetleri (sıralı 1, 2, 3...)
   const seriesBadges = useMemo(() => {
     if (!badge.series) return [];
     return badges
@@ -155,18 +169,37 @@ function BadgeDetailModal({
       .sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0));
   }, [badge.series, badges]);
 
-  // Seviye çizgisinin doluluk oranı hesabı
+  // Seviye çizgisinin doluluk oranı
   const completedCount = seriesBadges.filter((b) => b.earned).length;
   const progressLinePercent = seriesBadges.length > 1
     ? Math.min(100, Math.round(((completedCount - 0.5) / (seriesBadges.length - 1)) * 100))
     : 0;
 
+  // Serideki önceki / sonraki seviyeye geçiş
+  const handleNextTier = useCallback(() => {
+    const idx = seriesBadges.findIndex((b) => b.id === badge.id);
+    if (idx !== -1 && idx < seriesBadges.length - 1) {
+      onSelectBadge(seriesBadges[idx + 1].id);
+    } else if (idx === seriesBadges.length - 1) {
+      onSelectBadge(seriesBadges[0].id);
+    }
+  }, [seriesBadges, badge.id, onSelectBadge]);
+
+  const handlePrevTier = useCallback(() => {
+    const idx = seriesBadges.findIndex((b) => b.id === badge.id);
+    if (idx > 0) {
+      onSelectBadge(seriesBadges[idx - 1].id);
+    } else if (idx === 0) {
+      onSelectBadge(seriesBadges[seriesBadges.length - 1].id);
+    }
+  }, [seriesBadges, badge.id, onSelectBadge]);
+
   // Klavye kısayolları (Esc, Sol/Sağ oklar)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") onNext();
-      if (e.key === "ArrowLeft") onPrev();
+      if (e.key === "ArrowRight") handleNextTier();
+      if (e.key === "ArrowLeft") handlePrevTier();
     }
     window.addEventListener("keydown", handleKeyDown);
     const originalOverflow = document.body.style.overflow;
@@ -175,7 +208,7 @@ function BadgeDetailModal({
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = originalOverflow;
     };
-  }, [onClose, onNext, onPrev]);
+  }, [onClose, handleNextTier, handlePrevTier]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -195,7 +228,7 @@ function BadgeDetailModal({
           style={{ backgroundColor: rarity.text }}
         />
 
-        {/* Üst Bar: Kategori Başlığı & Kapat Butonu */}
+        {/* Üst Bar: Seri Başlığı & Kapat Butonu */}
         <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800/80 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
@@ -219,7 +252,7 @@ function BadgeDetailModal({
 
         {/* Modal Gövdesi */}
         <div className="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 py-4 space-y-4">
-          {/* Rozet Odak Alanı (Estetik Madalyon & Vitrin) */}
+          {/* Rozet Odak Alanı */}
           <div className="flex flex-col items-center text-center">
             <div
               className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center mb-3.5 shadow-2xl transition-transform relative"
@@ -254,7 +287,7 @@ function BadgeDetailModal({
               {badge.earned ? (
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wide">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>BU BAŞARI KAZANILDI</span>
+                  <span>BU SEVİYE KAZANILDI</span>
                 </div>
               ) : remaining > 0 ? (
                 <div
@@ -299,11 +332,13 @@ function BadgeDetailModal({
             </div>
           </div>
 
-          {/* ─── Seviye İlerleme Çizgisi (Sıfır Kaydırma Çubuğu) ─────────── */}
+          {/* ─── Serinin Tüm Seviyeleri (Burada Listelenir) ─────────────── */}
           {seriesBadges.length > 1 && (
             <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-zinc-200">Seri Seviye Ağacı</span>
+                <span className="font-bold text-zinc-200">
+                  {seriesInfo?.title ?? "Seri"} Seviye Ağacı
+                </span>
                 <span className="text-zinc-400 text-xs font-mono">
                   {completedCount} / {seriesBadges.length} Tamamlandı
                 </span>
@@ -370,14 +405,15 @@ function BadgeDetailModal({
           </div>
         </div>
 
-        {/* Modal Alt Barı: Navigasyon */}
+        {/* Modal Alt Barı: Seviyeler Arası Gezinme */}
         <div className="pt-3.5 border-t border-zinc-800/80 flex items-center justify-between shrink-0 text-xs">
           <button
-            onClick={onPrev}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors cursor-pointer"
+            onClick={handlePrevTier}
+            disabled={seriesBadges.length <= 1}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
-            <span>Önceki</span>
+            <span>Önceki Seviye</span>
           </button>
 
           <button
@@ -388,10 +424,11 @@ function BadgeDetailModal({
           </button>
 
           <button
-            onClick={onNext}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors cursor-pointer"
+            onClick={handleNextTier}
+            disabled={seriesBadges.length <= 1}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
-            <span>Sonraki</span>
+            <span>Sonraki Seviye</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -400,7 +437,7 @@ function BadgeDetailModal({
   );
 }
 
-/* ─── Rozet Kartı (Estetik, Hırslandıran, Parlayan & Büyütülmüş) ─────────── */
+/* ─── Rozet Kartı (Ana Görünümde Seri Başına 1 Adet Aktif Seviye Kartı) ──── */
 
 function BadgeCard({
   badge,
@@ -412,6 +449,7 @@ function BadgeCard({
   const theme = useThemeColors();
   const rarity = RARITY_COLORS[badge.rarity];
   const Icon = BADGE_ICON[badge.id] ?? Trophy;
+  const seriesInfo = badge.series ? SERIES_INFO[badge.series] : null;
 
   const current = badge.current ?? 0;
   const target = badge.target ?? 1;
@@ -480,10 +518,14 @@ function BadgeCard({
         )}
       </div>
 
-      {/* Gövde: Büyütülmüş Vektör Madalyon, İkon, Başlık ve Açıklama */}
-      <div className="flex flex-col items-center my-1.5 min-w-0 relative z-10">
+      {/* Gövde: Seri Başlığı, Vektör Madalyon, İkon, Başlık ve Açıklama */}
+      <div className="flex flex-col items-center my-1 min-w-0 relative z-10">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] mb-1 opacity-90 truncate max-w-full">
+          {seriesInfo?.title ?? "Başarı"}
+        </span>
+
         <div
-          className={`relative flex items-center justify-center w-16 h-16 rounded-2xl mb-2.5 transition-all duration-300 group-hover:scale-105 shadow-lg ${
+          className={`relative flex items-center justify-center w-15 h-15 rounded-2xl mb-2 transition-all duration-300 group-hover:scale-105 shadow-lg ${
             badge.earned
               ? ""
               : "bg-gradient-to-b from-zinc-800/80 to-zinc-900/90 border border-zinc-700/60 text-zinc-400 group-hover:border-zinc-500 group-hover:text-zinc-200"
@@ -499,7 +541,7 @@ function BadgeCard({
               : undefined
           }
         >
-          <Icon className="w-8 h-8 stroke-[2]" />
+          <Icon className="w-7 h-7 stroke-[2]" />
           {badge.earned ? (
             <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-md ring-2 ring-zinc-900">
               <Check className="w-3 h-3 stroke-[3]" />
@@ -514,7 +556,7 @@ function BadgeCard({
         <p className="text-base sm:text-lg font-extrabold text-zinc-100 leading-tight truncate w-full text-center px-1 group-hover:text-white transition-colors">
           {badge.name}
         </p>
-        <p className="text-xs text-zinc-400 text-center line-clamp-2 mt-1 leading-relaxed w-full px-1">
+        <p className="text-xs text-zinc-400 text-center line-clamp-2 mt-0.5 leading-relaxed w-full px-1">
           {badge.description}
         </p>
       </div>
@@ -524,7 +566,7 @@ function BadgeCard({
         {badge.earned ? (
           <div className="w-full py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
             <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span>KAZANILDI</span>
+            <span>{badge.tier === badge.maxTier ? "SERİ TAMAMLANDI" : "SEVİYE KAZANILDI"}</span>
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -559,8 +601,8 @@ function BadgeCard({
               ) : (
                 <span className="text-[var(--accent)] font-bold">Açılmaya hazır!</span>
               )}
-              <span className="text-zinc-400 group-hover:text-white font-semibold text-xs transition-colors flex items-center gap-0.5">
-                İncele →
+              <span className="text-zinc-300 group-hover:text-white font-semibold text-xs transition-colors flex items-center gap-0.5">
+                Seviyeler →
               </span>
             </div>
           </div>
@@ -570,7 +612,7 @@ function BadgeCard({
   );
 }
 
-/* ─── Ana Rozet Koleksiyonu Bileşeni (Kayan Kartlar & Masaüstü Butonları) ─── */
+/* ─── Ana Rozet Koleksiyonu Bileşeni (Seri Odaklı, Temiz & Sağa Kayan) ────── */
 
 export default function BadgeCollection({ badges }: Props) {
   const theme = useThemeColors();
@@ -591,51 +633,68 @@ export default function BadgeCollection({ badges }: Props) {
   const total = badges.length;
   const pct = total > 0 ? Math.round((earned.length / total) * 100) : 0;
 
-  // Akıllı Sıradaki Hedefler: Her serinin sıradaki ilk kilitli seviyesi
-  const activeNextMilestones = useMemo(() => {
-    const unearned = badges.filter((b) => !b.earned);
-    const seriesSeen = new Set<string>();
-    const immediateTargets: (Badge & { progressPct: number; remaining: number })[] = [];
-
-    for (const b of unearned) {
-      const sKey = b.series ?? b.id;
-      if (!seriesSeen.has(sKey)) {
-        seriesSeen.add(sKey);
-        const cur = b.current ?? 0;
-        const tgt = b.target ?? 1;
-        const p = Math.min(100, Math.max(0, Math.round((cur / tgt) * 100)));
-        const rem = Math.max(0, tgt - cur);
-        immediateTargets.push({ ...b, progressPct: p, remaining: rem });
+  // ─── Her Serinin Tek Bir Temsilci Kartı (Her Seviye Ayrı Gözükmez!) ───
+  const displayedSeriesCards = useMemo(() => {
+    // Filtreleme yapılacak serileri belirle
+    let targetSeriesKeys: BadgeSeries[] = SERIES_KEYS;
+    if (category !== "all") {
+      if (category === "habits") {
+        targetSeriesKeys = HABIT_SERIES;
+      } else {
+        targetSeriesKeys = [category as BadgeSeries];
       }
     }
 
-    return immediateTargets.sort((a, b) => b.progressPct - a.progressPct || a.remaining - b.remaining);
-  }, [badges]);
+    const cards: Badge[] = [];
 
-  // Filtrelenmiş rozetler
-  const displayedBadges = useMemo(() => {
-    let result = badges;
+    for (const s of targetSeriesKeys) {
+      const sBadges = badges
+        .filter((b) => b.series === s)
+        .sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0));
 
-    // Hedefler sekmesindeyse akıllı sıradaki kilometre taşlarını göster
-    if (filter === "closest") {
-      result = activeNextMilestones;
-    } else {
-      // Kategori filtresi
-      if (category !== "all") {
-        if (category === "habits") {
-          result = result.filter((b) => b.series && HABIT_SERIES.includes(b.series));
+      if (sBadges.length === 0) continue;
+
+      const unearned = sBadges.filter((b) => !b.earned);
+      const earnedList = sBadges.filter((b) => b.earned);
+
+      if (filter === "earned") {
+        // Kazanılanlar sekmesinde: seride en az 1 seviye kazanıldıysa en yüksek kazanılan seviyeyi göster
+        if (earnedList.length > 0) {
+          cards.push(earnedList[earnedList.length - 1]);
+        }
+      } else if (filter === "locked") {
+        // Kilitliler sekmesinde: serinin henüz açılmamış sıradaki seviyesini göster
+        if (unearned.length > 0) {
+          cards.push(unearned[0]);
+        }
+      } else if (filter === "closest") {
+        // Sıradaki hedefler sekmesinde: serinin sıradaki kilitli seviyesini al
+        if (unearned.length > 0) {
+          cards.push(unearned[0]);
+        }
+      } else {
+        // "Tümü" modunda:
+        // Eğer seride henüz açılmamış seviye varsa sıradaki hedef seviyeyi göster (kullanıcının aktif görevi)
+        // Eğer serinin tüm seviyeleri açılmışsa en üst seviyeyi göster (tamamlandı rozeti)
+        if (unearned.length > 0) {
+          cards.push(unearned[0]);
         } else {
-          result = result.filter((b) => b.series === category);
+          cards.push(sBadges[sBadges.length - 1]);
         }
       }
-
-      // Durum filtresi
-      if (filter === "earned") result = result.filter((b) => b.earned);
-      if (filter === "locked") result = result.filter((b) => !b.earned);
     }
 
-    return result;
-  }, [badges, filter, category, activeNextMilestones]);
+    // Sıradaki hedefler modunda tamamlanma yüzdesine göre sırala
+    if (filter === "closest") {
+      return cards.sort((a, b) => {
+        const aPct = Math.min(100, Math.round(((a.current ?? 0) / (a.target ?? 1)) * 100));
+        const bPct = Math.min(100, Math.round(((b.current ?? 0) / (b.target ?? 1)) * 100));
+        return bPct - aPct;
+      });
+    }
+
+    return cards;
+  }, [badges, filter, category]);
 
   // Modalda açılacak rozet
   const selectedBadge = useMemo(() => {
@@ -661,7 +720,7 @@ export default function BadgeCollection({ badges }: Props) {
       el.removeEventListener("scroll", updateScrollButtons);
       window.removeEventListener("resize", updateScrollButtons);
     };
-  }, [updateScrollButtons, displayedBadges]);
+  }, [updateScrollButtons, displayedSeriesCards]);
 
   const scrollByAmount = (amount: number) => {
     if (!sliderRef.current) return;
@@ -692,26 +751,6 @@ export default function BadgeCollection({ badges }: Props) {
     setIsDragging(false);
   };
 
-  // Modalda sonraki rozete geç
-  const handleNextBadge = () => {
-    if (!selectedBadgeId) return;
-    const idx = badges.findIndex((b) => b.id === selectedBadgeId);
-    if (idx !== -1) {
-      const nextIdx = (idx + 1) % badges.length;
-      setSelectedBadgeId(badges[nextIdx].id);
-    }
-  };
-
-  // Modalda önceki rozete geç
-  const handlePrevBadge = () => {
-    if (!selectedBadgeId) return;
-    const idx = badges.findIndex((b) => b.id === selectedBadgeId);
-    if (idx !== -1) {
-      const prevIdx = (idx - 1 + badges.length) % badges.length;
-      setSelectedBadgeId(badges[prevIdx].id);
-    }
-  };
-
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 sm:p-5 h-full flex flex-col overflow-hidden">
       {/* ─── Başlık ve Özet Barı ────────────────────────────────────── */}
@@ -729,13 +768,13 @@ export default function BadgeCollection({ badges }: Props) {
           <div>
             <h2 className="text-sm sm:text-base font-semibold text-zinc-100">Rozet Koleksiyonu</h2>
             <p className="text-xs text-zinc-400">
-              {earned.length} / {total} rozet kazanıldı • Oklarla veya kaydırarak incele
+              {earned.length} / {total} seviye tamamlandı • 15 Başarı Serisi
             </p>
           </div>
         </div>
 
         {/* Sağ: İlerleme Yüzdesi */}
-        <div className="flex items-center gap-2">
+        <div className="text-right">
           <span className="text-base sm:text-lg font-bold tabular-nums" style={{ color: theme.accent }}>
             %{pct}
           </span>
@@ -766,7 +805,7 @@ export default function BadgeCollection({ badges }: Props) {
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Tümü ({total})
+            Tümü ({displayedSeriesCards.length})
           </button>
           <button
             onClick={() => setFilter("closest")}
@@ -777,7 +816,7 @@ export default function BadgeCollection({ badges }: Props) {
             }`}
           >
             <Target className="w-3 h-3 text-[var(--accent)]" />
-            <span>Sıradaki Hedefler ({activeNextMilestones.length})</span>
+            <span>Sıradaki Hedefler</span>
           </button>
           <button
             onClick={() => setFilter("earned")}
@@ -787,7 +826,7 @@ export default function BadgeCollection({ badges }: Props) {
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Kazanılanlar ({earned.length})
+            Kazanılanlar
           </button>
           <button
             onClick={() => setFilter("locked")}
@@ -797,7 +836,7 @@ export default function BadgeCollection({ badges }: Props) {
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Kilitli ({total - earned.length})
+            Kilitli
           </button>
         </div>
 
@@ -820,7 +859,7 @@ export default function BadgeCollection({ badges }: Props) {
         )}
       </div>
 
-      {/* ─── Sağa & Sola Kayan Kart Alanı (Masaüstü Butonları + Tut-Çek) ── */}
+      {/* ─── Seri Kartları Alanı (Masaüstü Butonları + Tut-Çek Kayan Şerit) ── */}
       <div className="flex-1 min-h-0 relative flex items-center group/slider">
         {/* Sol Kenar Karartması ve Masaüstü Sol Ok Butonu */}
         <div
@@ -856,10 +895,10 @@ export default function BadgeCollection({ badges }: Props) {
           <ChevronRight className="w-5 h-5" />
         </button>
 
-        {displayedBadges.length === 0 ? (
+        {displayedSeriesCards.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-zinc-400 w-full">
             <Trophy className="w-8 h-8 mb-2 opacity-30 text-zinc-500" />
-            <p className="text-xs text-zinc-400">Bu filtreye uygun rozet bulunamadı.</p>
+            <p className="text-xs text-zinc-400">Bu filtreye uygun başarı serisi bulunamadı.</p>
           </div>
         ) : (
           <div
@@ -872,7 +911,7 @@ export default function BadgeCollection({ badges }: Props) {
               isDragging ? "cursor-grabbing" : "cursor-grab"
             }`}
           >
-            {displayedBadges.map((badge) => (
+            {displayedSeriesCards.map((badge) => (
               <BadgeCard
                 key={badge.id}
                 badge={badge}
@@ -887,15 +926,13 @@ export default function BadgeCollection({ badges }: Props) {
         )}
       </div>
 
-      {/* ─── Rozet Detay Modalı ───────────────────────────────────────── */}
+      {/* ─── Rozet Detay Modalı (Tüm Seviyeler Burada İncelenir) ─────────── */}
       {selectedBadge && (
         <BadgeDetailModal
           badge={selectedBadge}
           badges={badges}
           onClose={() => setSelectedBadgeId(null)}
           onSelectBadge={(id) => setSelectedBadgeId(id)}
-          onNext={handleNextBadge}
-          onPrev={handlePrevBadge}
         />
       )}
     </div>
