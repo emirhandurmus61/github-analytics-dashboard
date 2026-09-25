@@ -27,6 +27,9 @@ export type Badge = {
   emoji: string;
   earned: boolean;
   rarity: "common" | "rare" | "epic";
+  current?: number;
+  target?: number;
+  unit?: string;
 };
 
 export type BadgeInput = {
@@ -110,6 +113,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🚀",
       earned: hasSynced,
       rarity: "common",
+      current: hasSynced ? 1 : 0,
+      target: 1,
+      unit: "senkronizasyon",
     },
     {
       id: "streak_7",
@@ -118,6 +124,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🔥",
       earned: longestStreak >= 7,
       rarity: "common",
+      current: longestStreak,
+      target: 7,
+      unit: "gün",
     },
     {
       id: "streak_30",
@@ -126,6 +135,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "⚡",
       earned: longestStreak >= 30,
       rarity: "epic",
+      current: longestStreak,
+      target: 30,
+      unit: "gün",
     },
     {
       id: "night_owl",
@@ -134,6 +146,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🦉",
       earned: nightCommits >= 10,
       rarity: "common",
+      current: nightCommits,
+      target: 10,
+      unit: "commit",
     },
     {
       id: "weekend_warrior",
@@ -142,6 +157,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "⚔️",
       earned: weekendCommits >= 10,
       rarity: "rare",
+      current: weekendCommits,
+      target: 10,
+      unit: "commit",
     },
     {
       id: "big_cleanup",
@@ -150,6 +168,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🧹",
       earned: maxDeletion >= 1000,
       rarity: "rare",
+      current: maxDeletion,
+      target: 1000,
+      unit: "satır",
     },
     {
       id: "polyglot",
@@ -158,6 +179,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🌐",
       earned: languageCount >= 5,
       rarity: "rare",
+      current: languageCount,
+      target: 5,
+      unit: "dil",
     },
     {
       id: "open_source",
@@ -166,6 +190,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🌍",
       earned: forkCommits >= 5,
       rarity: "epic",
+      current: forkCommits,
+      target: 5,
+      unit: "commit",
     },
     {
       id: "streak_100",
@@ -174,6 +201,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "💎",
       earned: longestStreak >= 100,
       rarity: "epic",
+      current: longestStreak,
+      target: 100,
+      unit: "gün",
     },
     {
       id: "early_bird",
@@ -182,6 +212,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🐦",
       earned: earlyCommits >= 10,
       rarity: "common",
+      current: earlyCommits,
+      target: 10,
+      unit: "commit",
     },
     {
       id: "hexaglot",
@@ -190,6 +223,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🗣️",
       earned: languageCount >= 8,
       rarity: "epic",
+      current: languageCount,
+      target: 8,
+      unit: "dil",
     },
     {
       id: "century",
@@ -198,6 +234,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "💯",
       earned: totalCommits >= 100,
       rarity: "common",
+      current: totalCommits,
+      target: 100,
+      unit: "commit",
     },
     {
       id: "millennium",
@@ -206,6 +245,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🏆",
       earned: totalCommits >= 1000,
       rarity: "epic",
+      current: totalCommits,
+      target: 1000,
+      unit: "commit",
     },
     {
       id: "marathoner",
@@ -214,6 +256,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🏃",
       earned: totalActiveDays >= 100,
       rarity: "rare",
+      current: totalActiveDays,
+      target: 100,
+      unit: "gün",
     },
     {
       id: "collector",
@@ -222,6 +267,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "📦",
       earned: repoCount >= 10,
       rarity: "common",
+      current: repoCount,
+      target: 10,
+      unit: "repo",
     },
     {
       id: "architect",
@@ -230,6 +278,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🏗️",
       earned: linesAdded >= 100000,
       rarity: "rare",
+      current: linesAdded,
+      target: 100000,
+      unit: "satır",
     },
     {
       id: "merge_master",
@@ -238,6 +289,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🔀",
       earned: mergedPRs >= 20,
       rarity: "rare",
+      current: mergedPRs,
+      target: 20,
+      unit: "PR",
     },
     {
       id: "bug_hunter",
@@ -246,6 +300,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "🐛",
       earned: closedIssues >= 30,
       rarity: "common",
+      current: closedIssues,
+      target: 30,
+      unit: "issue",
     },
     {
       id: "stargazer",
@@ -254,6 +311,9 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "⭐",
       earned: totalStars >= 50,
       rarity: "rare",
+      current: totalStars,
+      target: 50,
+      unit: "yıldız",
     },
     {
       id: "dedicated",
@@ -262,14 +322,48 @@ export function calcBadges(input: BadgeInput): Badge[] {
       emoji: "👑",
       earned: longestStreak >= 365,
       rarity: "epic",
+      current: longestStreak,
+      target: 365,
+      unit: "gün",
     },
   ];
 
   return BADGES;
 }
 
-export const RARITY_COLORS: Record<Badge["rarity"], { text: string; bg: string; border: string }> = {
-  common: { text: "#a1a1aa", bg: "rgba(161,161,170,0.08)", border: "rgba(161,161,170,0.2)" },
-  rare:   { text: "#60a5fa", bg: "rgba(96,165,250,0.08)",  border: "rgba(96,165,250,0.2)" },
-  epic:   { text: "#c084fc", bg: "rgba(192,132,252,0.08)", border: "rgba(192,132,252,0.2)" },
+export const RARITY_COLORS: Record<
+  Badge["rarity"],
+  {
+    text: string;
+    bg: string;
+    border: string;
+    glow: string;
+    badgeBg: string;
+    badgeBorder: string;
+  }
+> = {
+  common: {
+    text: "#94a3b8",
+    bg: "rgba(148, 163, 184, 0.08)",
+    border: "rgba(148, 163, 184, 0.25)",
+    glow: "rgba(148, 163, 184, 0.15)",
+    badgeBg: "rgba(148, 163, 184, 0.12)",
+    badgeBorder: "rgba(148, 163, 184, 0.3)",
+  },
+  rare: {
+    text: "#38bdf8",
+    bg: "rgba(56, 189, 248, 0.09)",
+    border: "rgba(56, 189, 248, 0.3)",
+    glow: "rgba(56, 189, 248, 0.22)",
+    badgeBg: "rgba(56, 189, 248, 0.14)",
+    badgeBorder: "rgba(56, 189, 248, 0.35)",
+  },
+  epic: {
+    text: "#c084fc",
+    bg: "rgba(192, 132, 252, 0.10)",
+    border: "rgba(192, 132, 252, 0.32)",
+    glow: "rgba(192, 132, 252, 0.25)",
+    badgeBg: "rgba(192, 132, 252, 0.16)",
+    badgeBorder: "rgba(192, 132, 252, 0.4)",
+  },
 };
