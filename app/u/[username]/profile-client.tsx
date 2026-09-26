@@ -1072,7 +1072,6 @@ function ProfileReadme({
 }) {
   const theme = useThemeColors();
   const [copied, setCopied] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   const cleanContent = useMemo(() => {
     if (!content) return "";
@@ -1093,7 +1092,6 @@ function ProfileReadme({
 
   const words = useMemo(() => cleanContent.trim().split(/\s+/).length, [cleanContent]);
   const readingTime = useMemo(() => Math.max(1, Math.ceil(words / 180)), [words]);
-  const isLong = cleanContent.length > 1200;
 
   const handleCopyRaw = () => {
     navigator.clipboard.writeText(cleanContent).then(() => {
@@ -1209,11 +1207,7 @@ function ProfileReadme({
 
         {/* Markdown Render Area */}
         <div className="relative">
-          <div
-            className={`p-6 sm:p-8 prose-profile transition-all duration-300 ${
-              isLong && !isExpanded ? "max-h-[500px] overflow-hidden" : ""
-            }`}
-          >
+          <div className="p-5 sm:p-7 prose-profile">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
@@ -1383,7 +1377,8 @@ function ProfileReadme({
                     srcStr.includes("streak-stats") ||
                     srcStr.includes("readme-typing-svg") ||
                     srcStr.includes("github-profile-trophy") ||
-                    srcStr.includes("capsule-render");
+                    srcStr.includes("capsule-render") ||
+                    srcStr.includes("/api/widget/");
 
                   if (isBadge) {
                     return (
@@ -1429,33 +1424,6 @@ function ProfileReadme({
               {cleanContent}
             </ReactMarkdown>
           </div>
-
-          {/* Fade out mask & Expand button when long */}
-          {isLong && !isExpanded && (
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent flex items-end justify-center pb-4">
-              <button
-                type="button"
-                onClick={() => setIsExpanded(true)}
-                className="flex items-center gap-2 rounded-xl border border-zinc-700/80 bg-zinc-900/90 px-4 py-2 text-xs font-semibold text-zinc-200 shadow-xl backdrop-blur-md transition-all hover:bg-zinc-800 hover:border-zinc-600"
-              >
-                <span>Tüm README'yi Gör ({words} kelime)</span>
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          {isLong && isExpanded && (
-            <div className="flex justify-center py-4 border-t border-zinc-800/60 bg-zinc-900/40">
-              <button
-                type="button"
-                onClick={() => setIsExpanded(false)}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
-              >
-                <span>Daha Az Göster</span>
-                <ChevronDown className="w-3.5 h-3.5 rotate-180 transition-transform" />
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </section>
