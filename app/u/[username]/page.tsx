@@ -82,8 +82,13 @@ export default async function PublicProfilePage({ params }: Props) {
     // Kolonlar henuz yok — sessizce devam et
   }
 
-  // README kaynağına göre gösterilecek içerik
-  const displayReadme = readmeSourceDb === "custom" ? profileReadmeDb : (githubReadmeDb ?? profileReadmeDb);
+  // README kaynağına göre gösterilecek içerik:
+  // "custom" -> Kullanıcının dashboard ayarlarında belirlediği özel README
+  // "github" -> GitHub profil reposundan (username/username) çekilen README
+  const displayReadme =
+    readmeSourceDb === "custom"
+      ? (profileReadmeDb ?? null)
+      : (githubReadmeDb ?? null);
 
   const widgets: Widgets =
     user.public_widgets && typeof user.public_widgets === "object"
@@ -269,6 +274,7 @@ export default async function PublicProfilePage({ params }: Props) {
         avatarUrl={user.avatar_url}
         bio={user.bio}
         profileReadme={displayReadme}
+        readmeSource={readmeSourceDb === "custom" ? "custom" : "github"}
         currentlyWorkingOn={user.currently_working_on}
         yearlyGoal={user.yearly_goal}
         techTags={techTags}

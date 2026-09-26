@@ -72,7 +72,11 @@ export async function saveProfileSettings(
   // Gizlilik — Liderlik tablosu opt-in
   const leaderboardOptIn = formData.get("leaderboard_opt_in") === "on";
 
-  // Ana alanlar
+  // README source
+  const readmeSourceRaw = formData.get("readme_source") as string | null;
+  const readmeSource = readmeSourceRaw === "custom" ? "custom" : "github";
+
+  // Ana alanlar ve garanti kolonlar
   const { error } = await supabaseAdmin
     .from("users")
     .update({
@@ -88,32 +92,27 @@ export async function saveProfileSettings(
       social_linkedin: socialLinkedin,
       social_website: socialWebsite,
       social_discord: socialDiscord,
+      pinned_repos: pinnedRepos,
+      profile_readme: profileReadme || null,
+      readme_source: readmeSource,
     })
     .eq("username", session.user.username);
 
-  if (error) return { error: "Kayit basarisiz: " + error.message };
+  if (error) return { error: "Kayıt başarısız: " + error.message };
 
-  // README source
-  const readmeSourceRaw = formData.get("readme_source") as string | null;
-  const readmeSource = readmeSourceRaw === "custom" ? "custom" : "github";
-
-  // Yeni kolonlar — migration yapilmamissa sessizce gec
+  // leaderboard_opt_in kolonu opsiyoneldir (eğer DB'de henüz kolon yoksa ana kaydı bozmaz)
   try {
     await supabaseAdmin
       .from("users")
-      .update({
-        pinned_repos: pinnedRepos,
-        profile_readme: profileReadme || null,
-        readme_source: readmeSource,
-        leaderboard_opt_in: leaderboardOptIn,
-      })
+      .update({ leaderboard_opt_in: leaderboardOptIn })
       .eq("username", session.user.username);
   } catch {
-    // Kolonlar henuz yok — sorun degil
+    // Kolon henüz yoksa sessizce geç
   }
 
   revalidatePath(`/u/${session.user.username}`);
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/settings");
   return { success: true };
 }
 

@@ -44,7 +44,7 @@ export default async function SettingsPage() {
   try {
     const { data: extra } = await supabaseAdmin
       .from("users")
-      .select("pinned_repos, profile_readme, github_readme, readme_source, leaderboard_opt_in")
+      .select("pinned_repos, profile_readme, github_readme, readme_source")
       .eq("id", user.id)
       .single();
     if (extra) {
@@ -52,11 +52,23 @@ export default async function SettingsPage() {
       profileReadmeDb = extra.profile_readme ?? null;
       githubReadmeDb = extra.github_readme ?? null;
       readmeSourceDb = extra.readme_source === "custom" ? "custom" : "github";
-      // Açıkça false yapılmışsa opt-out, NULL veya true ise opt-in
-      leaderboardOptInDb = extra.leaderboard_opt_in !== false;
     }
   } catch {
     // Kolonlar henuz yok
+  }
+
+  // leaderboard_opt_in opsiyoneldir — ayrı sorgula ki ana alanların yüklenmesini engellemesin
+  try {
+    const { data: lb } = await supabaseAdmin
+      .from("users")
+      .select("leaderboard_opt_in")
+      .eq("id", user.id)
+      .single();
+    if (lb && (lb as any).leaderboard_opt_in !== undefined) {
+      leaderboardOptInDb = (lb as any).leaderboard_opt_in !== false;
+    }
+  } catch {
+    // Kolon henüz yoksa varsayılan: true
   }
 
   const { data: repoRows } = await supabaseAdmin

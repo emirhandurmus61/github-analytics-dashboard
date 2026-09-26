@@ -500,17 +500,23 @@ export default function SettingsForm({
 
             {/* README içerik */}
             {selectedReadmeSource === "github" ? (
-              githubReadme ? (
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-500 font-mono leading-relaxed max-h-52 overflow-y-auto whitespace-pre-wrap">
-                  {githubReadme.slice(0, 500)}{githubReadme.length > 500 ? "…" : ""}
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-600">
-                  GitHub profilinde README bulunamadı.{" "}
-                  <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-500">{username}/{username}</code>{" "}
-                  reposunu oluşturup sync yap.
-                </p>
-              )
+              <div className="space-y-3">
+                {githubReadme ? (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-500 font-mono leading-relaxed max-h-52 overflow-y-auto whitespace-pre-wrap">
+                    {githubReadme.slice(0, 500)}{githubReadme.length > 500 ? "…" : ""}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+                    <p className="text-xs text-zinc-400">
+                      GitHub profilinde README bulunamadı veya henüz çekilmedi.{" "}
+                      <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">{username}/{username}</code>{" "}
+                      reposu oluşturulduğunda sync ile otomatik buraya gelecektir.
+                    </p>
+                  </div>
+                )}
+                {/* Özel README içeriğini kaybetmemek için gizli input ile koruyoruz */}
+                <input type="hidden" name="profile_readme" value={readme} />
+              </div>
             ) : (
               <ReadmeEditor
                 value={readme}

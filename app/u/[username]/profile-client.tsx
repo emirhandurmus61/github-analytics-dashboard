@@ -50,6 +50,7 @@ type ProfileProps = {
   avatarUrl: string | null;
   bio: string | null;
   profileReadme: string | null;
+  readmeSource?: "github" | "custom";
   currentlyWorkingOn: string | null;
   yearlyGoal: string | null;
   techTags: string[];
@@ -1061,10 +1062,12 @@ function ProfileReadme({
   content,
   username,
   isOwner,
+  source = "github",
 }: {
   content: string;
   username: string;
   isOwner?: boolean;
+  source?: "github" | "custom";
 }) {
   const theme = useThemeColors();
   const [copied, setCopied] = useState(false);
@@ -1093,9 +1096,22 @@ function ProfileReadme({
             <BookOpen className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-              Geliştirici Manifestosu
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-zinc-100">
+                Geliştirici Manifestosu
+              </h2>
+              {source === "github" ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-zinc-700/60 bg-zinc-800/80 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
+                  <FolderGit2 className="w-3 h-3 text-zinc-400" />
+                  GitHub README
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                  <Sparkles className="w-3 h-3 text-emerald-400" />
+                  Özel README
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-zinc-500">
               Kişisel README, teknik hedefler ve yazılım felsefesi
             </p>
@@ -1763,7 +1779,7 @@ function ProfileShareButtons({ username }: { username: string }) {
 export default function ProfileClient(props: ProfileProps) {
   const theme = useThemeColors();
   const {
-    username, userId, name, avatarUrl, bio, profileReadme,
+    username, userId, name, avatarUrl, bio, profileReadme, readmeSource,
     currentlyWorkingOn, yearlyGoal, techTags,
     stats, currentStreak, longestStreak,
     earnedBadges, pinnedRepos, topRepos,
@@ -2006,6 +2022,7 @@ export default function ProfileClient(props: ProfileProps) {
             content={profileReadme}
             username={username}
             isOwner={isOwner}
+            source={readmeSource}
           />
         ) : isOwner ? (
           <section className="animate-profile-slide-up" style={{ animationDelay: "500ms" }}>
