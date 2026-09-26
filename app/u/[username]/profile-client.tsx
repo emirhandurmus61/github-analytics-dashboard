@@ -3,17 +3,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
-import { useState, useEffect, useRef } from "react";
+import remarkGfm from "remark-gfm";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useThemeColors } from "@/components/theme-provider";
 import {
   Flame, Zap, Moon, Swords, Eraser, Globe, Rocket, Trophy,
   Star, GitFork, MapPin, Calendar, Activity, Code2, Target,
   Sparkles, Award, ChevronRight, Download, ExternalLink,
   BookOpen, Timer, TrendingUp, Layers, Hash, ArrowRight,
-  Link as LinkIcon, MessageCircle, Share2, Check,
+  Link as LinkIcon, MessageCircle, Share2, Check, Copy,
   Sunrise, Sun, Sunset, Clock, GitCommit, Shuffle,
   Compass, AlignLeft, Minus, Blend, FolderGit2, LayoutGrid, Map as MapIcon,
   UserPlus, UserCheck, Users,
+  Terminal, FileCode, Info, Lightbulb, AlertTriangle, AlertCircle, ShieldAlert,
+  Dna, CheckCircle2, ChevronDown, Pencil,
 } from "lucide-react";
 import type { Badge } from "@/lib/badges";
 import type { DeveloperDNA } from "@/lib/developer-dna";
@@ -317,99 +320,448 @@ function StatCard({
 
 /* ─── Developer DNA section ─── */
 
-const DNA_DIM_META: Record<string, { icon: React.ReactNode; color: string; score: number; desc: string }> = {
-  "Gece Kuşu":        { icon: <Moon className="w-3.5 h-3.5" />,       color: "#818cf8", score: 85, desc: "Gece yarısı–sabah 6 arası en verimli haldeydin. Sessiz saatlerde derine dalıyorsun." },
-  "Sabahçı":          { icon: <Sunrise className="w-3.5 h-3.5" />,    color: "#fb923c", score: 75, desc: "Sabah erken saatlerde en üretken dönemin başlıyor. Günü kodla açıyorsun." },
-  "Öğleden Sonracı":  { icon: <Sun className="w-3.5 h-3.5" />,        color: "#fbbf24", score: 60, desc: "Öğleden sonra ritme giriyorsun — toplantılar, planlama derken asıl iş başlıyor." },
-  "Akşamcı":          { icon: <Sunset className="w-3.5 h-3.5" />,     color: "#f97316", score: 70, desc: "Gün bittikten sonra gerçek verimlilik saatlerin başlıyor. Akşam commitlerin artıyor." },
-  "Her Saatte":       { icon: <Clock className="w-3.5 h-3.5" />,      color: "#94a3b8", score: 50, desc: "Gün boyunca dengeli dağılım — ihtiyaç duydukça, zamanı gelince kodluyorsun." },
-  "Küçük & Sık":      { icon: <GitCommit className="w-3.5 h-3.5" />,  color: "#34d399", score: 80, desc: "Sık ama küçük commitler atıyorsun. CI dostu, geri alması kolay, gözden geçirmesi rahat." },
-  "Büyük & Seyrek":   { icon: <Zap className="w-3.5 h-3.5" />,        color: "#60a5fa", score: 65, desc: "Az sayıda ama kapsamlı commit. Büyük özellikleri tamamlayıp tek seferde gönderiyorsun." },
-  "Patlama Yapan":    { icon: <TrendingUp className="w-3.5 h-3.5" />, color: "#f43f5e", score: 90, desc: "Kısa sürede çok commit — sprint veya hackathon tarzı yoğun çalışma dönemlerin var." },
-  "Dengeli":          { icon: <Shuffle className="w-3.5 h-3.5" />,    color: "#a78bfa", score: 55, desc: "Küçük ve büyük commit arasında doğal denge. Duruma göre adapte olan esnek bir stil." },
-  "Uzman":            { icon: <Code2 className="w-3.5 h-3.5" />,      color: "#22d3ee", score: 95, desc: "Tek dilde derin uzmanlık. Ekosistemi, idiomları ve en iyi pratikleri içselleştirdin." },
-  "Poliglot":         { icon: <Globe className="w-3.5 h-3.5" />,      color: "#4ade80", score: 85, desc: "5+ farklı dil kullanıyorsun. Geniş teknik bakış açısı ve yüksek adaptasyon kabiliyeti." },
-  "Geçiş Aşamasında": { icon: <Layers className="w-3.5 h-3.5" />,    color: "#fb923c", score: 60, desc: "Birincil dilinden yeniye geçiyorsun — aktif bir öğrenme ve dönüşüm sürecinin içindesin." },
-  "Keşifçi":          { icon: <Compass className="w-3.5 h-3.5" />,    color: "#f59e0b", score: 70, desc: "2–4 dil arasında dengeli dağılım. Birden fazla alanda yetkin olmayı tercih ediyorsun." },
-  "Konvansiyonalist": { icon: <AlignLeft className="w-3.5 h-3.5" />, color: "#a78bfa", score: 90, desc: "feat:, fix:, chore: gibi conventional commit formatını tutarlı kullanıyorsun. Changelog otomasyonu için ideal." },
-  "Minimalist":       { icon: <Minus className="w-3.5 h-3.5" />,      color: "#94a3b8", score: 40, desc: "Kısa ve öz mesajlar. Hızlısın ama geçmişe bakınca bağlam kaybolabiliyor." },
-  "Anlatıcı":         { icon: <BookOpen className="w-3.5 h-3.5" />,   color: "#34d399", score: 80, desc: "Ayrıntılı commit mesajları yazıyorsun. Neden'i de anlatan, ekip çalışmasına değer katan bir stil." },
-  "Karma":            { icon: <Blend className="w-3.5 h-3.5" />,      color: "#fbbf24", score: 60, desc: "Tutarlı bir format yok ama kasıtlı bir çeşitlilik de değil. Duruma göre şekillenen doğal akış." },
-  "Tek Proje":        { icon: <FolderGit2 className="w-3.5 h-3.5" />, color: "#22d3ee", score: 90, desc: "Commitlerinin büyük çoğunluğu tek projede. Derin odak ve süreklilik — monorepo dostu çalışma tarzı." },
-  "Çok Ön Yüz":       { icon: <LayoutGrid className="w-3.5 h-3.5" />, color: "#a78bfa", score: 70, desc: "2–5 repo arasında dengeli dağılım. Birden fazla projeyi aynı anda götürebilen, context-switch yapabilen birisin." },
+type DimMeta = {
+  icon: React.ReactNode;
+  color: string;
+  score: number;
+  badge: string;
+  desc: string;
+  superpower: string;
 };
 
-function DeveloperDNASection({ dna, accent, accentBorder }: {
+const DNA_DIM_META: Record<string, DimMeta> = {
+  "Gece Kuşu": {
+    icon: <Moon className="w-4 h-4" />,
+    color: "#818cf8",
+    score: 85,
+    badge: "22:00 – 06:00 Zirve",
+    desc: "Gece yarısı ve sabaha karşı en yüksek konsantrasyona ulaşıyorsun. Dış uyaranların kesildiği sessiz saatlerde derin mimari ve karmaşık kod bloklarına odaklanıyorsun.",
+    superpower: "Gürültüsüz saatlerde kesintisiz odaklanma ve yüksek kaliteli kod üretimi.",
+  },
+  "Sabahçı": {
+    icon: <Sunrise className="w-4 h-4" />,
+    color: "#fb923c",
+    score: 80,
+    badge: "06:00 – 12:00 Zirve",
+    desc: "Günü kod yazarak başlatıyor, zihnin en taze olduğu erken sabah saatlerinde en kritik teslimatlarını yapıyorsun.",
+    superpower: "Günün başında kritik görevleri tamamlayarak takıma erken ivme kazandırma.",
+  },
+  "Öğleden Sonracı": {
+    icon: <Sun className="w-4 h-4" />,
+    color: "#fbbf24",
+    score: 65,
+    badge: "12:00 – 17:00 Zirve",
+    desc: "Öğleden sonra doruk noktasına ulaşıyorsun. Sabah planlama ve toplantıları tamamlandıktan sonra asıl geliştirme ritmine giriyorsun.",
+    superpower: "Toplantı ve planlama sonrası taze kararlarla yüksek hacimli üretim.",
+  },
+  "Akşamcı": {
+    icon: <Sunset className="w-4 h-4" />,
+    color: "#f97316",
+    score: 75,
+    badge: "17:00 – 22:00 Zirve",
+    desc: "İş günü bittikten sonra gerçek üretkenliğin başlıyor. Akşam saatlerinde kesintisiz akış moduna girerek commit hacmini katlıyorsun.",
+    superpower: "Günün son saatlerinde biriken fikirleri hızlıca çalışan koda dönüştürme.",
+  },
+  "Her Saatte": {
+    icon: <Clock className="w-4 h-4" />,
+    color: "#94a3b8",
+    score: 55,
+    badge: "24 Saat Dengeli",
+    desc: "Commitlerin gün boyunca dengeli dağılmış. Belirli bir kalıba sıkışmadan, ihtiyaç duydukça ve problem olgunlaştıkça çözüm üretiyorsun.",
+    superpower: "Zaman kısıtlamalarından bağımsız, yüksek esneklik ve her an hazır olma.",
+  },
+
+  "Küçük & Sık": {
+    icon: <GitCommit className="w-4 h-4" />,
+    color: "#34d399",
+    score: 85,
+    badge: "CI/CD & PR Dostu",
+    desc: "Sık sık küçük ve anlamlı değişiklikler gönderiyorsun. CI/CD dostu, geri alması kolay ve ekip üyeleri için incelenmesi son derece rahat bir stil.",
+    superpower: "Düşük riskli deploymentlar, kolay merge süreçleri ve hızlı iterasyon.",
+  },
+  "Büyük & Seyrek": {
+    icon: <Zap className="w-4 h-4" />,
+    color: "#60a5fa",
+    score: 70,
+    badge: "Büyük Özellik Teslimatı",
+    desc: "Az sayıda ama kapsamlı commitler. Büyük özellikleri yerel ortamında eksiksiz tamamlayıp tek seferde sağlam adımlarla göndermeyi tercih ediyorsun.",
+    superpower: "Bütünsel düşünme, kapsamlı mimari değişiklikleri tek hamlede bitirme.",
+  },
+  "Patlama Yapan": {
+    icon: <TrendingUp className="w-4 h-4" />,
+    color: "#f43f5e",
+    score: 90,
+    badge: "Sprint & Hackathon",
+    desc: "Kısa sürede çok yüksek sayıda commit: sprint veya hackathon tarzı yoğun çalışma. Enerjini biriktirip yüksek yoğunluklu teslimat patlamaları yapıyorsun.",
+    superpower: "Kritik teslim tarihlerinde ve kriz anlarında devasa çıktı üretme gücü.",
+  },
+  "Dengeli": {
+    icon: <Shuffle className="w-4 h-4" />,
+    color: "#a78bfa",
+    score: 60,
+    badge: "Esnek Ritim",
+    desc: "Küçük düzeltmeler ile büyük modüller arasında doğal bir denge. Görevin kapsamına göre esneyebilen, pragmatik bir teslimat stili.",
+    superpower: "Farklı görev gereksinimlerine hızla adapte olabilen çok yönlü ritim.",
+  },
+
+  "Uzman": {
+    icon: <Code2 className="w-4 h-4" />,
+    color: "#22d3ee",
+    score: 95,
+    badge: "Derin Uzmanlık",
+    desc: "Tek bir birincil dilde derin uzmanlık. Dilin ekosistemini, tasarım kalıplarını, idiomlarını ve performans inceliklerini içselleştirmişsin.",
+    superpower: "Karmaşık dil dinamiklerinde ve mimari kararlarda referans mühendis rolü.",
+  },
+  "Poliglot": {
+    icon: <Globe className="w-4 h-4" />,
+    color: "#4ade80",
+    score: 88,
+    badge: "5+ Çoklu Dil",
+    desc: "Birden fazla farklı dili aktif olarak kullanıyorsun. Yeni teknolojilere hızlı adaptasyon, geniş teknik bakış açısı ve platform bağımsız vizyon.",
+    superpower: "Farklı dil paradigmalarını (fonksiyonel, OOP, sistem) birleştirme ustalığı.",
+  },
+  "Geçiş Aşamasında": {
+    icon: <Layers className="w-4 h-4" />,
+    color: "#fb923c",
+    score: 65,
+    badge: "Aktif Dönüşüm",
+    desc: "Birincil dilinden yeni bir teknoloji yığınına geçiş yapıyorsun. Sürekli öğrenme, dönüşüm ve kendini yenileme sürecindesin.",
+    superpower: "Eski alışkanlıkları yeni paradigmalarla harmanlayarak hızla büyüme.",
+  },
+  "Keşifçi": {
+    icon: <Compass className="w-4 h-4" />,
+    color: "#f59e0b",
+    score: 72,
+    badge: "Teknoloji Kaşifi",
+    desc: "Farklı diller ve projeler arasında dengeli dağılım. Teknoloji dünyasındaki yenilikleri denemekten ve çok yönlü araçlar geliştirmekten keyif alıyorsun.",
+    superpower: "Doğru iş için doğru aracı seçebilen geniş vizyon ve cesur denemeler.",
+  },
+
+  "Konvansiyonalist": {
+    icon: <AlignLeft className="w-4 h-4" />,
+    color: "#a78bfa",
+    score: 92,
+    badge: "Conventional Commits",
+    desc: "feat:, fix:, chore:, refactor: gibi semantik commit standartlarını titizlikle uyguluyorsun. Otomatik changelog ve sürümleme için mükemmel.",
+    superpower: "Ekip standartlarına kusursuz uyum ve otomatik sürümleme altyapısı.",
+  },
+  "Minimalist": {
+    icon: <Minus className="w-4 h-4" />,
+    color: "#94a3b8",
+    score: 45,
+    badge: "Kısa & Öz Mesajlar",
+    desc: "Kısa ve doğrudan mesajlar yazıyorsun. Kodun kendisini konuşturmayı tercih eden, hıza ve pratikliğe odaklı bir yaklaşım.",
+    superpower: "Bürokrasiden uzak, hızlı ve pragmatik geliştirme döngüsü.",
+  },
+  "Anlatıcı": {
+    icon: <BookOpen className="w-4 h-4" />,
+    color: "#34d399",
+    score: 85,
+    badge: "Ayrıntılı Dokümantasyon",
+    desc: "Sadece ne yapıldığını değil, 'neden' yapıldığını da anlatan ayrıntılı commit mesajları. Gelecekteki geliştiriciler ve kod arkeolojisi için altın değerinde.",
+    superpower: "Kod geçmişini yaşayan bir dokümantasyona dönüştürerek bilgi kaybını önleme.",
+  },
+  "Karma": {
+    icon: <Blend className="w-4 h-4" />,
+    color: "#fbbf24",
+    score: 62,
+    badge: "Doğal Akış",
+    desc: "Katı kalıplara bağlı kalmadan duruma göre şekillenen doğal bir mesaj akışı. Acil durumlarda hızlı, kritik yerlerde açıklayıcı.",
+    superpower: "Durumun ciddiyetine ve ihtiyacına göre serbestçe şekil alan esneklik.",
+  },
+
+  "Tek Proje": {
+    icon: <FolderGit2 className="w-4 h-4" />,
+    color: "#22d3ee",
+    score: 90,
+    badge: "Derin Odaklanma",
+    desc: "Commitlerinin büyük çoğunluğu ana projende toplanıyor. Monorepo dostu, yüksek süreklilik ve derin ürün sahiplenmesi göstergesi.",
+    superpower: "Ürünü baştan sona avucunun içi gibi bilme ve derin konsantrasyon.",
+  },
+  "Çok Ön Yüz": {
+    icon: <LayoutGrid className="w-4 h-4" />,
+    color: "#a78bfa",
+    score: 75,
+    badge: "Multi-Repo Yönetimi",
+    desc: "2-5 farklı repo arasında dengeli dağılım. Birden fazla mikroservisi veya kütüphaneyi eşzamanlı yürütebilen, yüksek context-switch kapasitesi.",
+    superpower: "Bölünmüş sistemlerde ve çoklu projelerde yüksek koordinasyon yeteneği.",
+  },
+};
+
+function DeveloperDNASection({
+  dna,
+  accent,
+  accentBorder,
+  username,
+}: {
   dna: import("@/lib/developer-dna").DeveloperDNA;
   accent: string;
   accentBorder: string;
+  username: string;
 }) {
+  const [selectedDim, setSelectedDim] = useState<number>(0);
+  const [copied, setCopied] = useState(false);
+
   const dims = [
-    { label: "Çalışma Zamanı", value: dna.workTime },
-    { label: "Commit Ritmi",   value: dna.commitRhythm },
-    { label: "Dil Profili",    value: dna.langProfile },
-    { label: "Mesaj Stili",    value: dna.msgQuality },
-    { label: "Odak Stili",     value: dna.focusStyle },
+    { label: "Çalışma Zamanı", key: "workTime", value: dna.workTime },
+    { label: "Commit Ritmi", key: "commitRhythm", value: dna.commitRhythm },
+    { label: "Dil Profili", key: "langProfile", value: dna.langProfile },
+    { label: "Mesaj Stili", key: "msgQuality", value: dna.msgQuality },
+    { label: "Odak Stili", key: "focusStyle", value: dna.focusStyle },
   ];
 
+  const currentMeta = DNA_DIM_META[dims[selectedDim].value] ?? {
+    icon: <Code2 className="w-4 h-4" />,
+    color: accent,
+    score: 70,
+    badge: "Özel Profil",
+    desc: "",
+    superpower: "",
+  };
+
+  const handleShare = () => {
+    const text = `${username} · Developer DNA: ${dna.developerType} (%${dna.confidence} Doğruluk)`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   return (
-    <div
-      className="rounded-2xl border overflow-hidden"
-      style={{ borderColor: accentBorder }}
-    >
-      {/* Üst banner — developer type */}
-      <div
-        className="px-5 py-4 flex items-center gap-3"
-        style={{ background: `linear-gradient(135deg, ${accent}15 0%, ${accent}06 100%)`, borderBottom: `1px solid ${accentBorder}` }}
-      >
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0"
-          style={{ backgroundColor: `${accent}20`, color: accent, boxShadow: `0 0 14px ${accent}25` }}
-        >
-          <MapIcon className="w-4 h-4" />
+    <section className="animate-profile-slide-up space-y-4" style={{ animationDelay: "550ms" }}>
+      {/* Bölüm Başlığı */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ backgroundColor: `${accent}15`, color: accent }}
+          >
+            <Dna className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+              Developer DNA & Mühendislik Karakteri
+            </h2>
+            <p className="text-[11px] text-zinc-500">
+              Git geçmişi, saat dağılımı ve teslimat ritminin yapay zeka analizi
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Geliştirici Tipi</p>
-          <p className="text-sm font-bold mt-0.5" style={{ color: accent }}>{dna.developerType}</p>
+
+        <button
+          onClick={handleShare}
+          type="button"
+          className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3 h-3 text-emerald-400" />
+              <span className="text-emerald-400 font-medium">DNA Kopyalandı</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="w-3 h-3 text-zinc-400" />
+              <span>DNA Paylaş</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Hero Archetype Banner */}
+      <div
+        className="relative rounded-2xl border p-6 overflow-hidden transition-all duration-300"
+        style={{
+          borderColor: accentBorder,
+          background: `radial-gradient(ellipse at 15% 0%, ${accent}20 0%, transparent 60%), linear-gradient(145deg, rgba(24,24,27,0.85) 0%, rgba(9,9,11,0.95) 100%)`,
+          boxShadow: `0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)`,
+        }}
+      >
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="flex items-start gap-4">
+            {/* Glowing avatar icon */}
+            <div
+              className="relative flex h-14 w-14 items-center justify-center rounded-2xl shrink-0"
+              style={{
+                backgroundColor: `${accent}18`,
+                color: accent,
+                border: `1px solid ${accent}35`,
+                boxShadow: `0 0 24px ${accent}30`,
+              }}
+            >
+              <Dna className="w-7 h-7" />
+              <div
+                className="absolute inset-0 rounded-2xl animate-pulse opacity-40"
+                style={{ boxShadow: `0 0 16px ${accent}` }}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                  Geliştirici Arketipi
+                </span>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                  style={{ backgroundColor: `${accent}15`, color: accent, border: `1px solid ${accent}30` }}
+                >
+                  Yapay Zeka Analizi
+                </span>
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                {dna.developerType}
+              </h3>
+
+              <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                Bu profil; derin odaklanma dönemlerinde yüksek verimle çalışan, sürdürülebilir mimariyi ve sürekli teslimat ritmini benimsemiş bir yazılım mühendisini temsil eder.
+              </p>
+
+              {/* Trait pills */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {dims.map((d) => {
+                  const m = DNA_DIM_META[d.value];
+                  return (
+                    <span
+                      key={d.label}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium border"
+                      style={{
+                        borderColor: m ? `${m.color}25` : "#27272a",
+                        backgroundColor: m ? `${m.color}08` : "transparent",
+                        color: m ? m.color : "#a1a1aa",
+                      }}
+                    >
+                      {m?.icon}
+                      <span>{d.value}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Confidence pill */}
+          <div className="shrink-0 flex flex-col items-start lg:items-end gap-1.5 bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3.5 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-bold text-zinc-200">
+                %{dna.confidence} Analiz Doğruluğu
+              </span>
+            </div>
+            <p className="text-[10px] text-zinc-500">
+              Son 365 günlük Git geçmişine dayanır
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* 5 boyut grid */}
-      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-        {dims.map(({ label, value }) => {
-          const meta = DNA_DIM_META[value] ?? { icon: <Code2 className="w-3.5 h-3.5" />, color: "#6b7280", score: 50, desc: "" };
+      {/* 5 Boyut Kartları */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {dims.map(({ label, value }, idx) => {
+          const meta = DNA_DIM_META[value] ?? {
+            icon: <Code2 className="w-4 h-4" />,
+            color: "#6b7280",
+            score: 50,
+            badge: "Standart",
+            desc: "",
+            superpower: "",
+          };
+          const isSelected = selectedDim === idx;
+
           return (
-            <div
+            <button
               key={label}
-              title={meta.desc}
-              className="rounded-xl border p-3 flex flex-col gap-2 cursor-default group transition-all hover:scale-[1.02]"
-              style={{ borderColor: `${meta.color}25`, backgroundColor: `${meta.color}06` }}
+              type="button"
+              onClick={() => setSelectedDim(idx)}
+              className="group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-200 hover:scale-[1.01]"
+              style={{
+                borderColor: isSelected ? meta.color : `${meta.color}30`,
+                backgroundColor: isSelected ? `${meta.color}12` : "rgba(24,24,27,0.6)",
+                boxShadow: isSelected ? `0 0 20px ${meta.color}20` : "none",
+              }}
             >
-              <div className="flex items-center gap-2">
-                <div
-                  className="flex h-6 w-6 items-center justify-center rounded-lg shrink-0"
-                  style={{ backgroundColor: `${meta.color}18`, color: meta.color }}
-                >
-                  {meta.icon}
+              <div>
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="flex h-6 w-6 items-center justify-center rounded-lg"
+                      style={{ backgroundColor: `${meta.color}20`, color: meta.color }}
+                    >
+                      {meta.icon}
+                    </div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                      {label}
+                    </span>
+                  </div>
+
+                  <span
+                    className="rounded-full px-1.5 py-0.5 text-[8px] font-bold tracking-wide uppercase"
+                    style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
+                  >
+                    {meta.badge}
+                  </span>
                 </div>
-                <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wide">{label}</span>
+
+                {/* Trait Value */}
+                <h4
+                  className="text-sm font-bold mt-1 tracking-tight"
+                  style={{ color: meta.color }}
+                >
+                  {value}
+                </h4>
+
+                {/* Progress Intensity bar */}
+                <div className="my-2.5 h-1 w-full rounded-full bg-zinc-800/80 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${meta.score}%`,
+                      background: `linear-gradient(90deg, ${meta.color}60, ${meta.color})`,
+                    }}
+                  />
+                </div>
+
+                {/* Description */}
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  {meta.desc}
+                </p>
               </div>
-              <p className="text-xs font-semibold leading-tight" style={{ color: meta.color }}>{value}</p>
-              <div className="h-0.5 w-full rounded-full bg-zinc-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${meta.score}%`, background: `linear-gradient(90deg, ${meta.color}60, ${meta.color})` }}
-                />
+
+              <div className="mt-3 pt-2 border-t border-zinc-800/60 flex items-center justify-between text-[10px]">
+                <span className="text-zinc-500">Mühendislik Etkisi</span>
+                <span className="font-semibold" style={{ color: meta.color }}>
+                  Detay →
+                </span>
               </div>
-              {/* Tooltip benzeri açıklama hover'da */}
-              <p className="text-[10px] text-zinc-600 leading-tight line-clamp-2 group-hover:text-zinc-500 transition-colors">
-                {meta.desc}
-              </p>
-            </div>
+            </button>
           );
         })}
       </div>
-    </div>
+
+      {/* Seçilen Boyutun Süper Gücü & Takım Avantajı */}
+      <div
+        className="rounded-xl border p-4 flex items-start gap-3 transition-all duration-300"
+        style={{
+          borderColor: `${currentMeta.color}35`,
+          backgroundColor: `${currentMeta.color}08`,
+        }}
+      >
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-lg shrink-0 mt-0.5"
+          style={{ backgroundColor: `${currentMeta.color}20`, color: currentMeta.color }}
+        >
+          <Sparkles className="w-4 h-4" />
+        </div>
+        <div className="space-y-0.5">
+          <p className="text-xs font-bold" style={{ color: currentMeta.color }}>
+            {dims[selectedDim].label}: {dims[selectedDim].value} — Süper Güç & Ekip Avantajı
+          </p>
+          <p className="text-xs text-zinc-300 leading-relaxed">
+            {currentMeta.superpower}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -451,7 +803,7 @@ function BadgeCard({ badge, index }: { badge: Badge; index: number }) {
   );
 }
 
-/* ─── Repo card (premium) ─── */
+/* ─── Repo card (premium showcase) ─── */
 
 function RepoCard({ repo, pinned, index = 0 }: { repo: RepoData; pinned?: boolean; index?: number }) {
   const theme = useThemeColors();
@@ -462,124 +814,750 @@ function RepoCard({ repo, pinned, index = 0 }: { repo: RepoData; pinned?: boolea
       href={`https://github.com/${repo.full_name}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="animate-profile-slide-up group rounded-xl border p-4 flex flex-col gap-3 transition-all hover:scale-[1.02] relative overflow-hidden"
+      className="group relative flex flex-col justify-between rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] overflow-hidden"
       style={{
         animationDelay: `${index * 60 + 200}ms`,
-        borderColor: pinned ? `${theme.accent}30` : "rgba(39,39,42,0.4)",
+        borderColor: pinned ? `${theme.accent}35` : "rgba(39,39,42,0.6)",
         background: pinned
           ? `linear-gradient(145deg, ${theme.accentBg} 0%, rgba(9,9,11,0.95) 100%)`
-          : "linear-gradient(145deg, rgba(24,24,27,0.6) 0%, rgba(9,9,11,0.8) 100%)",
+          : "linear-gradient(145deg, rgba(24,24,27,0.7) 0%, rgba(9,9,11,0.9) 100%)",
+        boxShadow: pinned ? `0 4px 20px ${theme.accent}12` : "none",
       }}
     >
       {/* Hover glow */}
       <div
-        className="absolute -top-12 -right-12 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-3xl"
+        className="absolute -top-12 -right-12 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-3xl pointer-events-none"
         style={{ backgroundColor: langColor ?? theme.accent }}
       />
 
-      <div className="flex items-center gap-2 min-w-0 relative z-10">
-        {pinned && <MapPin className="w-3 h-3 shrink-0" style={{ color: theme.accent }} />}
-        {langColor && <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: langColor }} />}
-        <span className="text-sm font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">{repo.name}</span>
-        <ExternalLink className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors ml-auto shrink-0" />
+      <div className="space-y-2 relative z-10">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            {pinned ? (
+              <FolderGit2 className="w-4 h-4 shrink-0" style={{ color: theme.accent }} />
+            ) : (
+              <GitFork className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
+            )}
+            <span className="text-sm font-bold text-zinc-100 truncate group-hover:text-white transition-colors">
+              {repo.name}
+            </span>
+          </div>
+          <ExternalLink className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0" />
+        </div>
+
+        {repo.description ? (
+          <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2">
+            {repo.description}
+          </p>
+        ) : (
+          <p className="text-xs text-zinc-600 italic">Açıklama bulunmuyor.</p>
+        )}
       </div>
-      {repo.description && (
-        <p className="text-[11px] text-zinc-500 leading-relaxed line-clamp-2 relative z-10">{repo.description}</p>
-      )}
-      <div className="flex items-center gap-4 text-xs text-zinc-600 relative z-10">
-        <span className="flex items-center gap-1">
-          <Star className="w-3 h-3" />
-          {repo.stars}
+
+      <div className="mt-3 pt-2.5 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500 relative z-10">
+        <div className="flex items-center gap-3">
+          {repo.language && (
+            <span className="flex items-center gap-1.5 font-medium text-zinc-400">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: langColor ?? "#71717a" }}
+              />
+              {repo.language}
+            </span>
+          )}
+          <span className="flex items-center gap-1 hover:text-amber-400 transition-colors">
+            <Star className="w-3.5 h-3.5 text-amber-500/80" />
+            <span>{repo.stars}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <GitFork className="w-3.5 h-3.5 text-zinc-500" />
+            <span>{repo.forks}</span>
+          </span>
+        </div>
+
+        <span className="text-[11px] font-medium opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: theme.accent }}>
+          İncele →
         </span>
-        <span className="flex items-center gap-1">
-          <GitFork className="w-3 h-3" />
-          {repo.forks}
-        </span>
-        {repo.language && <span className="text-zinc-500">{repo.language}</span>}
       </div>
     </a>
   );
 }
 
-/* ─── Markdown README renderer ─── */
+/* ─── Markdown Alert / Callout Parser ─── */
 
-function ProfileReadme({ content }: { content: string }) {
-  const theme = useThemeColors();
+const ALERT_CONFIG: Record<string, {
+  label: string;
+  icon: React.ReactNode;
+  border: string;
+  bg: string;
+  text: string;
+  titleColor: string;
+}> = {
+  NOTE: {
+    label: "NOTE",
+    icon: <Info className="w-4 h-4 text-sky-400 shrink-0" />,
+    border: "border-sky-500/40",
+    bg: "bg-sky-500/[0.07]",
+    text: "text-sky-200",
+    titleColor: "text-sky-400",
+  },
+  TIP: {
+    label: "TIP",
+    icon: <Lightbulb className="w-4 h-4 text-emerald-400 shrink-0" />,
+    border: "border-emerald-500/40",
+    bg: "bg-emerald-500/[0.07]",
+    text: "text-emerald-200",
+    titleColor: "text-emerald-400",
+  },
+  IMPORTANT: {
+    label: "IMPORTANT",
+    icon: <AlertCircle className="w-4 h-4 text-purple-400 shrink-0" />,
+    border: "border-purple-500/40",
+    bg: "bg-purple-500/[0.07]",
+    text: "text-purple-200",
+    titleColor: "text-purple-400",
+  },
+  WARNING: {
+    label: "WARNING",
+    icon: <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />,
+    border: "border-amber-500/40",
+    bg: "bg-amber-500/[0.07]",
+    text: "text-amber-200",
+    titleColor: "text-amber-400",
+  },
+  CAUTION: {
+    label: "CAUTION",
+    icon: <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />,
+    border: "border-rose-500/40",
+    bg: "bg-rose-500/[0.07]",
+    text: "text-rose-200",
+    titleColor: "text-rose-400",
+  },
+};
+
+function renderBlockquote(children: React.ReactNode, themeAccent: string) {
+  const arr = React.Children.toArray(children);
+  if (arr.length > 0) {
+    const firstChild = arr[0];
+    if (React.isValidElement(firstChild) && (firstChild.props as { children?: React.ReactNode })?.children) {
+      const pChildren = React.Children.toArray((firstChild.props as { children?: React.ReactNode }).children);
+      const firstText = typeof pChildren[0] === "string" ? pChildren[0] : "";
+      const match = firstText.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:\s*\n|\s+)?(.*)/i);
+
+      if (match) {
+        const type = match[1].toUpperCase();
+        const alert = ALERT_CONFIG[type] ?? ALERT_CONFIG.NOTE;
+        const inlineAfter = match[2];
+
+        const newPChildren = [
+          inlineAfter ? inlineAfter : null,
+          ...pChildren.slice(1),
+        ].filter(Boolean);
+
+        const newFirstChild = React.cloneElement(
+          firstChild as React.ReactElement<{ children?: React.ReactNode }>,
+          {
+            children:
+              newPChildren.length === 1 && typeof newPChildren[0] === "string"
+                ? newPChildren[0]
+                : newPChildren,
+          }
+        );
+
+        return (
+          <div className={`my-4 rounded-xl border-l-4 p-4 ${alert.border} ${alert.bg} shadow-sm backdrop-blur-sm`}>
+            <div className="flex items-center gap-2 mb-2 font-bold tracking-wider text-xs">
+              {alert.icon}
+              <span className={alert.titleColor}>{alert.label}</span>
+            </div>
+            <div className="text-zinc-300 leading-relaxed text-xs sm:text-sm pl-6 space-y-2">
+              {newPChildren.length > 0 && newFirstChild}
+              {arr.slice(1)}
+            </div>
+          </div>
+        );
+      }
+    }
+  }
 
   return (
-    <div className="animate-profile-slide-up rounded-2xl border border-zinc-800/40 relative overflow-hidden"
-      style={{ background: "linear-gradient(145deg, rgba(24,24,27,0.6) 0%, rgba(9,9,11,0.8) 100%)" }}
+    <blockquote
+      className="border-l-4 pl-4 pr-3 py-1.5 my-4 italic rounded-r-xl"
+      style={{
+        borderColor: themeAccent,
+        backgroundColor: `${themeAccent}08`,
+        color: "#d4d4d8",
+      }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-zinc-800/40">
-        <BookOpen className="w-3.5 h-3.5 text-zinc-500" />
-        <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest">README</span>
+      {children}
+    </blockquote>
+  );
+}
+
+/* ─── Code Block with Copy ─── */
+
+function CodeBlock({ children, className }: { children: React.ReactNode; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const langMatch = /language-(\w+)/.exec(className || "");
+  const lang = langMatch ? langMatch[1] : "";
+
+  const extractText = (node: React.ReactNode): string => {
+    if (typeof node === "string") return node;
+    if (typeof node === "number") return String(node);
+    if (Array.isArray(node)) return node.map(extractText).join("");
+    if (React.isValidElement(node) && (node.props as { children?: React.ReactNode })?.children) {
+      return extractText((node.props as { children?: React.ReactNode }).children);
+    }
+    return "";
+  };
+
+  const codeText = extractText(children).replace(/\n$/, "");
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="relative my-4 rounded-xl border border-zinc-800/90 bg-[#0d0d10] overflow-hidden group shadow-lg">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/70 bg-zinc-900/60 text-xs select-none">
+        <div className="flex items-center gap-2">
+          <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+          <span className="font-mono text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+            {lang || "code"}
+          </span>
+        </div>
+        <button
+          onClick={handleCopy}
+          type="button"
+          title="Kodu Kopyala"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3 h-3 text-emerald-400" />
+              <span className="text-emerald-400 font-medium">Kopyalandı</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3 h-3 text-zinc-500" />
+              <span>Kopyala</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="p-4 overflow-x-auto custom-scroll text-xs sm:text-[13px] font-mono leading-relaxed text-zinc-200">
+        <code>{children}</code>
+      </pre>
+    </div>
+  );
+}
+
+/* ─── Markdown README renderer ─── */
+
+function ProfileReadme({
+  content,
+  username,
+  isOwner,
+}: {
+  content: string;
+  username: string;
+  isOwner?: boolean;
+}) {
+  const theme = useThemeColors();
+  const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const words = useMemo(() => content.trim().split(/\s+/).length, [content]);
+  const readingTime = useMemo(() => Math.max(1, Math.ceil(words / 180)), [words]);
+  const isLong = content.length > 1200;
+
+  const handleCopyRaw = () => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <section className="animate-profile-slide-up space-y-2.5" style={{ animationDelay: "500ms" }}>
+      {/* Bölüm Başlığı */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ backgroundColor: `${theme.accent}15`, color: theme.accent }}
+          >
+            <BookOpen className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+              Geliştirici Manifestosu
+            </h2>
+            <p className="text-[11px] text-zinc-500">
+              Kişisel README, teknik hedefler ve yazılım felsefesi
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isOwner && (
+            <Link
+              href="/dashboard/settings#profil-sayfasi"
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+            >
+              <Pencil className="w-3 h-3" />
+              <span>README Düzenle</span>
+            </Link>
+          )}
+
+          <button
+            onClick={handleCopyRaw}
+            type="button"
+            title="Ham Markdown Metnini Kopyala"
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-400" />
+                <span className="text-emerald-400 font-medium">Kopyalandı</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span>Markdown Kopyala</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Markdown content */}
-      <div className="px-5 py-4 prose-profile">
-        <ReactMarkdown
-          components={{
-            h1: ({ children }) => <h1 className="text-xl font-bold text-zinc-100 mb-3 mt-4 first:mt-0">{children}</h1>,
-            h2: ({ children }) => <h2 className="text-lg font-bold text-zinc-200 mb-2 mt-4">{children}</h2>,
-            h3: ({ children }) => <h3 className="text-base font-semibold text-zinc-300 mb-2 mt-3">{children}</h3>,
-            p: ({ children }) => <p className="text-sm text-zinc-400 leading-relaxed mb-3">{children}</p>,
-            ul: ({ children }) => <ul className="text-sm text-zinc-400 space-y-1.5 mb-3 list-none pl-0">{children}</ul>,
-            ol: ({ children }) => <ol className="text-sm text-zinc-400 space-y-1.5 mb-3 list-decimal pl-5">{children}</ol>,
-            li: ({ children }) => (
-              <li className="flex items-start gap-2">
-                <ChevronRight className="w-3 h-3 shrink-0 mt-1" style={{ color: theme.accent }} />
-                <span>{children}</span>
-              </li>
-            ),
-            strong: ({ children }) => <strong className="font-semibold text-zinc-200">{children}</strong>,
-            em: ({ children }) => <em className="text-zinc-300 italic">{children}</em>,
-            code: ({ children, className }) => {
-              const isBlock = className?.includes("language-");
-              if (isBlock) {
-                return (
-                  <code className="block rounded-lg bg-zinc-900 border border-zinc-800/60 px-4 py-3 text-xs text-zinc-300 font-mono overflow-x-auto mb-3">
+      {/* Editor / Terminal Card Container */}
+      <div
+        className="rounded-2xl border border-zinc-800/80 bg-zinc-950/70 overflow-hidden shadow-2xl backdrop-blur-md"
+        style={{
+          boxShadow: `0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)`,
+        }}
+      >
+        {/* macOS / Editor Chrome Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/60 select-none">
+          <div className="flex items-center gap-3">
+            {/* Window control dots */}
+            <div className="flex items-center gap-1.5">
+              <div className="h-2.5 w-2.5 rounded-full bg-rose-500/80" />
+              <div className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
+              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
+            </div>
+
+            {/* Tab pill */}
+            <div className="flex items-center gap-1.5 rounded-md bg-zinc-800/60 px-2.5 py-1 border border-zinc-700/50">
+              <FileCode className="w-3 h-3 text-zinc-400" />
+              <span className="text-xs font-mono font-medium text-zinc-200">
+                README.md
+              </span>
+              <span
+                className="text-[9px] font-bold uppercase tracking-wider rounded px-1"
+                style={{ backgroundColor: `${theme.accent}18`, color: theme.accent }}
+              >
+                MD
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono">
+            <span>{words} kelime</span>
+            <span>·</span>
+            <span>~{readingTime} dk okuma</span>
+          </div>
+        </div>
+
+        {/* Markdown Render Area */}
+        <div className="relative">
+          <div
+            className={`p-6 sm:p-8 prose-profile transition-all duration-300 ${
+              isLong && !isExpanded ? "max-h-[500px] overflow-hidden" : ""
+            }`}
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                h1: ({ children }) => (
+                  <h1 className="text-2xl font-black text-white mt-6 mb-3 pb-2 border-b border-zinc-800 flex items-center gap-2 first:mt-0">
                     {children}
-                  </code>
-                );
-              }
-              return (
-                <code
-                  className="rounded-md px-1.5 py-0.5 text-xs font-mono"
-                  style={{ backgroundColor: `${theme.accent}12`, color: theme.accent }}
-                >
-                  {children}
-                </code>
-              );
-            },
-            pre: ({ children }) => <div className="mb-3">{children}</div>,
-            a: ({ children, href }) => (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 transition-colors" style={{ color: theme.accent }}>
-                {children}
-              </a>
-            ),
-            blockquote: ({ children }) => (
-              <blockquote className="border-l-2 pl-4 my-3 italic" style={{ borderColor: theme.accent, color: "#a1a1aa" }}>
-                {children}
-              </blockquote>
-            ),
-            img: ({ src, alt }) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={src ?? ""}
-                alt={alt ?? ""}
-                loading="lazy"
-                className="rounded-lg max-w-full h-auto my-3 border border-zinc-800/30"
-                style={{ maxHeight: 400 }}
-              />
-            ),
-            hr: () => <hr className="border-zinc-800/40 my-4" />,
-          }}
-        >
-          {content}
-        </ReactMarkdown>
+                  </h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="text-xl font-bold text-zinc-100 mt-6 mb-2.5 flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.accent }} />
+                    {children}
+                  </h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="text-base font-semibold text-zinc-200 mt-4 mb-2">
+                    {children}
+                  </h3>
+                ),
+                p: ({ children }) => (
+                  <p className="text-sm sm:text-[14px] text-zinc-300 leading-relaxed mb-3.5">
+                    {children}
+                  </p>
+                ),
+                ul: ({ children }) => (
+                  <ul className="text-sm text-zinc-300 space-y-1.5 mb-4 list-disc pl-5">
+                    {children}
+                  </ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="text-sm text-zinc-300 space-y-1.5 mb-4 list-decimal pl-5">
+                    {children}
+                  </ol>
+                ),
+                li: ({ children }) => (
+                  <li className="leading-relaxed pl-1 marker:text-zinc-500">
+                    {children}
+                  </li>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-bold text-zinc-100">{children}</strong>
+                ),
+                em: ({ children }) => (
+                  <em className="text-zinc-200 italic">{children}</em>
+                ),
+                pre: ({ children }) => <div className="not-prose my-3">{children}</div>,
+                code: ({ className, children }) => {
+                  const match = /language-(\w+)/.exec(className || "");
+                  const isBlock = Boolean(match) || (typeof children === "string" && children.includes("\n"));
+
+                  if (isBlock) {
+                    return <CodeBlock className={className}>{children}</CodeBlock>;
+                  }
+                  return (
+                    <code
+                      className="rounded-md px-1.5 py-0.5 text-xs font-mono font-medium border border-zinc-700/50 bg-zinc-800/80 text-zinc-200"
+                      style={{ color: theme.accent }}
+                    >
+                      {children}
+                    </code>
+                  );
+                },
+                a: ({ children, href }) => (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 underline underline-offset-4 font-medium transition-colors hover:opacity-80"
+                    style={{ color: theme.accent }}
+                  >
+                    <span>{children}</span>
+                    <ExternalLink className="w-2.5 h-2.5 ml-0.5 opacity-70" />
+                  </a>
+                ),
+                blockquote: ({ children }) => renderBlockquote(children, theme.accent),
+                table: ({ children }) => (
+                  <div className="my-4 w-full overflow-x-auto rounded-xl border border-zinc-800/80 bg-zinc-950/70 custom-scroll shadow-md">
+                    <table className="w-full text-left text-xs border-collapse">
+                      {children}
+                    </table>
+                  </div>
+                ),
+                thead: ({ children }) => (
+                  <thead className="bg-zinc-900/90 text-zinc-300 font-semibold border-b border-zinc-800 uppercase text-[11px] tracking-wider">
+                    {children}
+                  </thead>
+                ),
+                th: ({ children }) => (
+                  <th className="px-4 py-3 font-semibold text-zinc-200 border-b border-zinc-800">
+                    {children}
+                  </th>
+                ),
+                td: ({ children }) => (
+                  <td className="px-4 py-2.5 border-b border-zinc-800/40 text-zinc-300">
+                    {children}
+                  </td>
+                ),
+                tr: ({ children }) => (
+                  <tr className="hover:bg-zinc-800/25 transition-colors border-b border-zinc-800/30 last:border-b-0">
+                    {children}
+                  </tr>
+                ),
+                input: ({ type, checked }) => {
+                  if (type === "checkbox") {
+                    return (
+                      <span className="inline-flex items-center justify-center mr-2 align-middle">
+                        {checked ? (
+                          <span className="flex h-4 w-4 items-center justify-center rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold">
+                            ✓
+                          </span>
+                        ) : (
+                          <span className="h-4 w-4 rounded border border-zinc-700 bg-zinc-800/50" />
+                        )}
+                      </span>
+                    );
+                  }
+                  return <input type={type} />;
+                },
+                img: ({ src, alt }) => {
+                  const isBadge =
+                    typeof src === "string" &&
+                    (src.includes("shields.io") ||
+                      src.includes("badge") ||
+                      src.includes("badgen.net") ||
+                      src.includes("/api/badge"));
+
+                  if (isBadge) {
+                    return (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={src ?? ""}
+                        alt={alt ?? ""}
+                        loading="lazy"
+                        className="inline-block align-middle my-1 mr-1.5 max-h-7 rounded hover:opacity-90 transition-opacity"
+                      />
+                    );
+                  }
+
+                  return (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={src ?? ""}
+                      alt={alt ?? ""}
+                      loading="lazy"
+                      className="rounded-xl max-w-full h-auto my-4 border border-zinc-800/60 shadow-lg"
+                      style={{ maxHeight: 520 }}
+                    />
+                  );
+                },
+                hr: () => <hr className="border-zinc-800/60 my-6" />,
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+
+          {/* Fade out mask & Expand button when long */}
+          {isLong && !isExpanded && (
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent flex items-end justify-center pb-4">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(true)}
+                className="flex items-center gap-2 rounded-xl border border-zinc-700/80 bg-zinc-900/90 px-4 py-2 text-xs font-semibold text-zinc-200 shadow-xl backdrop-blur-md transition-all hover:bg-zinc-800 hover:border-zinc-600"
+              >
+                <span>Tüm README'yi Gör ({words} kelime)</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {isLong && isExpanded && (
+            <div className="flex justify-center py-4 border-t border-zinc-800/60 bg-zinc-900/40">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(false)}
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <span>Daha Az Göster</span>
+                <ChevronDown className="w-3.5 h-3.5 rotate-180 transition-transform" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </section>
+  );
+}
+
+/* ─── Focus & Featured Repositories Section ─── */
+
+function FocusAndShowcaseSection({
+  currentlyWorkingOn,
+  yearlyGoal,
+  pinnedRepos,
+  topRepos,
+  currentYear,
+  isOwner,
+  username,
+  theme,
+}: {
+  currentlyWorkingOn: string | null;
+  yearlyGoal: string | null;
+  pinnedRepos: RepoData[];
+  topRepos: RepoData[];
+  currentYear: number;
+  isOwner?: boolean;
+  username: string;
+  theme: ReturnType<typeof useThemeColors>;
+}) {
+  const hasFocus = Boolean(currentlyWorkingOn || yearlyGoal);
+  const featuredRepos = pinnedRepos.length > 0 ? pinnedRepos : [];
+
+  if (!hasFocus && featuredRepos.length === 0 && !isOwner) {
+    return null;
+  }
+
+  return (
+    <section className="animate-profile-slide-up space-y-4" style={{ animationDelay: "450ms" }}>
+      {/* Bölüm Başlığı */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ backgroundColor: `${theme.accent}15`, color: theme.accent }}
+          >
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+              Aktif Odak & 2026 Vizyonu
+            </h2>
+            <p className="text-[11px] text-zinc-500">
+              Üzerinde çalışılan güncel teknolojiler, yıllık hedef ve öne çıkan projeler
+            </p>
+          </div>
+        </div>
+
+        {isOwner && (
+          <Link
+            href="/dashboard/settings#profil"
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+          >
+            <Pencil className="w-3 h-3" />
+            <span>Hedef & Repo Düzenle</span>
+          </Link>
+        )}
+      </div>
+
+      {/* Odak Kartları: Şu an üzerinde & 2026 Hedefi */}
+      {hasFocus ? (
+        <div className={`grid gap-3.5 ${currentlyWorkingOn && yearlyGoal ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+          {currentlyWorkingOn && (
+            <div
+              className="group relative rounded-2xl border p-5 overflow-hidden transition-all duration-300 hover:border-emerald-500/40"
+              style={{
+                borderColor: `${theme.accent}30`,
+                background: `linear-gradient(145deg, ${theme.accentBg} 0%, rgba(9,9,11,0.95) 100%)`,
+              }}
+            >
+              {/* Radial glow */}
+              <div
+                className="absolute -top-12 -right-12 w-36 h-36 rounded-full opacity-10 group-hover:opacity-20 transition-opacity blur-2xl"
+                style={{ backgroundColor: theme.accent }}
+              />
+
+              <div className="relative z-10 flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  {/* Pulsing live beacon */}
+                  <div className="relative flex h-2.5 w-2.5">
+                    <span
+                      className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                      style={{ backgroundColor: theme.accent }}
+                    />
+                    <span
+                      className="relative inline-flex rounded-full h-2.5 w-2.5"
+                      style={{ backgroundColor: theme.accent }}
+                    />
+                  </div>
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-widest"
+                    style={{ color: theme.accent }}
+                  >
+                    Şu An Üzerinde Çalışıyor
+                  </span>
+                </div>
+                <span className="rounded-full bg-zinc-900/80 border border-zinc-800/80 px-2 py-0.5 text-[9px] font-medium text-zinc-400 uppercase tracking-wider">
+                  Aktif Sprint
+                </span>
+              </div>
+
+              <p className="relative z-10 text-sm sm:text-base text-zinc-100 font-medium leading-relaxed">
+                {currentlyWorkingOn}
+              </p>
+            </div>
+          )}
+
+          {yearlyGoal && (
+            <div
+              className="group relative rounded-2xl border border-amber-500/25 p-5 overflow-hidden transition-all duration-300 hover:border-amber-500/50"
+              style={{
+                background: "linear-gradient(145deg, rgba(245,158,11,0.08) 0%, rgba(9,9,11,0.95) 100%)",
+              }}
+            >
+              <div
+                className="absolute -top-12 -right-12 w-36 h-36 rounded-full opacity-10 group-hover:opacity-20 transition-opacity blur-2xl bg-amber-500"
+              />
+
+              <div className="relative z-10 flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-amber-400">
+                    <Target className="w-3 h-3" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
+                    {currentYear} Yılı Hedefi
+                  </span>
+                </div>
+                <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold text-amber-400 uppercase tracking-wider">
+                  {currentYear} VİZYONU
+                </span>
+              </div>
+
+              <p className="relative z-10 text-sm sm:text-base text-zinc-100 font-medium leading-relaxed">
+                {yearlyGoal}
+              </p>
+            </div>
+          )}
+        </div>
+      ) : isOwner ? (
+        <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-6 text-center">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-800/60 text-zinc-400 mb-3">
+            <Target className="w-5 h-5" />
+          </div>
+          <h3 className="text-sm font-semibold text-zinc-200">2026 Hedefini ve Aktif Çalışmanı Paylaş</h3>
+          <p className="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
+            Ziyaretçilerine şu an ne geliştirdiğini ve bu yılki hedeflerini göstererek profilini öne çıkar.
+          </p>
+          <Link
+            href="/dashboard/settings#profil"
+            className="mt-3.5 inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold"
+            style={{ backgroundColor: theme.accent, color: "#09090b" }}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Hedef Ekle
+          </Link>
+        </div>
+      ) : null}
+
+      {/* Öne Çıkan Vitrin Repoları */}
+      {featuredRepos.length > 0 && (
+        <div className="space-y-2.5 pt-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FolderGit2 className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                Öne Çıkan Vitrin Repoları
+              </span>
+            </div>
+            <span className="text-[10px] text-zinc-600 font-medium">
+              {featuredRepos.length} Seçilmiş Proje
+            </span>
+          </div>
+
+          <div
+            className={`grid gap-3.5 ${
+              featuredRepos.length === 1
+                ? "grid-cols-1"
+                : featuredRepos.length === 2
+                ? "grid-cols-1 md:grid-cols-2"
+                : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            }`}
+          >
+            {featuredRepos.map((repo, i) => (
+              <RepoCard key={repo.name} repo={repo} pinned index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1010,88 +1988,71 @@ export default function ProfileClient(props: ProfileProps) {
           </div>
         )}
 
-        {/* ── Currently working on & Yearly goal ── */}
-        {(currentlyWorkingOn || yearlyGoal) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {currentlyWorkingOn && (
-              <div
-                className="animate-profile-slide-up rounded-2xl border p-5 relative overflow-hidden"
-                style={{
-                  animationDelay: "500ms",
-                  borderColor: `${theme.accent}25`,
-                  background: `linear-gradient(145deg, ${theme.accentBg} 0%, rgba(9,9,11,0.95) 100%)`,
-                }}
-              >
-                <div className="flex items-center gap-2 mb-2.5">
-                  <div className="relative">
-                    <Sparkles className="w-3.5 h-3.5" style={{ color: theme.accent }} />
-                    <div className="absolute inset-0 animate-pulse rounded-full" style={{ boxShadow: `0 0 8px ${theme.accent}40` }} />
-                  </div>
-                  <p className="text-[10px] uppercase tracking-[0.15em] font-medium" style={{ color: theme.accent }}>Su an uzerinde</p>
-                </div>
-                <p className="text-sm text-zinc-200 leading-relaxed">{currentlyWorkingOn}</p>
-              </div>
-            )}
-            {yearlyGoal && (
-              <div
-                className="animate-profile-slide-up rounded-2xl border border-zinc-800/40 p-5"
-                style={{
-                  animationDelay: "540ms",
-                  background: "linear-gradient(145deg, rgba(24,24,27,0.6) 0%, rgba(9,9,11,0.8) 100%)",
-                }}
-              >
-                <div className="flex items-center gap-2 mb-2.5">
-                  <Target className="w-3.5 h-3.5 text-zinc-500" />
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">{currentYear} Hedefi</p>
-                </div>
-                <p className="text-sm text-zinc-300 leading-relaxed">{yearlyGoal}</p>
-              </div>
-            )}
-          </div>
-        )}
+        {/* ── 1. Aktif Odak, 2026 Hedefleri & Vitrin Projeleri ── */}
+        <FocusAndShowcaseSection
+          currentlyWorkingOn={currentlyWorkingOn}
+          yearlyGoal={yearlyGoal}
+          pinnedRepos={pinnedRepos}
+          topRepos={topRepos}
+          currentYear={currentYear}
+          isOwner={isOwner}
+          username={username}
+          theme={theme}
+        />
 
-        {/* ── Profile README ── */}
-        {profileReadme && (
-          <ProfileReadme content={profileReadme} />
-        )}
+        {/* ── 2. Geliştirici Manifestosu (README.md) ── */}
+        {profileReadme ? (
+          <ProfileReadme
+            content={profileReadme}
+            username={username}
+            isOwner={isOwner}
+          />
+        ) : isOwner ? (
+          <section className="animate-profile-slide-up" style={{ animationDelay: "500ms" }}>
+            <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-6 sm:p-8 text-center backdrop-blur-sm">
+              <div
+                className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl mb-3.5"
+                style={{ backgroundColor: `${theme.accent}15`, color: theme.accent }}
+              >
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-zinc-100">Profil README'si Ekleyin</h3>
+              <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto leading-relaxed">
+                GitHub profilinizi Markdown, tablolar, kod blokları ve özel rozetler ile zenginleştirerek ziyaretçilerinize kendinizi en iyi şekilde tanıtın.
+              </p>
+              <Link
+                href="/dashboard/settings#profil-sayfasi"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow-lg transition-transform hover:scale-105"
+                style={{ backgroundColor: theme.accent, color: "#09090b" }}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>README Oluştur</span>
+              </Link>
+            </div>
+          </section>
+        ) : null}
 
-        {/* ── Developer DNA ── */}
+        {/* ── 3. Developer DNA & Mühendislik Karakteri ── */}
         {developerDna && (
-          <div className="animate-profile-slide-up" style={{ animationDelay: "540ms" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Code2 className="w-4 h-4 text-zinc-500" />
-              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">Developer DNA</h2>
-            </div>
-            <DeveloperDNASection dna={developerDna} accent={theme.accent} accentBorder={theme.accentBorder} />
-          </div>
+          <DeveloperDNASection
+            dna={developerDna}
+            accent={theme.accent}
+            accentBorder={theme.accentBorder}
+            username={username}
+          />
         )}
 
-        {/* ── Badges ── */}
+        {/* ── 4. Rozetler ── */}
         {earnedBadges.length > 0 && (
-          <div className="animate-profile-slide-up" style={{ animationDelay: "550ms" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Award className="w-4 h-4 text-zinc-500" />
-              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">Rozetler</h2>
-              <span className="text-[10px] text-zinc-700 tabular-nums">{earnedBadges.length} kazanildi</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {earnedBadges.map((badge, i) => (
-                <BadgeCard key={badge.id} badge={badge} index={i} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Pinned repos (up to 3) ── */}
-        {pinnedRepos.length > 0 && (
           <div className="animate-profile-slide-up" style={{ animationDelay: "600ms" }}>
             <div className="flex items-center gap-2 mb-3">
-              <MapPin className="w-4 h-4 text-zinc-500" />
-              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">One Cikan Repolar</h2>
+              <Award className="w-4 h-4 text-zinc-500" />
+              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">Kazanılan Rozetler</h2>
+              <span className="text-[10px] text-zinc-700 tabular-nums">{earnedBadges.length} rozet</span>
             </div>
-            <div className={`grid gap-3 ${pinnedRepos.length === 1 ? "grid-cols-1" : pinnedRepos.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
-              {pinnedRepos.map((repo, i) => (
-                <RepoCard key={repo.name} repo={repo} pinned index={i} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {earnedBadges.map((badge, i) => (
+                <BadgeCard key={badge.id} badge={badge} index={i} />
               ))}
             </div>
           </div>
