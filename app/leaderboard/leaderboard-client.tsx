@@ -248,7 +248,7 @@ export default function LeaderboardClient({
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="max-w-2xl mx-auto px-4 py-12 space-y-8">
+      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-12 lg:px-8 space-y-8">
 
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
@@ -334,7 +334,7 @@ export default function LeaderboardClient({
           <div className="space-y-6">
             {/* Top 3 podium */}
             {top3.length > 0 && (
-              <div className="space-y-2.5">
+              <div className={`grid grid-cols-1 ${top3.length === 2 ? "md:grid-cols-2" : top3.length >= 3 ? "md:grid-cols-3" : ""} gap-3.5`}>
                 {top3.map((entry) => (
                   <PodiumCard
                     key={entry.username}
@@ -358,7 +358,7 @@ export default function LeaderboardClient({
 
             {/* Rest */}
             {rest.length > 0 && (
-              <div className="space-y-2">
+              <div className={`grid grid-cols-1 ${rest.length > 1 ? "md:grid-cols-2" : ""} gap-2.5`}>
                 {rest.map((entry) => (
                   <EntryRow
                     key={entry.username}

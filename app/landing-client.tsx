@@ -262,7 +262,7 @@ export default function LandingClient({ signInAction }: { signInAction: () => Pr
         </div>
 
         {/* Nav */}
-        <nav className="relative z-20 flex items-center justify-between px-6 py-5 sm:px-10">
+        <nav className="relative z-20 mx-auto flex w-full max-w-[1400px] items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/[0.08] ring-1 ring-emerald-500/15">
               <GH className="h-3.5 w-3.5 text-emerald-400" />

@@ -29,9 +29,11 @@ export default async function DashboardLayout({
     <ThemeProvider accent={accent}>
       <div className="flex min-h-screen flex-col">
         <Navbar />
-        <div className="flex-1 px-3 py-4 sm:px-6 sm:py-8">
-          <div className="mx-auto max-w-7xl">{children}</div>
-        </div>
+        <main className="flex-1">
+          <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+            {children}
+          </div>
+        </main>
       </div>
     </ThemeProvider>
   );

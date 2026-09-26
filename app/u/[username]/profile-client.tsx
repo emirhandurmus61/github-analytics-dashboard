@@ -835,7 +835,7 @@ export default function ProfileClient(props: ProfileProps) {
         {/* Header bar — Navbar server component olarak page.tsx'den render ediliyor */}
 
         {/* Hero content */}
-        <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 pt-12 sm:pt-16 pb-10">
+        <div className="relative z-10 mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-10">
           <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8">
             {/* Avatar */}
             <div className="relative animate-profile-slide-up shrink-0">
@@ -962,7 +962,7 @@ export default function ProfileClient(props: ProfileProps) {
       </div>
 
       {/* ═══ MAIN CONTENT ═══ */}
-      <main className="mx-auto max-w-5xl px-4 sm:px-6 pb-16 space-y-6 -mt-1">
+      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 pb-16 space-y-6 -mt-1">
 
         {/* ── Bento stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
