@@ -1074,12 +1074,29 @@ function ProfileReadme({
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const words = useMemo(() => content.trim().split(/\s+/).length, [content]);
+  const cleanContent = useMemo(() => {
+    if (!content) return "";
+    let text = content.replace(/\r\n/g, "\n");
+    text = text.replace(/^[ \t]+$/gm, "");
+    // Fix broken attribute values like src="..." with accidental newlines
+    text = text.replace(/(src|href)=["\x27]([^"\x27]+)["\x27]/g, (match, attr, val) => {
+      return `${attr}="${val.replace(/\s+/g, "")}"`;
+    });
+    // Strip accidental leading spaces on HTML tags, headings, dividers, lists, markdown images
+    text = text.replace(/^[ \t]+(<|#|---|-|\*|!\[)/gm, "$1");
+    // Flatten multi-line HTML opening tags
+    text = text.replace(/(<[a-z0-9]+[^>]*>)/gi, (tag) => {
+      return tag.replace(/\s*\n\s*/g, " ");
+    });
+    return text.trim();
+  }, [content]);
+
+  const words = useMemo(() => cleanContent.trim().split(/\s+/).length, [cleanContent]);
   const readingTime = useMemo(() => Math.max(1, Math.ceil(words / 180)), [words]);
-  const isLong = content.length > 1200;
+  const isLong = cleanContent.length > 1200;
 
   const handleCopyRaw = () => {
-    navigator.clipboard.writeText(content).then(() => {
+    navigator.clipboard.writeText(cleanContent).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -1409,7 +1426,7 @@ function ProfileReadme({
                 hr: () => <hr className="border-zinc-800/60 my-6" />,
               }}
             >
-              {content}
+              {cleanContent}
             </ReactMarkdown>
           </div>
 
