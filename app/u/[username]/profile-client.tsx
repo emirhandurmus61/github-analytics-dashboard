@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useThemeColors } from "@/components/theme-provider";
 import {
@@ -1198,7 +1199,16 @@ function ProfileReadme({
           >
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
               components={{
+                div: ({ className, align, children, ...props }: any) => (
+                  <div
+                    className={`${className || ""} ${align === "center" ? "text-center" : ""}`}
+                    {...props}
+                  >
+                    {children}
+                  </div>
+                ),
                 h1: ({ children }) => (
                   <h1 className="text-2xl font-black text-white mt-6 mb-3 pb-2 border-b border-zinc-800 flex items-center gap-2 first:mt-0">
                     {children}
@@ -1215,8 +1225,13 @@ function ProfileReadme({
                     {children}
                   </h3>
                 ),
-                p: ({ children }) => (
-                  <p className="text-sm sm:text-[14px] text-zinc-300 leading-relaxed mb-3.5">
+                p: ({ children, align, className, ...props }: any) => (
+                  <p
+                    className={`text-sm sm:text-[14px] text-zinc-300 leading-relaxed mb-3.5 ${
+                      className || ""
+                    } ${align === "center" ? "text-center" : ""}`}
+                    {...props}
+                  >
                     {children}
                   </p>
                 ),
@@ -1258,18 +1273,42 @@ function ProfileReadme({
                     </code>
                   );
                 },
-                a: ({ children, href }) => (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-0.5 underline underline-offset-4 font-medium transition-colors hover:opacity-80"
-                    style={{ color: theme.accent }}
-                  >
-                    <span>{children}</span>
-                    <ExternalLink className="w-2.5 h-2.5 ml-0.5 opacity-70" />
-                  </a>
-                ),
+                a: ({ children, href, className, ...props }: any) => {
+                  // Görsel içeren bağlantılarda alt çizgi ve ikon koyma
+                  const hasImage = React.Children.toArray(children).some(
+                    (child: any) =>
+                      React.isValidElement(child) &&
+                      (child.type === "img" || (child.props as any)?.src)
+                  );
+
+                  if (hasImage) {
+                    return (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block transition-opacity hover:opacity-85"
+                        {...props}
+                      >
+                        {children}
+                      </a>
+                    );
+                  }
+
+                  return (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 underline underline-offset-4 font-medium transition-colors hover:opacity-80"
+                      style={{ color: theme.accent }}
+                      {...props}
+                    >
+                      <span>{children}</span>
+                      <ExternalLink className="w-2.5 h-2.5 ml-0.5 opacity-70" />
+                    </a>
+                  );
+                },
                 blockquote: ({ children }) => renderBlockquote(children, theme.accent),
                 table: ({ children }) => (
                   <div className="my-4 w-full overflow-x-auto rounded-xl border border-zinc-800/80 bg-zinc-950/70 custom-scroll shadow-md">
@@ -1314,22 +1353,43 @@ function ProfileReadme({
                   }
                   return <input type={type} />;
                 },
-                img: ({ src, alt }) => {
+                img: ({ src, alt, ...props }: any) => {
+                  const srcStr = typeof src === "string" ? src : "";
                   const isBadge =
-                    typeof src === "string" &&
-                    (src.includes("shields.io") ||
-                      src.includes("badge") ||
-                      src.includes("badgen.net") ||
-                      src.includes("/api/badge"));
+                    srcStr.includes("shields.io") ||
+                    srcStr.includes("badgen.net") ||
+                    srcStr.includes("/api/badge") ||
+                    srcStr.includes("badge.svg");
+
+                  const isStatCard =
+                    srcStr.includes("github-readme-stats") ||
+                    srcStr.includes("streak-stats") ||
+                    srcStr.includes("readme-typing-svg") ||
+                    srcStr.includes("github-profile-trophy") ||
+                    srcStr.includes("capsule-render");
 
                   if (isBadge) {
                     return (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={src ?? ""}
+                        src={srcStr}
                         alt={alt ?? ""}
                         loading="lazy"
-                        className="inline-block align-middle my-1 mr-1.5 max-h-7 rounded hover:opacity-90 transition-opacity"
+                        className="inline-block align-middle my-1 mr-1.5 max-h-7 rounded transition-transform hover:scale-105"
+                        {...props}
+                      />
+                    );
+                  }
+
+                  if (isStatCard) {
+                    return (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={srcStr}
+                        alt={alt ?? ""}
+                        loading="lazy"
+                        className="inline-block align-middle my-2 mx-1 max-w-full rounded-xl transition-all duration-200 hover:scale-[1.01]"
+                        {...props}
                       />
                     );
                   }
@@ -1337,11 +1397,12 @@ function ProfileReadme({
                   return (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={src ?? ""}
+                      src={srcStr}
                       alt={alt ?? ""}
                       loading="lazy"
                       className="rounded-xl max-w-full h-auto my-4 border border-zinc-800/60 shadow-lg"
                       style={{ maxHeight: 520 }}
+                      {...props}
                     />
                   );
                 },
