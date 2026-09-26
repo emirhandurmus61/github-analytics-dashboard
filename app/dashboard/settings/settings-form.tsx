@@ -946,7 +946,7 @@ function ReadmeEditor({
     { label: "•", title: "Liste", action: () => insertAt("\n- "), cls: "" },
   ];
 
-  const charPct = (value.length / 2000) * 100;
+  const charPct = (value.length / 10000) * 100;
 
   return (
     <div className="space-y-2">
@@ -998,7 +998,7 @@ function ReadmeEditor({
         onDragOver={(e) => e.preventDefault()}
         onPaste={handlePaste}
         rows={10}
-        maxLength={2000}
+        maxLength={10000}
         placeholder={"### Merhaba!\n\nBen bir yazılım geliştiriciyim.\n\n- Şu an **proje** üzerinde çalışıyorum\n- **Rust** öğreniyorum"}
         className="w-full resize-y rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 font-mono text-sm leading-relaxed text-zinc-100 placeholder-zinc-700 transition-colors focus:border-zinc-600 focus:outline-none"
       />
@@ -1015,7 +1015,7 @@ function ReadmeEditor({
               }}
             />
           </div>
-          <span className="text-[10px] tabular-nums text-zinc-700">{value.length}/2000</span>
+          <span className="text-[10px] tabular-nums text-zinc-700">{value.length}/10000</span>
         </div>
       </div>
     </div>

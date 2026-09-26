@@ -31,7 +31,7 @@ export async function saveProfileSettings(
   }
 
   // Profile README
-  const profileReadme = (formData.get("profile_readme") as string | null)?.slice(0, 2000) ?? "";
+  const profileReadme = (formData.get("profile_readme") as string | null)?.slice(0, 10000) ?? "";
 
   // Widget görünürlüğü
   const widgets = {
