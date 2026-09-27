@@ -775,7 +775,7 @@ export default function SettingsForm({
                   hint="maks. 3 repo seçin"
                   desc="Profil kartınızda ve sayfanızda vitrin projeler olarak öne çıkarılır."
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-2.5 max-w-2xl">
                     {[0, 1, 2].map((i) => (
                       <div key={i} className="relative">
                         <span
@@ -803,7 +803,7 @@ export default function SettingsForm({
                           }}
                           className="w-full appearance-none rounded-xl border border-zinc-800 bg-zinc-900/90 py-2.5 pl-11 pr-4 text-xs text-zinc-100 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
                         >
-                          <option value="">{i === 0 ? "— Birinci repo seç —" : "— Opsiyonel —"}</option>
+                          <option value="">{i === 0 ? "— Birinci repo seç —" : i === 1 ? "— İkinci repo seç (opsiyonel) —" : "— Üçüncü repo seç (opsiyonel) —"}</option>
                           {repos
                             .filter(
                               (r) => !selectedPinned.includes(r.name) || selectedPinned[i] === r.name
