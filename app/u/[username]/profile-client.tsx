@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { Badge } from "@/lib/badges";
 import type { DeveloperDNA } from "@/lib/developer-dna";
+import { useLanguage } from "@/lib/i18n";
 
 /* ─── Types ─── */
 
@@ -145,6 +146,7 @@ function AnimatedNumber({ value, duration = 1200 }: { value: number; duration?: 
 /* ─── Language donut chart ─── */
 
 function LanguageDonut({ languages, size = 160 }: { languages: LangData[]; size?: number }) {
+  const { lang: appLang } = useLanguage();
   const [hovered, setHovered] = useState<number | null>(null);
   const theme = useThemeColors();
   const cx = size / 2;
@@ -196,7 +198,7 @@ function LanguageDonut({ languages, size = 160 }: { languages: LangData[]; size?
           stroke={hovered !== null ? languages[hovered].color : "#52525b"}
         />
         <text x={cx} y={cy + 10} textAnchor="middle" className="text-[11px] font-medium" fill={hovered !== null ? languages[hovered].color : "#71717a"}>
-          {hovered !== null ? `${languages[hovered].pct.toFixed(1)}%` : `${languages.length} dil`}
+          {hovered !== null ? `${languages[hovered].pct.toFixed(1)}%` : `${languages.length} ${appLang === "tr" ? "dil" : "langs"}`}
         </text>
       </svg>
       <div className="flex flex-col gap-1.5 min-w-0">
@@ -501,28 +503,29 @@ function DeveloperDNASection({
   accentBorder: string;
   username: string;
 }) {
+  const { lang } = useLanguage();
   const [selectedDim, setSelectedDim] = useState<number>(0);
   const [copied, setCopied] = useState(false);
 
   const dims = [
-    { label: "Çalışma Zamanı", key: "workTime", value: dna.workTime },
-    { label: "Commit Ritmi", key: "commitRhythm", value: dna.commitRhythm },
-    { label: "Dil Profili", key: "langProfile", value: dna.langProfile },
-    { label: "Mesaj Stili", key: "msgQuality", value: dna.msgQuality },
-    { label: "Odak Stili", key: "focusStyle", value: dna.focusStyle },
+    { label: lang === "tr" ? "Çalışma Zamanı" : "Working Hours", key: "workTime", value: dna.workTime },
+    { label: lang === "tr" ? "Commit Ritmi" : "Commit Rhythm", key: "commitRhythm", value: dna.commitRhythm },
+    { label: lang === "tr" ? "Dil Profili" : "Language Profile", key: "langProfile", value: dna.langProfile },
+    { label: lang === "tr" ? "Mesaj Stili" : "Message Style", key: "msgQuality", value: dna.msgQuality },
+    { label: lang === "tr" ? "Odak Stili" : "Focus Style", key: "focusStyle", value: dna.focusStyle },
   ];
 
   const currentMeta = DNA_DIM_META[dims[selectedDim].value] ?? {
     icon: <Code2 className="w-4 h-4" />,
     color: accent,
     score: 70,
-    badge: "Özel Profil",
+    badge: lang === "tr" ? "Özel Profil" : "Custom Profile",
     desc: "",
     superpower: "",
   };
 
   const handleShare = () => {
-    const text = `${username} · Developer DNA: ${dna.developerType} (%${dna.confidence} Doğruluk)`;
+    const text = `${username} · Developer DNA: ${dna.developerType} (${lang === "tr" ? `%${dna.confidence} Doğruluk` : `${dna.confidence}% Accuracy`})`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -542,10 +545,10 @@ function DeveloperDNASection({
           </div>
           <div>
             <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-              Developer DNA & Mühendislik Karakteri
+              {lang === "tr" ? "Developer DNA & Mühendislik Karakteri" : "Developer DNA & Engineering Profile"}
             </h2>
             <p className="text-[11px] text-zinc-500">
-              Git geçmişi, saat dağılımı ve teslimat ritminin yapay zeka analizi
+              {lang === "tr" ? "Git geçmişi, saat dağılımı ve teslimat ritminin yapay zeka analizi" : "AI analysis of Git history, hour distribution, and delivery rhythm"}
             </p>
           </div>
         </div>
@@ -558,12 +561,12 @@ function DeveloperDNASection({
           {copied ? (
             <>
               <Check className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400 font-medium">DNA Kopyalandı</span>
+              <span className="text-emerald-400 font-medium">{lang === "tr" ? "DNA Kopyalandı" : "DNA Copied"}</span>
             </>
           ) : (
             <>
               <Share2 className="w-3 h-3 text-zinc-400" />
-              <span>DNA Paylaş</span>
+              <span>{lang === "tr" ? "DNA Paylaş" : "Share DNA"}</span>
             </>
           )}
         </button>
@@ -600,13 +603,13 @@ function DeveloperDNASection({
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                  Geliştirici Arketipi
+                  {lang === "tr" ? "Geliştirici Arketipi" : "Developer Archetype"}
                 </span>
                 <span
                   className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
                   style={{ backgroundColor: `${accent}15`, color: accent, border: `1px solid ${accent}30` }}
                 >
-                  Yapay Zeka Analizi
+                  {lang === "tr" ? "Yapay Zeka Analizi" : "AI Analysis"}
                 </span>
               </div>
 
@@ -615,7 +618,9 @@ function DeveloperDNASection({
               </h3>
 
               <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                Bu profil; derin odaklanma dönemlerinde yüksek verimle çalışan, sürdürülebilir mimariyi ve sürekli teslimat ritmini benimsemiş bir yazılım mühendisini temsil eder.
+                {lang === "tr"
+                  ? "Bu profil; derin odaklanma dönemlerinde yüksek verimle çalışan, sürdürülebilir mimariyi ve sürekli teslimat ritmini benimsemiş bir yazılım mühendisini temsil eder."
+                  : "This profile represents a software engineer who operates with high velocity during focused sprints, embracing sustainable architecture and continuous delivery."}
               </p>
 
               {/* Trait pills */}
@@ -646,11 +651,11 @@ function DeveloperDNASection({
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-bold text-zinc-200">
-                %{dna.confidence} Analiz Doğruluğu
+                {lang === "tr" ? `%${dna.confidence} Analiz Doğruluğu` : `${dna.confidence}% Analysis Accuracy`}
               </span>
             </div>
             <p className="text-[10px] text-zinc-500">
-              Son 365 günlük Git geçmişine dayanır
+              {lang === "tr" ? "Son 365 günlük Git geçmişine dayanır" : "Based on last 365 days Git activity"}
             </p>
           </div>
         </div>
@@ -730,9 +735,9 @@ function DeveloperDNASection({
               </div>
 
               <div className="mt-3 pt-2 border-t border-zinc-800/60 flex items-center justify-between text-[10px]">
-                <span className="text-zinc-500">Mühendislik Etkisi</span>
+                <span className="text-zinc-500">{lang === "tr" ? "Mühendislik Etkisi" : "Engineering Impact"}</span>
                 <span className="font-semibold" style={{ color: meta.color }}>
-                  Detay →
+                  {lang === "tr" ? "Detay →" : "Details →"}
                 </span>
               </div>
             </button>
@@ -756,7 +761,7 @@ function DeveloperDNASection({
         </div>
         <div className="space-y-0.5">
           <p className="text-xs font-bold" style={{ color: currentMeta.color }}>
-            {dims[selectedDim].label}: {dims[selectedDim].value} — Süper Güç & Ekip Avantajı
+            {dims[selectedDim].label}: {dims[selectedDim].value} {lang === "tr" ? "— Süper Güç & Ekip Avantajı" : "— Superpower & Team Edge"}
           </p>
           <p className="text-xs text-zinc-300 leading-relaxed">
             {currentMeta.superpower}
@@ -809,6 +814,7 @@ function BadgeCard({ badge, index }: { badge: Badge; index: number }) {
 
 function RepoCard({ repo, pinned, index = 0 }: { repo: RepoData; pinned?: boolean; index?: number }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const langColor = repo.language ? (LANG_COLORS[repo.language] ?? "#6b7280") : null;
 
   return (
@@ -852,7 +858,7 @@ function RepoCard({ repo, pinned, index = 0 }: { repo: RepoData; pinned?: boolea
             {repo.description}
           </p>
         ) : (
-          <p className="text-xs text-zinc-600 italic">Açıklama bulunmuyor.</p>
+          <p className="text-xs text-zinc-600 italic">{lang === "tr" ? "Açıklama bulunmuyor." : "No description provided."}</p>
         )}
       </div>
 
@@ -878,7 +884,7 @@ function RepoCard({ repo, pinned, index = 0 }: { repo: RepoData; pinned?: boolea
         </div>
 
         <span className="text-[11px] font-medium opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: theme.accent }}>
-          İncele →
+          {lang === "tr" ? "İncele →" : "View →"}
         </span>
       </div>
     </a>
@@ -1071,6 +1077,7 @@ function ProfileReadme({
   source?: "github" | "custom";
 }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const cleanContent = useMemo(() => {
@@ -1114,7 +1121,7 @@ function ProfileReadme({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-zinc-100">
-                Geliştirici Manifestosu
+                {lang === "tr" ? "Geliştirici Manifestosu" : "Developer Manifesto"}
               </h2>
               {source === "github" ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-zinc-700/60 bg-zinc-800/80 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
@@ -1124,12 +1131,12 @@ function ProfileReadme({
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
                   <Sparkles className="w-3 h-3 text-emerald-400" />
-                  Özel README
+                  {lang === "tr" ? "Özel README" : "Custom README"}
                 </span>
               )}
             </div>
             <p className="text-[11px] text-zinc-500">
-              Kişisel README, teknik hedefler ve yazılım felsefesi
+              {lang === "tr" ? "Kişisel README, teknik hedefler ve yazılım felsefesi" : "Personal README, technical goals, and engineering philosophy"}
             </p>
           </div>
         </div>
@@ -1141,25 +1148,25 @@ function ProfileReadme({
               className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
             >
               <Pencil className="w-3 h-3" />
-              <span>README Düzenle</span>
+              <span>{lang === "tr" ? "README Düzenle" : "Edit README"}</span>
             </Link>
           )}
 
           <button
             onClick={handleCopyRaw}
             type="button"
-            title="Ham Markdown Metnini Kopyala"
+            title={lang === "tr" ? "Ham Markdown Metnini Kopyala" : "Copy Raw Markdown"}
             className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
           >
             {copied ? (
               <>
                 <Check className="w-3 h-3 text-emerald-400" />
-                <span className="text-emerald-400 font-medium">Kopyalandı</span>
+                <span className="text-emerald-400 font-medium">{lang === "tr" ? "Kopyalandı" : "Copied"}</span>
               </>
             ) : (
               <>
                 <Copy className="w-3 h-3" />
-                <span>Markdown Kopyala</span>
+                <span>{lang === "tr" ? "Markdown Kopyala" : "Copy Markdown"}</span>
               </>
             )}
           </button>
@@ -1199,9 +1206,9 @@ function ProfileReadme({
           </div>
 
           <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono">
-            <span>{words} kelime</span>
+            <span>{words} {lang === "tr" ? "kelime" : "words"}</span>
             <span>·</span>
-            <span>~{readingTime} dk okuma</span>
+            <span>~{readingTime} {lang === "tr" ? "dk okuma" : "min read"}</span>
           </div>
         </div>
 
@@ -1451,6 +1458,7 @@ function FocusAndShowcaseSection({
   username: string;
   theme: ReturnType<typeof useThemeColors>;
 }) {
+  const { lang } = useLanguage();
   const hasFocus = Boolean(currentlyWorkingOn || yearlyGoal);
   const featuredRepos = pinnedRepos.length > 0 ? pinnedRepos : [];
 
@@ -1471,10 +1479,10 @@ function FocusAndShowcaseSection({
           </div>
           <div>
             <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-              Aktif Odak & 2026 Vizyonu
+              {lang === "tr" ? `Aktif Odak & ${currentYear} Vizyonu` : `Active Focus & ${currentYear} Vision`}
             </h2>
             <p className="text-[11px] text-zinc-500">
-              Üzerinde çalışılan güncel teknolojiler, yıllık hedef ve öne çıkan projeler
+              {lang === "tr" ? "Üzerinde çalışılan güncel teknolojiler, yıllık hedef ve öne çıkan projeler" : "Current technologies, yearly goals, and featured projects"}
             </p>
           </div>
         </div>
@@ -1485,7 +1493,7 @@ function FocusAndShowcaseSection({
             className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
           >
             <Pencil className="w-3 h-3" />
-            <span>Hedef & Repo Düzenle</span>
+            <span>{lang === "tr" ? "Hedef & Repo Düzenle" : "Edit Goals & Repos"}</span>
           </Link>
         )}
       </div>
@@ -1524,11 +1532,11 @@ function FocusAndShowcaseSection({
                     className="text-[10px] font-bold uppercase tracking-widest"
                     style={{ color: theme.accent }}
                   >
-                    Şu An Üzerinde Çalışıyor
+                    {lang === "tr" ? "Şu An Üzerinde Çalışıyor" : "Currently Working On"}
                   </span>
                 </div>
                 <span className="rounded-full bg-zinc-900/80 border border-zinc-800/80 px-2 py-0.5 text-[9px] font-medium text-zinc-400 uppercase tracking-wider">
-                  Aktif Sprint
+                  {lang === "tr" ? "Aktif Sprint" : "Active Sprint"}
                 </span>
               </div>
 
@@ -1555,11 +1563,11 @@ function FocusAndShowcaseSection({
                     <Target className="w-3 h-3" />
                   </div>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
-                    {currentYear} Yılı Hedefi
+                    {currentYear} {lang === "tr" ? "Yılı Hedefi" : "Yearly Goal"}
                   </span>
                 </div>
                 <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold text-amber-400 uppercase tracking-wider">
-                  {currentYear} VİZYONU
+                  {currentYear} {lang === "tr" ? "VİZYONU" : "VISION"}
                 </span>
               </div>
 
@@ -1574,9 +1582,11 @@ function FocusAndShowcaseSection({
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-800/60 text-zinc-400 mb-3">
             <Target className="w-5 h-5" />
           </div>
-          <h3 className="text-sm font-semibold text-zinc-200">2026 Hedefini ve Aktif Çalışmanı Paylaş</h3>
+          <h3 className="text-sm font-semibold text-zinc-200">
+            {lang === "tr" ? `${currentYear} Hedefini ve Aktif Çalışmanı Paylaş` : `Share Your ${currentYear} Goal & Active Work`}
+          </h3>
           <p className="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
-            Ziyaretçilerine şu an ne geliştirdiğini ve bu yılki hedeflerini göstererek profilini öne çıkar.
+            {lang === "tr" ? "Ziyaretçilerine şu an ne geliştirdiğini ve bu yılki hedeflerini göstererek profilini öne çıkar." : "Stand out by showing visitors what you are building and your goals for this year."}
           </p>
           <Link
             href="/dashboard/settings#profil"
@@ -1584,7 +1594,7 @@ function FocusAndShowcaseSection({
             style={{ backgroundColor: theme.accent, color: "#09090b" }}
           >
             <Pencil className="w-3.5 h-3.5" />
-            Hedef Ekle
+            {lang === "tr" ? "Hedef Ekle" : "Add Goal"}
           </Link>
         </div>
       ) : null}
@@ -1596,11 +1606,11 @@ function FocusAndShowcaseSection({
             <div className="flex items-center gap-2">
               <FolderGit2 className="w-3.5 h-3.5 text-zinc-400" />
               <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                Öne Çıkan Vitrin Repoları
+                {lang === "tr" ? "Öne Çıkan Vitrin Repoları" : "Featured Showcase Repos"}
               </span>
             </div>
             <span className="text-[10px] text-zinc-600 font-medium">
-              {featuredRepos.length} Seçilmiş Proje
+              {featuredRepos.length} {lang === "tr" ? "Seçilmiş Proje" : "Selected Projects"}
             </span>
           </div>
 
@@ -1661,6 +1671,7 @@ function ActivitySparkline({ data }: { data: DayData[] }) {
 
 function FollowButton({ username }: { username: string }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const [following, setFollowing] = useState<boolean | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -1685,7 +1696,7 @@ function FollowButton({ username }: { username: string }) {
         return;
       }
       if (res.status === 429) {
-        alert("Günlük takip limitine ulaştınız (20).");
+        alert(lang === "tr" ? "Günlük takip limitine ulaştınız (20)." : "You have reached your daily follow limit (20).");
         return;
       }
       const data = await res.json();
@@ -1703,7 +1714,7 @@ function FollowButton({ username }: { username: string }) {
       <button
         onClick={toggle}
         disabled={loading}
-        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         style={
           following
             ? { borderColor: "rgba(39,39,42,0.6)", color: "#a1a1aa", backgroundColor: "rgba(39,39,42,0.3)" }
@@ -1713,12 +1724,12 @@ function FollowButton({ username }: { username: string }) {
         {following ? (
           <>
             <UserCheck className="w-3 h-3" />
-            Takip Ediliyor
+            {lang === "tr" ? "Takip Ediliyor" : "Following"}
           </>
         ) : (
           <>
             <UserPlus className="w-3 h-3" />
-            Takip Et
+            {lang === "tr" ? "Takip Et" : "Follow"}
           </>
         )}
       </button>
@@ -1736,12 +1747,15 @@ function FollowButton({ username }: { username: string }) {
 
 function ProfileShareButtons({ username }: { username: string }) {
   const theme = useThemeColors();
+  const { lang, t } = useLanguage();
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const cardUrl = `/api/card/${username}?format=og`;
   const tweetText = encodeURIComponent(
-    `GitHub istatistiklerime bakın! 🚀 Devboard`
+    lang === "tr"
+      ? `GitHub istatistiklerime bakın! 🚀 Devboard`
+      : `Check out my GitHub developer analytics! 🚀 Devboard`
   );
   const profileUrl = typeof window !== "undefined"
     ? `${window.location.origin}/u/${username}`
@@ -1774,12 +1788,12 @@ function ProfileShareButtons({ username }: { username: string }) {
       <button
         onClick={handleDownload}
         disabled={downloading}
-        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         style={{ borderColor: `${theme.accent}30`, color: theme.accent, backgroundColor: `${theme.accent}10` }}
-        title="Developer Card'ı PNG olarak indir"
+        title={lang === "tr" ? "Developer Card'ı PNG olarak indir" : "Download Developer Card as PNG"}
       >
         <Download className="w-3 h-3" />
-        {downloading ? "İndiriliyor..." : "Kartı İndir"}
+        {downloading ? (lang === "tr" ? "İndiriliyor..." : "Downloading...") : (lang === "tr" ? "Kartı İndir" : "Download Card")}
       </button>
 
       <a
@@ -1788,29 +1802,29 @@ function ProfileShareButtons({ username }: { username: string }) {
         rel="noopener noreferrer"
         className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all hover:scale-105 hover:border-zinc-600"
         style={{ borderColor: "#27272a", color: "#71717a" }}
-        title="Twitter'da paylaş"
+        title={lang === "tr" ? "Twitter'da paylaş" : "Share on Twitter"}
       >
         <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.726-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
         </svg>
-        Paylaş
+        {t.common.share}
       </a>
 
       <button
         onClick={handleCopy}
-        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all hover:scale-105 hover:border-zinc-600"
+        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all hover:scale-105 hover:border-zinc-600 cursor-pointer"
         style={{ borderColor: "#27272a", color: "#71717a" }}
-        title="Profil linkini kopyala"
+        title={lang === "tr" ? "Profil linkini kopyala" : "Copy profile link"}
       >
         {copied ? (
           <>
             <Check className="w-3 h-3 text-emerald-400" />
-            <span className="text-emerald-400">Kopyalandı!</span>
+            <span className="text-emerald-400">{t.common.copied}</span>
           </>
         ) : (
           <>
             <Share2 className="w-3 h-3" />
-            Link Kopyala
+            {lang === "tr" ? "Link Kopyala" : "Copy Link"}
           </>
         )}
       </button>
@@ -1824,6 +1838,7 @@ function ProfileShareButtons({ username }: { username: string }) {
 
 export default function ProfileClient(props: ProfileProps) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const {
     username, userId, name, avatarUrl, bio, profileReadme, readmeSource,
     currentlyWorkingOn, yearlyGoal, techTags,
@@ -1993,7 +2008,9 @@ export default function ProfileClient(props: ProfileProps) {
             <div className="hidden lg:block w-48 animate-profile-slide-up shrink-0" style={{ animationDelay: "160ms" }}>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <TrendingUp className="w-3 h-3 text-zinc-600" />
-                <p className="text-[10px] uppercase tracking-[0.12em] text-zinc-600 font-medium">Son 90 gun</p>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-zinc-600 font-medium">
+                  {lang === "tr" ? "Son 90 gün" : "Last 90 days"}
+                </p>
               </div>
               <ActivitySparkline data={heatmapData} />
             </div>
@@ -2006,10 +2023,10 @@ export default function ProfileClient(props: ProfileProps) {
 
         {/* ── Bento stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Layers} label="Repolar" value={stats.repoCount} delay={200} />
-          <StatCard icon={Activity} label="Commitler" value={stats.commitCount} sub="son 1 yil" accent={theme.accent} delay={280} />
-          <StatCard icon={Calendar} label="Aktif Gun" value={stats.activeDays} sub="son 1 yil" delay={360} />
-          <StatCard icon={Code2} label="Diller" value={stats.languageCount} delay={440} />
+          <StatCard icon={Layers} label={lang === "tr" ? "Repolar" : "Repositories"} value={stats.repoCount} delay={200} />
+          <StatCard icon={Activity} label={lang === "tr" ? "Commitler" : "Commits"} value={stats.commitCount} sub={lang === "tr" ? "son 1 yıl" : "last 1 year"} accent={theme.accent} delay={280} />
+          <StatCard icon={Calendar} label={lang === "tr" ? "Aktif Gün" : "Active Days"} value={stats.activeDays} sub={lang === "tr" ? "son 1 yıl" : "last 1 year"} delay={360} />
+          <StatCard icon={Code2} label={lang === "tr" ? "Diller" : "Languages"} value={stats.languageCount} delay={440} />
         </div>
 
         {/* ── Streaks ── */}
@@ -2024,11 +2041,15 @@ export default function ProfileClient(props: ProfileProps) {
               </div>
               <div className="flex items-center gap-2 mb-3 relative z-10">
                 <Flame className="w-4 h-4" style={{ color: theme.accent }} />
-                <p className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">Mevcut Streak</p>
+                <p className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">
+                  {lang === "tr" ? "Mevcut Streak" : "Current Streak"}
+                </p>
               </div>
               <p className="text-4xl sm:text-5xl font-black tabular-nums relative z-10" style={{ color: theme.accent }}>
                 <AnimatedNumber value={currentStreak} />
-                <span className="text-base font-normal text-zinc-600 ml-1">gun</span>
+                <span className="text-base font-normal text-zinc-600 ml-1">
+                  {lang === "tr" ? "gün" : "days"}
+                </span>
               </p>
             </div>
             <div
@@ -2040,11 +2061,15 @@ export default function ProfileClient(props: ProfileProps) {
               </div>
               <div className="flex items-center gap-2 mb-3 relative z-10">
                 <Timer className="w-4 h-4 text-zinc-500" />
-                <p className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">En Uzun Streak</p>
+                <p className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">
+                  {lang === "tr" ? "En Uzun Streak" : "Longest Streak"}
+                </p>
               </div>
               <p className="text-4xl sm:text-5xl font-black tabular-nums text-zinc-100 relative z-10">
                 <AnimatedNumber value={longestStreak} />
-                <span className="text-base font-normal text-zinc-600 ml-1">gun</span>
+                <span className="text-base font-normal text-zinc-600 ml-1">
+                  {lang === "tr" ? "gün" : "days"}
+                </span>
               </p>
             </div>
           </div>
@@ -2079,9 +2104,13 @@ export default function ProfileClient(props: ProfileProps) {
               >
                 <BookOpen className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-zinc-100">Profil README'si Ekleyin</h3>
+              <h3 className="text-base font-bold text-zinc-100">
+                {lang === "tr" ? "Profil README'si Ekleyin" : "Add Profile README"}
+              </h3>
               <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto leading-relaxed">
-                GitHub profilinizi Markdown, tablolar, kod blokları ve özel rozetler ile zenginleştirerek ziyaretçilerinize kendinizi en iyi şekilde tanıtın.
+                {lang === "tr"
+                  ? "GitHub profilinizi Markdown, tablolar, kod blokları ve özel rozetler ile zenginleştirerek ziyaretçilerinize kendinizi en iyi şekilde tanıtın."
+                  : "Introduce yourself to visitors by enriching your profile with Markdown, tables, code blocks, and custom badges."}
               </p>
               <Link
                 href="/dashboard/settings#profil-sayfasi"
@@ -2089,7 +2118,7 @@ export default function ProfileClient(props: ProfileProps) {
                 style={{ backgroundColor: theme.accent, color: "#09090b" }}
               >
                 <Pencil className="w-3.5 h-3.5" />
-                <span>README Oluştur</span>
+                <span>{lang === "tr" ? "README Oluştur" : "Create README"}</span>
               </Link>
             </div>
           </section>
@@ -2110,8 +2139,12 @@ export default function ProfileClient(props: ProfileProps) {
           <div className="animate-profile-slide-up" style={{ animationDelay: "600ms" }}>
             <div className="flex items-center gap-2 mb-3">
               <Award className="w-4 h-4 text-zinc-500" />
-              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">Kazanılan Rozetler</h2>
-              <span className="text-[10px] text-zinc-700 tabular-nums">{earnedBadges.length} rozet</span>
+              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
+                {lang === "tr" ? "Kazanılan Rozetler" : "Earned Badges"}
+              </h2>
+              <span className="text-[10px] text-zinc-700 tabular-nums">
+                {earnedBadges.length} {lang === "tr" ? "rozet" : "badges"}
+              </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {earnedBadges.map((badge, i) => (
@@ -2131,7 +2164,9 @@ export default function ProfileClient(props: ProfileProps) {
               >
                 <div className="flex items-center gap-2 mb-5">
                   <Code2 className="w-3.5 h-3.5 text-zinc-500" />
-                  <h2 className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">Dil Dagilimi</h2>
+                  <h2 className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">
+                    {lang === "tr" ? "Dil Dağılımı" : "Language Distribution"}
+                  </h2>
                 </div>
                 <LanguageDonut languages={topLanguages} />
               </div>
@@ -2146,17 +2181,19 @@ export default function ProfileClient(props: ProfileProps) {
                     <Activity className="w-3.5 h-3.5 text-zinc-500" />
                     <h2 className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">Contributions</h2>
                   </div>
-                  <span className="text-xs text-zinc-600 tabular-nums">{stats.commitCount.toLocaleString("tr-TR")} commit</span>
+                  <span className="text-xs text-zinc-600 tabular-nums">
+                    {stats.commitCount.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")} {lang === "tr" ? "commit" : "commits"}
+                  </span>
                 </div>
                 <div className="overflow-x-auto custom-scroll pb-1">
                   <MiniHeatmap data={heatmapData} />
                 </div>
                 <div className="mt-3 flex items-center justify-end gap-1.5">
-                  <span className="text-[10px] text-zinc-600">Az</span>
+                  <span className="text-[10px] text-zinc-600">{lang === "tr" ? "Az" : "Less"}</span>
                   {["rgba(255,255,255,0.03)", ...theme.shades].map((c, i) => (
                     <div key={i} className="rounded-[2px]" style={{ width: 10, height: 10, backgroundColor: c }} />
                   ))}
-                  <span className="text-[10px] text-zinc-600">Cok</span>
+                  <span className="text-[10px] text-zinc-600">{lang === "tr" ? "Çok" : "More"}</span>
                 </div>
               </div>
             )}
@@ -2168,7 +2205,9 @@ export default function ProfileClient(props: ProfileProps) {
           <div className="animate-profile-slide-up" style={{ animationDelay: "800ms" }}>
             <div className="flex items-center gap-2 mb-3">
               <Star className="w-4 h-4 text-zinc-500" />
-              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">En Yildizli Repolar</h2>
+              <h2 className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
+                {lang === "tr" ? "En Yıldızlı Repolar" : "Top Starred Repos"}
+              </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {topRepos.map((repo, i) => (
@@ -2202,7 +2241,7 @@ export default function ProfileClient(props: ProfileProps) {
               <Link href="/" className="text-zinc-500 hover:text-zinc-300 transition-colors">
                 Devboard
               </Link>{" "}
-              ile olusturuldu
+              {lang === "tr" ? "ile oluşturuldu" : "powered by"}
             </p>
           </div>
         </footer>

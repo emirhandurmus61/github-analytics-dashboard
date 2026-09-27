@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { Suspense } from "react";
+import { cookies } from "next/headers";
+import { getDictionary, type Language } from "@/lib/i18n";
 import SyncButton from "./sync-button";
 import ContributionHeatmap from "./contribution-heatmap";
 import HourHeatmap from "./hour-heatmap";
@@ -42,6 +44,9 @@ type Props = {
 export default async function DashboardPage({ searchParams }: Props) {
   const session = await auth();
   const { range, hideForks: hideForkParam } = await searchParams;
+  const cookieStore = await cookies();
+  const lang = (cookieStore.get("devboard_lang")?.value as Language) || "tr";
+  const t = getDictionary(lang);
 
   const dateRange: DateRange =
     range === "30" || range === "90" || range === "365" ? range : "365";
@@ -681,7 +686,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   }
 
   const lastSynced = dbUser?.last_synced_at
-    ? new Date(dbUser.last_synced_at).toLocaleString("tr-TR")
+    ? new Date(dbUser.last_synced_at).toLocaleString(lang === "tr" ? "tr-TR" : "en-US")
     : null;
 
   const { THEMES, isValidTheme, DEFAULT_THEME } = await import("@/lib/themes");
@@ -701,15 +706,15 @@ export default async function DashboardPage({ searchParams }: Props) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-lg font-semibold text-zinc-100 sm:text-2xl">
-              Merhaba, {session?.user?.name?.split(" ")[0]}
+              {lang === "tr" ? `Merhaba, ${session?.user?.name?.split(" ")[0]}` : `Welcome, ${session?.user?.name?.split(" ")[0]}`}
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 sm:text-sm">
-              {lastSynced ? `Son sync: ${lastSynced}` : "Senkronizasyonu başlat."}
+              {lastSynced ? (lang === "tr" ? `Son sync: ${lastSynced}` : `Last sync: ${lastSynced}`) : (lang === "tr" ? "Senkronizasyonu başlat." : "Start synchronization.")}
             </p>
           </div>
           {hasSynced && (
             <div className="flex items-center gap-2 shrink-0">
-              <SyncButton label="Yenile" />
+              <SyncButton label={lang === "tr" ? "Yenile" : "Refresh"} />
             </div>
           )}
         </div>
@@ -732,9 +737,11 @@ export default async function DashboardPage({ searchParams }: Props) {
               </svg>
             </div>
           </div>
-          <h2 className="mb-2 text-lg font-medium text-zinc-100">Veriler henüz yüklenmedi</h2>
+          <h2 className="mb-2 text-lg font-medium text-zinc-100">
+            {lang === "tr" ? "Veriler henüz yüklenmedi" : "Data not loaded yet"}
+          </h2>
           <p className="mb-6 text-sm text-zinc-500">
-            GitHub repolarını ve commit geçmişini çekmek için senkronizasyonu başlat.
+            {lang === "tr" ? "GitHub repolarını ve commit geçmişini çekmek için senkronizasyonu başlat." : "Start synchronization to fetch your GitHub repositories and commit history."}
           </p>
           <SyncButton />
         </div>
@@ -748,15 +755,19 @@ export default async function DashboardPage({ searchParams }: Props) {
 
             {/* Stat kartlar */}
             <SortableWidget key="stat-repos" id="stat-repos" data-widget-id="stat-repos">
-              <StatCard label="Toplam Repo" value={stats.repoCount} />
+              <StatCard label={lang === "tr" ? "Toplam Repo" : "Total Repos"} value={stats.repoCount} lang={lang} />
             </SortableWidget>
 
             <SortableWidget key="stat-commits" id="stat-commits" data-widget-id="stat-commits">
-              <StatCard label={`Commit (${dateRange === "365" ? "1 yıl" : dateRange + " gün"})`} value={stats.commitCount} />
+              <StatCard
+                label={lang === "tr" ? `Commit (${dateRange === "365" ? "1 yıl" : dateRange + " gün"})` : `Commits (${dateRange === "365" ? "1 year" : dateRange + " days"})`}
+                value={stats.commitCount}
+                lang={lang}
+              />
             </SortableWidget>
 
             <SortableWidget key="stat-langs" id="stat-langs" data-widget-id="stat-langs">
-              <StatCard label="Kullanılan Dil" value={stats.languageCount} />
+              <StatCard label={lang === "tr" ? "Kullanılan Dil" : "Languages Used"} value={stats.languageCount} lang={lang} />
             </SortableWidget>
 
             {/* İçgörüler */}
@@ -822,17 +833,19 @@ export default async function DashboardPage({ searchParams }: Props) {
             <SortableWidget key="activity-bar" id="activity-bar" data-widget-id="activity-bar">
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
                 <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">
-                  Son {dateRange === "365" ? "30" : dateRange} Gun Aktivite
+                  {lang === "tr" ? `Son ${dateRange === "365" ? "30" : dateRange} Gün Aktivite` : `Last ${dateRange === "365" ? "30" : dateRange} Days Activity`}
                 </h2>
-                <ActivityBar data={recentActivity} />
+                <ActivityBar data={recentActivity} emptyText={lang === "tr" ? "Veri yok" : "No data"} />
               </div>
             </SortableWidget>
 
             {/* Dil dagilimi */}
             <SortableWidget key="lang-dist" id="lang-dist" data-widget-id="lang-dist">
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-                <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">Dil Dagilimi</h2>
-                <LanguageList languages={topLanguages} />
+                <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">
+                  {lang === "tr" ? "Dil Dağılımı" : "Language Distribution"}
+                </h2>
+                <LanguageList languages={topLanguages} emptyText={lang === "tr" ? "Veri yok" : "No data"} />
               </div>
             </SortableWidget>
 
@@ -906,17 +919,17 @@ export default async function DashboardPage({ searchParams }: Props) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({ label, value, lang = "tr" }: { label: string; value: number; lang?: Language }) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 h-full flex flex-col items-center justify-center p-5 gap-2">
       <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">{label}</p>
-      <p className="text-4xl font-bold text-zinc-100 tabular-nums">{value.toLocaleString("tr-TR")}</p>
+      <p className="text-4xl font-bold text-zinc-100 tabular-nums">{value.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}</p>
     </div>
   );
 }
 
-function ActivityBar({ data }: { data: { date: string; commit_count: number }[] }) {
-  if (data.length === 0) return <p className="text-[11px] text-zinc-600">Veri yok</p>;
+function ActivityBar({ data, emptyText = "Veri yok" }: { data: { date: string; commit_count: number }[]; emptyText?: string }) {
+  if (data.length === 0) return <p className="text-[11px] text-zinc-600">{emptyText}</p>;
   const max = Math.max(...data.map((d) => d.commit_count));
   return (
     <div className="flex items-end gap-0.5 flex-1">
@@ -939,8 +952,8 @@ const LANG_COLORS: Record<string, string> = {
   Java: "#b07219", "C++": "#f34b7d", "C#": "#178600", C: "#555555",
 };
 
-function LanguageList({ languages }: { languages: { language: string; bytes: number }[] }) {
-  if (languages.length === 0) return <p className="text-[11px] text-zinc-600">Veri yok</p>;
+function LanguageList({ languages, emptyText = "Veri yok" }: { languages: { language: string; bytes: number }[]; emptyText?: string }) {
+  if (languages.length === 0) return <p className="text-[11px] text-zinc-600">{emptyText}</p>;
   const total = languages.reduce((sum, l) => sum + l.bytes, 0);
   return (
     <div className="space-y-3 flex-1">

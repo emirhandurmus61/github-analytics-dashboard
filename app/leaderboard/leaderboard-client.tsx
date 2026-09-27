@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toggleLeaderboardOptIn } from "./actions";
 import type { LeaderboardEntry, LeaderboardCategory } from "./page";
+import { useLanguage } from "@/lib/i18n";
 
 const LANG_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
@@ -33,36 +34,6 @@ const LANG_COLORS: Record<string, string> = {
   Ruby: "#701516",
 };
 
-const CATEGORIES: {
-  id: LeaderboardCategory;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  desc: string;
-  metricLabel: string;
-}[] = [
-  {
-    id: "weekly",
-    label: "Bu Hafta",
-    icon: Flame,
-    desc: "commit",
-    metricLabel: "Haftalık Commit",
-  },
-  {
-    id: "streak",
-    label: "Streak",
-    icon: Trophy,
-    desc: "gün",
-    metricLabel: "Kesintisiz Gün",
-  },
-  {
-    id: "badges",
-    label: "Rozetler",
-    icon: Award,
-    desc: "rozet",
-    metricLabel: "Kazanılan Rozet",
-  },
-];
-
 export default function LeaderboardClient({
   weekly,
   streaks,
@@ -76,13 +47,38 @@ export default function LeaderboardClient({
   currentUsername: string | null;
   isOptedIn: boolean;
 }) {
+  const { lang, t } = useLanguage();
   const [category, setCategory] = useState<LeaderboardCategory>("weekly");
   const [optedIn, setOptedIn] = useState(initialOptedIn);
   const [isPending, startTransition] = useTransition();
 
+  const categories = [
+    {
+      id: "weekly" as LeaderboardCategory,
+      label: lang === "tr" ? "Bu Hafta" : "This Week",
+      icon: Flame,
+      desc: lang === "tr" ? "commit" : "commits",
+      metricLabel: t.leaderboard.weeklyCommits,
+    },
+    {
+      id: "streak" as LeaderboardCategory,
+      label: t.leaderboard.filterStreak,
+      icon: Trophy,
+      desc: lang === "tr" ? "gün" : "days",
+      metricLabel: t.leaderboard.longestStreak,
+    },
+    {
+      id: "badges" as LeaderboardCategory,
+      label: t.leaderboard.filterBadges,
+      icon: Award,
+      desc: lang === "tr" ? "rozet" : "badges",
+      metricLabel: t.leaderboard.badgeCount,
+    },
+  ];
+
   const entries =
     category === "weekly" ? weekly : category === "streak" ? streaks : badges;
-  const currentCat = CATEGORIES.find((c) => c.id === category)!;
+  const currentCat = categories.find((c) => c.id === category)!;
 
   const valueKey: keyof LeaderboardEntry =
     category === "weekly"
@@ -116,14 +112,14 @@ export default function LeaderboardClient({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-100">
-                  Liderlik Tablosu
+                  {t.leaderboard.title}
                 </h1>
                 <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400">
-                  Canlı Sıralama
+                  {lang === "tr" ? "Canlı Sıralama" : "Live Ranking"}
                 </span>
               </div>
               <p className="mt-0.5 text-xs sm:text-sm text-zinc-400">
-                Topluluktaki en aktif geliştiriciler ve haftalık performans liderleri
+                {t.leaderboard.subtitle}
               </p>
             </div>
           </div>
@@ -138,7 +134,7 @@ export default function LeaderboardClient({
                 backgroundColor: optedIn ? "rgba(24, 24, 27, 0.6)" : "rgba(239, 68, 68, 0.08)",
                 color: optedIn ? "#a1a1aa" : "#f87171",
               }}
-              title={optedIn ? "Sıralamadan gizlen" : "Sıralamada tekrar görün"}
+              title={optedIn ? (lang === "tr" ? "Sıralamadan gizlen" : "Hide from leaderboard") : (lang === "tr" ? "Sıralamada tekrar görün" : "Show on leaderboard")}
             >
               {isPending ? (
                 <span className="h-3.5 w-3.5 border-2 border-current rounded-full border-t-transparent animate-spin" />
@@ -149,10 +145,10 @@ export default function LeaderboardClient({
               )}
               <span>
                 {isPending
-                  ? "Güncelleniyor..."
+                  ? (lang === "tr" ? "Güncelleniyor..." : "Updating...")
                   : optedIn
-                  ? "Listede Görünüyorsun"
-                  : "Sıralamada Gizlisin"}
+                  ? (lang === "tr" ? "Listede Görünüyorsun" : "Visible on Board")
+                  : (lang === "tr" ? "Sıralamada Gizlisin" : "Hidden from Board")}
               </span>
             </button>
           )}
@@ -160,7 +156,7 @@ export default function LeaderboardClient({
 
         {/* ── Kategori Sekmeleri ── */}
         <div className="flex items-center gap-2 p-1.5 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md overflow-x-auto custom-scroll">
-          {CATEGORIES.map((c) => {
+          {categories.map((c) => {
             const isSelected = category === c.id;
             const Icon = c.icon;
             return (
@@ -212,11 +208,15 @@ export default function LeaderboardClient({
                 #{userEntry.rank}
               </div>
               <div>
-                <p className="text-xs text-zinc-400 font-medium">Bu Kategorideki Sıralamanız</p>
+                <p className="text-xs text-zinc-400 font-medium">
+                  {lang === "tr" ? "Bu Kategorideki Sıralamanız" : "Your Rank in this Category"}
+                </p>
                 <p className="text-sm font-bold text-zinc-100">
                   {userEntry.rank === 1
-                    ? "Tebrikler, 1. sıradasınız! Zirveyi koruyorsunuz."
-                    : `${userEntry.rank}. sıradasınız — ${((userEntry[valueKey] as number) || 0).toLocaleString("tr-TR")} ${currentCat.desc}`}
+                    ? (lang === "tr" ? "Tebrikler, 1. sıradasınız! Zirveyi koruyorsunuz." : "Congratulations, you are #1! Leading the charts.")
+                    : (lang === "tr"
+                        ? `${userEntry.rank}. sıradasınız — ${((userEntry[valueKey] as number) || 0).toLocaleString("tr-TR")} ${currentCat.desc}`
+                        : `Ranked #${userEntry.rank} — ${((userEntry[valueKey] as number) || 0).toLocaleString("en-US")} ${currentCat.desc}`)}
                 </p>
               </div>
             </div>
@@ -224,7 +224,7 @@ export default function LeaderboardClient({
               href={`/u/${currentUsername}`}
               className="hidden sm:flex items-center gap-1.5 rounded-xl border border-zinc-700/80 bg-zinc-800/60 px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors"
             >
-              <span>Profilin</span>
+              <span>{t.nav.myProfile}</span>
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -236,16 +236,20 @@ export default function LeaderboardClient({
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-800 border border-zinc-700">
               <Trophy className="h-7 w-7 text-zinc-500" />
             </div>
-            <p className="text-base font-bold text-zinc-200">Henüz sıralama verisi bulunmuyor</p>
+            <p className="text-base font-bold text-zinc-200">
+              {lang === "tr" ? "Henüz sıralama verisi bulunmuyor" : "No ranking data available yet"}
+            </p>
             <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
-              Kullanıcılar senkronize oldukça ve GitHub aktiviteleri toplandıkça sıralama otomatik güncellenecektir.
+              {lang === "tr"
+                ? "Kullanıcılar senkronize oldukça ve GitHub aktiviteleri toplandıkça sıralama otomatik güncellenecektir."
+                : "Rankings will automatically update as developers sync and collect GitHub activities."}
             </p>
             {!currentUsername && (
               <Link
                 href="/"
                 className="inline-block mt-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-emerald-400"
               >
-                Giriş Yap ve Katıl
+                {lang === "tr" ? "Giriş Yap ve Katıl" : "Sign In & Join"}
               </Link>
             )}
           </div>
@@ -263,6 +267,8 @@ export default function LeaderboardClient({
                   isSelf={isSelf}
                   value={value}
                   valueSuffix={currentCat.desc}
+                  lang={lang}
+                  youLabel={t.leaderboard.you}
                 />
               );
             })}
@@ -276,23 +282,29 @@ export default function LeaderboardClient({
               <Sparkles className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-base font-bold text-zinc-100">Siz de Liderlik Tablosunda Yer Alın</p>
+              <p className="text-base font-bold text-zinc-100">
+                {lang === "tr" ? "Siz de Liderlik Tablosunda Yer Alın" : "Join the Leaderboard"}
+              </p>
               <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto leading-relaxed">
-                GitHub hesabınızla bağlanın, commit verilerinizi senkronize edin ve topluluk geliştiricileri arasındaki yerinizi görün.
+                {lang === "tr"
+                  ? "GitHub hesabınızla bağlanın, commit verilerinizi senkronize edin ve topluluk geliştiricileri arasındaki yerinizi görün."
+                  : "Connect your GitHub account, sync your commit metrics, and claim your place among community developers."}
               </p>
             </div>
             <Link
               href="/"
               className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-6 py-2.5 text-xs font-bold text-zinc-950 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
             >
-              GitHub ile Giriş Yap
+              {lang === "tr" ? "GitHub ile Giriş Yap" : "Sign in with GitHub"}
             </Link>
           </div>
         )}
 
         {/* Bilgilendirme Alt Notu */}
         <p className="text-center text-xs text-zinc-600 leading-relaxed">
-          Liderlik tablosuna katılım tamamen isteğe bağlıdır. Ayarlar → Gizlilik bölümünden istediğiniz zaman sıralamadan ayrılabilirsiniz.
+          {lang === "tr"
+            ? "Liderlik tablosuna katılım tamamen isteğe bağlıdır. Ayarlar → Gizlilik bölümünden istediğiniz zaman sıralamadan ayrılabilirsiniz."
+            : "Participation in the leaderboard is completely optional. You can opt out anytime from Settings → Privacy."}
         </p>
       </div>
     </div>
@@ -307,12 +319,16 @@ function RankCard({
   isSelf,
   value,
   valueSuffix,
+  lang,
+  youLabel,
 }: {
   entry: LeaderboardEntry;
   rank: number;
   isSelf: boolean;
   value: number;
   valueSuffix: string;
+  lang: string;
+  youLabel: string;
 }) {
   // Sıralama basamağına göre renk ve stil konfigürasyonu
   const isFirst = rank === 1;
@@ -435,25 +451,25 @@ function RankCard({
 
           {isFirst && (
             <span className="rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-              Lider
+              {lang === "tr" ? "Lider" : "Leader"}
             </span>
           )}
 
           {isSecond && (
             <span className="rounded-full bg-slate-300/15 border border-slate-300/30 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
-              2. Sıra
+              {lang === "tr" ? "2. Sıra" : "2nd"}
             </span>
           )}
 
           {isThird && (
             <span className="rounded-full bg-amber-700/20 border border-amber-700/40 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
-              3. Sıra
+              {lang === "tr" ? "3. Sıra" : "3rd"}
             </span>
           )}
 
           {isSelf && (
             <span className="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
-              Sen
+              {youLabel}
             </span>
           )}
         </div>
@@ -481,7 +497,7 @@ function RankCard({
           className="font-black text-xl sm:text-2xl tabular-nums leading-none tracking-tight"
           style={{ color: valueColor }}
         >
-          {value.toLocaleString("tr-TR")}
+          {value.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
         </p>
         <p className="mt-1 text-[11px] text-zinc-500 font-medium">{valueSuffix}</p>
       </div>

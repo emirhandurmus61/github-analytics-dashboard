@@ -7,6 +7,7 @@ import {
   Clock, FileCode, FolderGit2, Calendar,
 } from "lucide-react";
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 
 /* ─── Tipler ─── */
 
@@ -42,22 +43,31 @@ type Props = {
 
 /* ─── Yardımcılar ─── */
 
-const DAYS_TR = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
-const MONTHS_TR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-const MONTHS_LONG_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const DAYS_BY_LANG: Record<string, string[]> = {
+  tr: ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"],
+  en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+};
 
-function fmtDate(dateStr: string) {
+const MONTHS_BY_LANG: Record<string, string[]> = {
+  tr: ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"],
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+};
+
+function fmtDate(dateStr: string, lang = "tr") {
   const d = new Date(dateStr + "T00:00:00");
-  return `${DAYS_TR[d.getDay()]}, ${d.getDate()} ${MONTHS_TR[d.getMonth()]}`;
+  const days = DAYS_BY_LANG[lang] || DAYS_BY_LANG.tr;
+  const months = MONTHS_BY_LANG[lang] || MONTHS_BY_LANG.tr;
+  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
 }
 
-function fmtWeekRange(start: string, end: string) {
+function fmtWeekRange(start: string, end: string, lang = "tr") {
   const s = new Date(start + "T00:00:00");
   const e = new Date(end + "T00:00:00");
+  const months = MONTHS_BY_LANG[lang] || MONTHS_BY_LANG.tr;
   if (s.getMonth() === e.getMonth()) {
-    return `${s.getDate()}–${e.getDate()} ${MONTHS_TR[s.getMonth()]} ${s.getFullYear()}`;
+    return `${s.getDate()}–${e.getDate()} ${months[s.getMonth()]} ${s.getFullYear()}`;
   }
-  return `${s.getDate()} ${MONTHS_TR[s.getMonth()]} – ${e.getDate()} ${MONTHS_TR[e.getMonth()]} ${e.getFullYear()}`;
+  return `${s.getDate()} ${months[s.getMonth()]} – ${e.getDate()} ${months[e.getMonth()]} ${e.getFullYear()}`;
 }
 
 function getCommitType(msg: string): string {
@@ -81,29 +91,46 @@ const TYPE_COLORS: Record<string, string> = {
   other: "#6b7280",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  feat: "Özellik",
-  fix: "Düzeltme",
-  chore: "Bakım",
-  docs: "Dokümantasyon",
-  style: "Stil",
-  refactor: "Refaktör",
-  test: "Test",
-  perf: "Performans",
-  build: "Build",
-  ci: "CI",
-  revert: "Geri Al",
-  wip: "WIP",
-  other: "Diğer",
+const TYPE_LABELS: Record<string, Record<string, string>> = {
+  tr: {
+    feat: "Özellik",
+    fix: "Düzeltme",
+    chore: "Bakım",
+    docs: "Dokümantasyon",
+    style: "Stil",
+    refactor: "Refaktör",
+    test: "Test",
+    perf: "Performans",
+    build: "Build",
+    ci: "CI",
+    revert: "Geri Al",
+    wip: "WIP",
+    other: "Diğer",
+  },
+  en: {
+    feat: "Feature",
+    fix: "Fix",
+    chore: "Chore",
+    docs: "Docs",
+    style: "Style",
+    refactor: "Refactor",
+    test: "Test",
+    perf: "Performance",
+    build: "Build",
+    ci: "CI",
+    revert: "Revert",
+    wip: "WIP",
+    other: "Other",
+  },
 };
 
-function groupCommitsByWeek(commits: Commit[]): WeekGroup[] {
+function groupCommitsByWeek(commits: Commit[], lang = "tr"): WeekGroup[] {
   const dayMap = new Map<string, DayGroup>();
 
   for (const c of commits) {
     const date = c.committed_at.slice(0, 10);
     if (!dayMap.has(date)) {
-      dayMap.set(date, { date, label: fmtDate(date), commits: [] });
+      dayMap.set(date, { date, label: fmtDate(date, lang), commits: [] });
     }
     dayMap.get(date)!.commits.push(c);
   }
@@ -124,7 +151,7 @@ function groupCommitsByWeek(commits: Commit[]): WeekGroup[] {
 
     if (!weekMap.has(weekStart)) {
       weekMap.set(weekStart, {
-        weekLabel: fmtWeekRange(weekStart, weekEnd),
+        weekLabel: fmtWeekRange(weekStart, weekEnd, lang),
         weekStart,
         days: [],
         totalCommits: 0,
@@ -216,11 +243,13 @@ function DaySection({
   isExpanded,
   onToggle,
   theme,
+  lang = "tr",
 }: {
   day: DayGroup;
   isExpanded: boolean;
   onToggle: () => void;
   theme: ReturnType<typeof useThemeColors>;
+  lang?: string;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const isToday = day.date === today;
@@ -249,14 +278,14 @@ function DaySection({
           className="text-xs font-semibold"
           style={{ color: isToday ? theme.accent : "#a1a1aa" }}
         >
-          {isToday ? "Bugün" : day.label}
+          {isToday ? (lang === "tr" ? "Bugün" : "Today") : day.label}
         </span>
         {isToday && (
           <span
             className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
             style={{ backgroundColor: `${theme.accent}18`, color: theme.accent }}
           >
-            bugün
+            {lang === "tr" ? "bugün" : "today"}
           </span>
         )}
         <span className="ml-auto shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">
@@ -280,6 +309,7 @@ function DaySection({
 
 export default function TimelineClient({ commits, repos, languages, username }: Props) {
   const theme = useThemeColors();
+  const { lang, t } = useLanguage();
 
   const [search, setSearch] = useState("");
   const [repoFilter, setRepoFilter] = useState<string>("");
@@ -330,7 +360,7 @@ export default function TimelineClient({ commits, repos, languages, username }: 
     return out;
   }, [commits, search, repoFilter, langFilter, typeFilter, showToday, todayDate]);
 
-  const weeks = useMemo(() => groupCommitsByWeek(filtered), [filtered]);
+  const weeks = useMemo(() => groupCommitsByWeek(filtered, lang), [filtered, lang]);
 
   /* ─── Bugün moduna git ─── */
   function goToday() {
@@ -425,8 +455,12 @@ export default function TimelineClient({ commits, repos, languages, username }: 
               <CalendarDays size={17} />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-zinc-100">Commit Zaman Çizelgesi</h1>
-              <p className="text-xs text-zinc-500">Son 365 gün · {commits.length.toLocaleString("tr")} commit</p>
+              <h1 className="text-lg font-bold text-zinc-100">{t.timeline.title}</h1>
+              <p className="text-xs text-zinc-500">
+                {lang === "tr"
+                  ? `Son 365 gün · ${commits.length.toLocaleString("tr-TR")} commit`
+                  : `Last 365 days · ${commits.length.toLocaleString("en-US")} commits`}
+              </p>
             </div>
           </div>
         </div>
@@ -435,7 +469,7 @@ export default function TimelineClient({ commits, repos, languages, username }: 
           {/* Bugün modu */}
           <button
             onClick={showToday ? () => { setShowToday(false); } : goToday}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all"
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer"
             style={{
               borderColor: showToday ? `${theme.accent}40` : "#3f3f46",
               backgroundColor: showToday ? `${theme.accent}12` : "transparent",
@@ -443,31 +477,31 @@ export default function TimelineClient({ commits, repos, languages, username }: 
             }}
           >
             <Calendar size={12} />
-            Bugün
+            {t.timeline.today}
           </button>
 
           {/* Tümünü aç/kapat */}
           <button
             onClick={expandAll}
-            className="rounded-lg border border-zinc-800 px-2.5 py-1.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300"
+            className="rounded-lg border border-zinc-800 px-2.5 py-1.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300 cursor-pointer"
           >
-            Tümünü Aç
+            {t.timeline.expandAll}
           </button>
           <button
             onClick={collapseAll}
-            className="rounded-lg border border-zinc-800 px-2.5 py-1.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300"
+            className="rounded-lg border border-zinc-800 px-2.5 py-1.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300 cursor-pointer"
           >
-            Tümünü Kapat
+            {t.timeline.collapseAll}
           </button>
 
           {/* Export */}
           <div className="relative">
             <button
               onClick={() => setShowExportMenu((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-400 transition-all hover:border-zinc-700 hover:text-zinc-200"
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-400 transition-all hover:border-zinc-700 hover:text-zinc-200 cursor-pointer"
             >
               <Download size={12} />
-              İndir
+              {t.timeline.download}
               <ChevronDown size={10} />
             </button>
 
@@ -480,7 +514,7 @@ export default function TimelineClient({ commits, repos, languages, username }: 
                     <button
                       key={f}
                       onClick={() => setExportFormat(f)}
-                      className="flex w-full items-center justify-between px-3 py-2 text-xs text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-zinc-200"
+                      className="flex w-full items-center justify-between px-3 py-2 text-xs text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-zinc-200 cursor-pointer"
                     >
                       {f.toUpperCase()}
                       {exportFormat === f && (
@@ -494,11 +528,11 @@ export default function TimelineClient({ commits, repos, languages, username }: 
                   <div className="my-1 border-t border-zinc-800/60" />
                   <button
                     onClick={doExport}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium transition-colors hover:bg-zinc-800/60"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium transition-colors hover:bg-zinc-800/60 cursor-pointer"
                     style={{ color: theme.accent }}
                   >
                     <Download size={11} />
-                    {filtered.length} commit indir
+                    {filtered.length} {t.timeline.downloadCommits}
                   </button>
                 </div>
               </>
@@ -510,10 +544,10 @@ export default function TimelineClient({ commits, repos, languages, username }: 
       {/* ── Özet kartlar ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: "Commit", value: filtered.length.toLocaleString("tr"), icon: <GitCommit size={13} /> },
-          { label: "Repo", value: uniqueRepos.toLocaleString("tr"), icon: <FolderGit2 size={13} /> },
-          { label: "Eklenen", value: `+${totalAdd.toLocaleString("tr")}`, icon: <Plus size={13} />, color: "#4ade80" },
-          { label: "Silinen", value: `-${totalDel.toLocaleString("tr")}`, icon: <Minus size={13} />, color: "#f87171" },
+          { label: t.timeline.statCommit, value: filtered.length.toLocaleString(lang === "tr" ? "tr-TR" : "en-US"), icon: <GitCommit size={13} /> },
+          { label: t.timeline.statRepo, value: uniqueRepos.toLocaleString(lang === "tr" ? "tr-TR" : "en-US"), icon: <FolderGit2 size={13} /> },
+          { label: t.timeline.statAdded, value: `+${totalAdd.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}`, icon: <Plus size={13} />, color: "#4ade80" },
+          { label: t.timeline.statDeleted, value: `-${totalDel.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}`, icon: <Minus size={13} />, color: "#f87171" },
         ].map((s) => (
           <div
             key={s.label}
@@ -535,14 +569,14 @@ export default function TimelineClient({ commits, repos, languages, username }: 
       >
         <div className="flex items-center gap-2 mb-3">
           <Filter size={12} className="text-zinc-500" />
-          <span className="text-xs text-zinc-500 font-medium">Filtrele</span>
+          <span className="text-xs text-zinc-500 font-medium">{t.timeline.filterLabel}</span>
           {activeFilters > 0 && (
             <button
               onClick={clearFilters}
-              className="ml-auto flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="ml-auto flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
             >
               <X size={10} />
-              Temizle ({activeFilters})
+              {t.timeline.clearFilters} ({activeFilters})
             </button>
           )}
         </div>
@@ -554,7 +588,7 @@ export default function TimelineClient({ commits, repos, languages, username }: 
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Mesaj, SHA veya repo ara…"
+              placeholder={t.timeline.searchPlaceholder}
               className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-7 pr-3 text-xs text-zinc-300 placeholder-zinc-700 outline-none transition-colors focus:border-zinc-600"
             />
           </div>
@@ -567,7 +601,7 @@ export default function TimelineClient({ commits, repos, languages, username }: 
               onChange={(e) => setRepoFilter(e.target.value)}
               className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-7 pr-3 text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600"
             >
-              <option value="">Tüm repolar</option>
+              <option value="">{t.timeline.allRepos}</option>
               {repos.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
@@ -582,7 +616,7 @@ export default function TimelineClient({ commits, repos, languages, username }: 
               onChange={(e) => setLangFilter(e.target.value)}
               className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-7 pr-3 text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600"
             >
-              <option value="">Tüm diller</option>
+              <option value="">{t.timeline.allLanguages}</option>
               {languages.map((l) => (
                 <option key={l} value={l}>{l}</option>
               ))}
@@ -597,9 +631,9 @@ export default function TimelineClient({ commits, repos, languages, username }: 
               onChange={(e) => setTypeFilter(e.target.value)}
               className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-7 pr-3 text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600"
             >
-              <option value="">Tüm tipler</option>
-              {COMMIT_TYPES.map((t) => (
-                <option key={t} value={t}>{TYPE_LABELS[t] ?? t}</option>
+              <option value="">{t.timeline.allTypes}</option>
+              {COMMIT_TYPES.map((tKey) => (
+                <option key={tKey} value={tKey}>{TYPE_LABELS[lang]?.[tKey] ?? tKey}</option>
               ))}
             </select>
           </div>
@@ -607,14 +641,14 @@ export default function TimelineClient({ commits, repos, languages, username }: 
 
         {/* Tip hızlı seç */}
         <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {COMMIT_TYPES.map((t) => {
-            const color = TYPE_COLORS[t];
-            const active = typeFilter === t;
+          {COMMIT_TYPES.map((tKey) => {
+            const color = TYPE_COLORS[tKey];
+            const active = typeFilter === tKey;
             return (
               <button
-                key={t}
-                onClick={() => setTypeFilter(active ? "" : t)}
-                className="rounded-lg px-2 py-1 text-[10px] font-medium transition-all"
+                key={tKey}
+                onClick={() => setTypeFilter(active ? "" : tKey)}
+                className="rounded-lg px-2 py-1 text-[10px] font-medium transition-all cursor-pointer"
                 style={{
                   backgroundColor: active ? `${color}22` : "#18181b",
                   color: active ? color : "#52525b",
@@ -623,7 +657,7 @@ export default function TimelineClient({ commits, repos, languages, username }: 
                   borderColor: active ? `${color}50` : "#27272a",
                 }}
               >
-                {t}
+                {TYPE_LABELS[lang]?.[tKey] ?? tKey}
               </button>
             );
           })}
@@ -634,10 +668,10 @@ export default function TimelineClient({ commits, repos, languages, username }: 
       {weeks.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
           <CalendarDays size={40} className="mb-4 opacity-30" />
-          <p className="text-sm">Filtrelere uyan commit bulunamadı</p>
+          <p className="text-sm">{t.timeline.noActivity}</p>
           {activeFilters > 0 && (
-            <button onClick={clearFilters} className="mt-2 text-xs underline underline-offset-2 hover:text-zinc-400 transition-colors">
-              Filtreleri temizle
+            <button onClick={clearFilters} className="mt-2 text-xs underline underline-offset-2 hover:text-zinc-400 transition-colors cursor-pointer">
+              {t.timeline.clearFilters}
             </button>
           )}
         </div>
@@ -662,7 +696,9 @@ export default function TimelineClient({ commits, repos, languages, username }: 
                   <span className="text-xs font-semibold text-zinc-300">{week.weekLabel}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-600">{week.days.length} gün aktif</span>
+                  <span className="text-[10px] text-zinc-600">
+                    {week.days.length} {lang === "tr" ? "gün aktif" : "days active"}
+                  </span>
                   <span
                     className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
                     style={{ backgroundColor: `${theme.accent}18`, color: theme.accent }}
@@ -681,6 +717,7 @@ export default function TimelineClient({ commits, repos, languages, username }: 
                     isExpanded={expandedDays.has(day.date)}
                     onToggle={() => toggleDay(day.date)}
                     theme={theme}
+                    lang={lang}
                   />
                 ))}
               </div>

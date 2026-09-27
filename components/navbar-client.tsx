@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { handleSignOut, handleSignIn } from "@/app/actions/auth";
 import MobileMenu from "./mobile-menu";
+import { useLanguage } from "@/lib/i18n";
 
 type NavbarClientProps = {
   isLoggedIn: boolean;
@@ -34,6 +35,7 @@ export default function NavbarClient({
   currentYear,
 }: NavbarClientProps) {
   const pathname = usePathname();
+  const { lang, setLang, t } = useLanguage();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -89,19 +91,19 @@ export default function NavbarClient({
   const navItems = [
     {
       href: "/dashboard",
-      label: "Genel Bakış",
+      label: t.nav.overview,
       icon: LayoutDashboard,
       active: isDashboardActive,
     },
     {
       href: "/dashboard/timeline",
-      label: "Zaman Çizelgesi",
+      label: t.nav.timeline,
       icon: History,
       active: isTimelineActive,
     },
     {
       href: "/leaderboard",
-      label: "Sıralama",
+      label: t.nav.leaderboard,
       icon: Trophy,
       active: isLeaderboardActive,
     },
@@ -109,14 +111,14 @@ export default function NavbarClient({
       ? [
           {
             href: `/u/${username}/${currentYear}`,
-            label: "Wrapped",
+            label: t.nav.wrapped,
             icon: Sparkles,
             active: isWrappedActive,
             badge: `${currentYear}`,
           },
           {
             href: `/u/${username}`,
-            label: "Profil",
+            label: t.nav.myProfile,
             icon: User,
             active: isProfileActive,
           },
@@ -293,7 +295,7 @@ export default function NavbarClient({
                         >
                           <div className="flex items-center gap-2">
                             <User className="h-3.5 w-3.5 text-zinc-400" />
-                            <span>Profili Görüntüle</span>
+                            <span>{t.nav.viewProfile}</span>
                           </div>
                           <ExternalLink className="h-3 w-3 text-zinc-500" />
                         </Link>
@@ -309,7 +311,7 @@ export default function NavbarClient({
                         }`}
                       >
                         <Settings className="h-3.5 w-3.5 text-zinc-400" />
-                        <span>Ayarlar</span>
+                        <span>{t.nav.settings}</span>
                       </Link>
                     </div>
 
@@ -322,11 +324,39 @@ export default function NavbarClient({
                         className="group flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-400"
                       >
                         <LogOut className="h-3.5 w-3.5 text-zinc-500 transition-colors group-hover:text-red-400" />
-                        <span>Çıkış Yap</span>
+                        <span>{t.nav.signOut}</span>
                       </button>
                     </form>
                   </div>
                 )}
+              </div>
+
+              {/* Dil Seçici (Language Switcher) */}
+              <div className="flex items-center rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setLang("tr")}
+                  className={`rounded-lg px-2 py-1 text-[11px] font-mono transition-all ${
+                    lang === "tr"
+                      ? "bg-zinc-800 font-bold text-white shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                  title="Türkçe"
+                >
+                  TR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLang("en")}
+                  className={`rounded-lg px-2 py-1 text-[11px] font-mono transition-all ${
+                    lang === "en"
+                      ? "bg-zinc-800 font-bold text-white shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                  title="English"
+                >
+                  EN
+                </button>
               </div>
 
               {/* Mobil Menü (Hamburger) */}
@@ -340,12 +370,40 @@ export default function NavbarClient({
           ) : (
             /* Giriş Yapmamış Kullanıcı Görünümü */
             <div className="flex items-center gap-2">
+              {/* Dil Seçici (Language Switcher) */}
+              <div className="flex items-center rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setLang("tr")}
+                  className={`rounded-lg px-2 py-1 text-[11px] font-mono transition-all ${
+                    lang === "tr"
+                      ? "bg-zinc-800 font-bold text-white shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                  title="Türkçe"
+                >
+                  TR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLang("en")}
+                  className={`rounded-lg px-2 py-1 text-[11px] font-mono transition-all ${
+                    lang === "en"
+                      ? "bg-zinc-800 font-bold text-white shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                  title="English"
+                >
+                  EN
+                </button>
+              </div>
+
               <Link
                 href="/leaderboard"
                 className="hidden sm:flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
               >
                 <Trophy className="h-3.5 w-3.5 text-amber-400" />
-                <span>Sıralama</span>
+                <span>{t.nav.leaderboard}</span>
               </Link>
               <form action={handleSignIn}>
                 <button
@@ -359,7 +417,7 @@ export default function NavbarClient({
                   >
                     <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
                   </svg>
-                  <span>Giriş Yap</span>
+                  <span>{t.nav.signIn}</span>
                 </button>
               </form>
             </div>

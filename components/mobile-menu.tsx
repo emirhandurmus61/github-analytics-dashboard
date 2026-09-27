@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { handleSignOut } from "@/app/actions/auth";
+import { useLanguage } from "@/lib/i18n";
 
 type Props = {
   username: string;
@@ -34,6 +35,7 @@ export default function MobileMenu({
 }: Props) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { lang, setLang, t } = useLanguage();
 
   // Route değiştiğinde menüyü otomatik kapat (React 19 pattern: adjusting state during render)
   const [prevPathname, setPrevPathname] = useState(pathname);
@@ -56,9 +58,9 @@ export default function MobileMenu({
 
   // ESC tuşuna basıldığında kapat
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
-    };
+    }
     if (open) {
       window.addEventListener("keydown", handleKeyDown);
     }
@@ -70,22 +72,22 @@ export default function MobileMenu({
   const navLinks = [
     {
       href: "/dashboard",
-      label: "Genel Bakış",
-      desc: "Metrikler, grafikler ve istatistikler",
+      label: t.nav.overview,
+      desc: lang === "tr" ? "Metrikler, grafikler ve istatistikler" : "Metrics, charts, and statistics",
       icon: LayoutDashboard,
       active: pathname === "/dashboard",
     },
     {
       href: "/dashboard/timeline",
-      label: "Zaman Çizelgesi",
-      desc: "Aktivite akışı ve commit geçmişi",
+      label: t.nav.timeline,
+      desc: lang === "tr" ? "Aktivite akışı ve commit geçmişi" : "Activity feed and commit history",
       icon: History,
       active: pathname.startsWith("/dashboard/timeline"),
     },
     {
       href: "/leaderboard",
-      label: "Sıralama",
-      desc: "Global geliştirici ligi ve rozetler",
+      label: t.nav.leaderboard,
+      desc: lang === "tr" ? "Global geliştirici ligi ve rozetler" : "Global developer league and badges",
       icon: Trophy,
       active: pathname.startsWith("/leaderboard"),
     },
@@ -93,8 +95,8 @@ export default function MobileMenu({
       ? [
           {
             href: `/u/${username}/${currentYear}`,
-            label: `Wrapped ${currentYear}`,
-            desc: "Yıllık geliştirici performansı özeti",
+            label: `${t.nav.wrapped} ${currentYear}`,
+            desc: lang === "tr" ? "Yıllık geliştirici performansı özeti" : "Annual developer performance review",
             icon: Sparkles,
             active:
               pathname.startsWith(`/u/${username}/${currentYear}`) ||
@@ -103,8 +105,8 @@ export default function MobileMenu({
           },
           {
             href: `/u/${username}`,
-            label: "Geliştirici Profili",
-            desc: "Kamuya açık vitrin sayfası",
+            label: t.nav.myProfile,
+            desc: lang === "tr" ? "Kamuya açık vitrin sayfası" : "Public developer showcase profile",
             icon: User,
             active:
               pathname === `/u/${username}` &&
@@ -114,8 +116,8 @@ export default function MobileMenu({
       : []),
     {
       href: "/dashboard/settings",
-      label: "Ayarlar",
-      desc: "Tema, görünüm ve hesap tercihleri",
+      label: t.nav.settings,
+      desc: lang === "tr" ? "Tema, görünüm ve hesap tercihleri" : "Theme, appearance, and account preferences",
       icon: Settings,
       active: pathname.startsWith("/dashboard/settings"),
     },
@@ -281,15 +283,40 @@ export default function MobileMenu({
               })}
             </div>
 
+            {/* Dil Seçici (Language Selector) */}
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-3 py-2 text-xs">
+              <span className="text-zinc-400 font-medium">{t.nav.language}</span>
+              <div className="flex items-center rounded-lg border border-zinc-800 bg-zinc-950 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setLang("tr")}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-mono font-semibold transition-colors ${
+                    lang === "tr" ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  Türkçe
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLang("en")}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-mono font-semibold transition-colors ${
+                    lang === "en" ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  English
+                </button>
+              </div>
+            </div>
+
             {/* Alt Çıkış Butonu */}
-            <div className="mt-4 border-t border-zinc-800/60 pt-3">
+            <div className="mt-2 border-t border-zinc-800/60 pt-3">
               <form action={handleSignOut}>
                 <button
                   type="submit"
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-4 py-2.5 text-xs font-medium text-zinc-400 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
                 >
                   <LogOut className="h-4 w-4" />
-                  <span>Oturumu Kapat</span>
+                  <span>{t.nav.signOut}</span>
                 </button>
               </form>
             </div>

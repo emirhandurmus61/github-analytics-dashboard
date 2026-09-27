@@ -15,6 +15,7 @@ import {
   Cpu,
   BarChart3,
 } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 /* ═══════════════════════════════════════════════════
    UTILS
@@ -296,10 +297,11 @@ export default function LandingClient({
 }: {
   signInAction: () => Promise<void>;
 }) {
+  const { lang, t } = useLanguage();
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setReady(true), 80);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setReady(true), 80);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -342,7 +344,7 @@ export default function LandingClient({
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             </span>
             <span className="text-xs font-medium text-zinc-400">
-              Geliştirici İstatistikleri &middot; Global Sıralama &middot; Yıllık Wrapped
+              {t.landing.heroBadge}
             </span>
           </div>
 
@@ -355,7 +357,7 @@ export default function LandingClient({
               transition: "all 0.7s cubic-bezier(.22,.61,.36,1) 0.25s",
             }}
           >
-            <span className="block text-zinc-100">GitHub Hikayeni</span>
+            <span className="block text-zinc-100">{t.landing.heroTitle1}</span>
             <span
               className="block"
               style={{
@@ -366,7 +368,7 @@ export default function LandingClient({
                 backgroundClip: "text",
               }}
             >
-              Sanata Dönüştür.
+              {t.landing.heroTitle2}
             </span>
           </h1>
 
@@ -379,8 +381,7 @@ export default function LandingClient({
               transition: "all 0.6s ease 0.45s",
             }}
           >
-            Commit ısı haritaları, 40+ rozet başarı sistemi, global geliştirici ligi,
-            sinematik Wrapped posteri ve paylaşılabilir vitrin sayfası — hepsi tek bir yerde.
+            {t.landing.heroSub}
           </p>
 
           {/* Çift Butonlu CTA */}
@@ -398,7 +399,7 @@ export default function LandingClient({
                 className="group relative flex items-center gap-2.5 rounded-2xl bg-zinc-100 py-3.5 pl-6 pr-6 text-sm font-bold text-zinc-950 shadow-xl shadow-emerald-500/10 transition-all hover:bg-white hover:scale-105 active:scale-95"
               >
                 <GH className="h-[18px] w-[18px]" />
-                <span>GitHub ile Başla</span>
+                <span>{t.landing.startWithGithub}</span>
                 <ArrowRight className="h-4 w-4 text-zinc-600 transition-transform group-hover:translate-x-1" />
               </button>
             </form>
@@ -408,12 +409,12 @@ export default function LandingClient({
               className="flex items-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 px-5 py-3.5 text-sm font-semibold text-zinc-300 backdrop-blur-md transition-all hover:border-zinc-700 hover:bg-zinc-800 hover:text-white"
             >
               <Trophy className="h-4 w-4 text-amber-400" />
-              <span>Sıralamayı Gör</span>
+              <span>{t.landing.viewLeaderboard}</span>
             </Link>
           </div>
 
           <p className="mt-3 text-[11px] text-zinc-600">
-            30 saniyede hazır &middot; Ücretsiz &middot; Sadece okuma izni
+            {t.landing.heroFootnote}
           </p>
 
           {/* Hero alt: mini ısı haritası preview */}
@@ -429,7 +430,7 @@ export default function LandingClient({
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[11px] font-mono text-zinc-400">Canlı Katkı Matrisi</span>
+                  <span className="text-[11px] font-mono text-zinc-400">{t.landing.liveMatrix}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   {[0.06, 0.25, 0.6, 1].map((op, i) => (
@@ -464,18 +465,16 @@ export default function LandingClient({
           <div className="mx-auto max-w-3xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-400 backdrop-blur-md">
               <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
-              <span>MİMARİ &amp; ÇALIŞMA PRENSİBİ</span>
+              <span>{t.landing.sec0Pill}</span>
             </div>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-5xl">
-              Ham GitHub verilerinden, <br className="hidden sm:inline" />
+              {t.landing.sec0Title1} <br className="hidden sm:inline" />
               <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-sky-400 bg-clip-text text-transparent">
-                yaşayan bir geliştirici kimliğine.
+                {t.landing.sec0Title2}
               </span>
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-zinc-400 sm:text-base">
-              GitHub profilinizdeki commit sayıları kodlama tutkunuzun yalnızca küçük bir parçasıdır.
-              Devboard, tüm geliştirme alışkanlıklarınızı ve proje dinamiklerinizi sıfır konfigürasyonla
-              anlamlandırır; oyunlaştırılmış, derin ve paylaşılabilir bir başarı ekosistemine dönüştürür.
+              {t.landing.sec0Desc}
             </p>
           </div>
         </R>
@@ -485,9 +484,9 @@ export default function LandingClient({
           <R>
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">
-                01 &middot; NE İŞE YARAR?
+                {t.landing.whatItDoes}
               </h3>
-              <span className="text-xs font-mono text-zinc-600">3 TEMEL FAYDA</span>
+              <span className="text-xs font-mono text-zinc-600">{t.landing.threeBenefits}</span>
             </div>
           </R>
 
@@ -504,18 +503,16 @@ export default function LandingClient({
                     <BarChart3 className="h-6 w-6 text-emerald-400" />
                   </div>
                   <h4 className="text-lg font-bold text-white group-hover:text-emerald-300 transition-colors">
-                    Derin Analitik &amp; Geliştirici DNA&apos;sı
+                    {t.landing.card1Title}
                   </h4>
                   <p className="mt-3 text-xs sm:text-sm leading-relaxed text-zinc-400">
-                    Sıradan bir katkı grafiğinin ötesine geçin. Gece/gündüz çalışma ritminizi, 
-                    en üretken olduğunuz saatleri, dil uzmanlıklarınızı ve küresel lig yüzdelik diliminizi 
-                    21 interaktif widget ile haritalandırır.
+                    {t.landing.card1Desc}
                   </p>
                 </div>
                 <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-4 text-[11px] font-mono text-emerald-400/90">
                   <span className="rounded-md bg-emerald-950/40 px-2 py-0.5 border border-emerald-500/20">Punch Card</span>
-                  <span className="rounded-md bg-emerald-950/40 px-2 py-0.5 border border-emerald-500/20">Streak &amp; Hedef</span>
-                  <span className="rounded-md bg-emerald-950/40 px-2 py-0.5 border border-emerald-500/20">Dil Matrisi</span>
+                  <span className="rounded-md bg-emerald-950/40 px-2 py-0.5 border border-emerald-500/20">Streak &amp; Goals</span>
+                  <span className="rounded-md bg-emerald-950/40 px-2 py-0.5 border border-emerald-500/20">Languages</span>
                 </div>
               </div>
             </R>
@@ -532,18 +529,16 @@ export default function LandingClient({
                     <Trophy className="h-6 w-6 text-amber-400" />
                   </div>
                   <h4 className="text-lg font-bold text-white group-hover:text-amber-300 transition-colors">
-                    Oyunlaştırma &amp; Başarı Vitrini
+                    {t.landing.card2Title}
                   </h4>
                   <p className="mt-3 text-xs sm:text-sm leading-relaxed text-zinc-400">
-                    Kodlama disiplininizi motive edici bir maceraya dönüştürün. Commit serileriniz, 
-                    PR katkılarınız ve gece mesailerinizle 40&apos;tan fazla özgün rozet kazanın, 
-                    küresel geliştirici liginde üst kademelere yükselin.
+                    {t.landing.card2Desc}
                   </p>
                 </div>
                 <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-4 text-[11px] font-mono text-amber-400/90">
-                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">40+ Rozet</span>
-                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">Geliştirici Ligi</span>
-                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">Seviye &amp; Puan</span>
+                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">40+ Badges</span>
+                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">Global League</span>
+                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">Tier &amp; Rank</span>
                 </div>
               </div>
             </R>
@@ -560,18 +555,16 @@ export default function LandingClient({
                     <Sparkles className="h-6 w-6 text-violet-400" />
                   </div>
                   <h4 className="text-lg font-bold text-white group-hover:text-violet-300 transition-colors">
-                    Sinematik Wrapped &amp; Festival Posteri
+                    {t.landing.card3Title}
                   </h4>
                   <p className="mt-3 text-xs sm:text-sm leading-relaxed text-zinc-400">
-                    Tüm yıl döktüğünüz her satır kodu Spotify Wrapped deneyiminde 10 parçalık hikaye 
-                    slaytlarına ve 1080x1080 editoryal festival posterine dönüştürün. 
-                    Portfolyonuzda veya LinkedIn&apos;de tek tıkla paylaşın.
+                    {t.landing.card3Desc}
                   </p>
                 </div>
                 <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-4 text-[11px] font-mono text-violet-400/90">
                   <span className="rounded-md bg-violet-950/40 px-2 py-0.5 border border-violet-500/20">1080x1080 Poster</span>
-                  <span className="rounded-md bg-violet-950/40 px-2 py-0.5 border border-violet-500/20">Arketip Kimliği</span>
-                  <span className="rounded-md bg-violet-950/40 px-2 py-0.5 border border-violet-500/20">1-Tıkla Paylaş</span>
+                  <span className="rounded-md bg-violet-950/40 px-2 py-0.5 border border-violet-500/20">Archetypes</span>
+                  <span className="rounded-md bg-violet-950/40 px-2 py-0.5 border border-violet-500/20">1-Click Share</span>
                 </div>
               </div>
             </R>
@@ -584,14 +577,14 @@ export default function LandingClient({
             <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">
-                  02 &middot; NASIL ÇALIŞIR?
+                  {t.landing.howItWorks}
                 </h3>
                 <h4 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
-                  3 Basit Adımda Sıfır Kurulum &amp; Güvenli Akış
+                  {t.landing.howItWorksSub}
                 </h4>
               </div>
               <p className="text-xs text-zinc-500 max-w-xs">
-                Karmaşık CLI araçları veya webhook ayarlarıyla uğraşmayın. Her şey bulutta otomatik gerçekleşir.
+                {t.landing.howItWorksDesc}
               </p>
             </div>
           </R>
@@ -607,15 +600,14 @@ export default function LandingClient({
                     </span>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400 border border-emerald-500/20">
                       <ShieldCheck className="h-3.5 w-3.5" />
-                      <span>Sadece Okuma İzni</span>
+                      <span>{t.landing.step1Badge}</span>
                     </span>
                   </div>
                   <h5 className="text-base font-bold text-white">
-                    GitHub ile Bağlanın
+                    {t.landing.step1Title}
                   </h5>
                   <p className="mt-2 text-xs sm:text-sm leading-relaxed text-zinc-400">
-                    OAuth üzerinden güvenle oturum açın. Kodlarınıza veya özel depolarınıza yazma yetkisi
-                    talep edilmez. Verileriniz tamamen güvendedir ve hiçbir şey değiştirilmez.
+                    {t.landing.step1Desc}
                   </p>
                 </div>
                 <div className="mt-5 rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-[11px] font-mono text-zinc-400">
@@ -623,7 +615,7 @@ export default function LandingClient({
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                     <span>read:user &middot; public_repo</span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Repo yazma veya silme izni istenmez</span>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">{t.landing.step1Foot}</span>
                 </div>
               </div>
             </R>
@@ -638,15 +630,14 @@ export default function LandingClient({
                     </span>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 px-2.5 py-1 text-[11px] font-medium text-sky-400 border border-sky-500/20">
                       <Cpu className="h-3.5 w-3.5" />
-                      <span>Anlık Analiz Motoru</span>
+                      <span>{t.landing.step2Badge}</span>
                     </span>
                   </div>
                   <h5 className="text-base font-bold text-white">
-                    Otomatik Veri Çözümleme
+                    {t.landing.step2Title}
                   </h5>
                   <p className="mt-2 text-xs sm:text-sm leading-relaxed text-zinc-400">
-                    GitHub GraphQL &amp; REST API üzerinden commitleriniz, PR&apos;larınız, dilleriniz ve 
-                    katkı zamanlarınız taranır; algoritmalar geliştirici DNA&apos;nızı saniyeler içinde hesaplar.
+                    {t.landing.step2Desc}
                   </p>
                 </div>
                 <div className="mt-5 rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-[11px] font-mono text-zinc-400">
@@ -654,7 +645,7 @@ export default function LandingClient({
                     <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
                     <span>GraphQL &middot; REST &middot; Cron Sync</span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 mt-1 block">40+ Rozet kuralı ve percentile ligi taranır</span>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">{t.landing.step2Foot}</span>
                 </div>
               </div>
             </R>
@@ -669,23 +660,22 @@ export default function LandingClient({
                     </span>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/10 px-2.5 py-1 text-[11px] font-medium text-violet-400 border border-violet-500/20">
                       <Share2 className="h-3.5 w-3.5" />
-                      <span>Canlı Vitrin &amp; Poster</span>
+                      <span>{t.landing.step3Badge}</span>
                     </span>
                   </div>
                   <h5 className="text-base font-bold text-white">
-                    Keşfet, Yarış ve Paylaş
+                    {t.landing.step3Title}
                   </h5>
                   <p className="mt-2 text-xs sm:text-sm leading-relaxed text-zinc-400">
-                    21 interaktif widget içeren kişisel dashboard&apos;unuz açılır. Rozetlerinizin 
-                    kilidi kalkar, lig sıralamanız belirlenir ve Wrapped posterinizi tek tıkla dünyaya sunarsınız.
+                    {t.landing.step3Desc}
                   </p>
                 </div>
                 <div className="mt-5 rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-[11px] font-mono text-zinc-400">
                   <div className="flex items-center gap-2 text-zinc-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
-                    <span>21 Widget &middot; Liderlik &middot; PNG Poster</span>
+                    <span>21 Widgets &middot; Leaderboard &middot; PNG Poster</span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 mt-1 block">Profil kartları ve sosyal medya vitrini hazır</span>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">{t.landing.step3Foot}</span>
                 </div>
               </div>
             </R>
@@ -761,17 +751,17 @@ export default function LandingClient({
 
                 <div className="mt-5 flex flex-wrap gap-1.5">
                   {[
-                    "Geliştirici Arketipleri",
-                    "Koleksiyon Posteri (PNG)",
-                    "1-Tıkla Paylaşım",
-                    "365 Gün Matriksi",
-                    "Zirve Ay Waveform",
-                  ].map((t) => (
+                    t.landing.bentoChipArchetypes,
+                    t.landing.bentoChipPoster,
+                    t.landing.bentoChipShare,
+                    t.landing.bentoChipMatrix,
+                    t.landing.bentoChipWaveform,
+                  ].map((chip) => (
                     <span
-                      key={t}
+                      key={chip}
                       className="rounded-full border border-zinc-800/60 bg-zinc-950/40 px-3 py-1 text-[10px] font-medium text-zinc-400"
                     >
-                      {t}
+                      {chip}
                     </span>
                   ))}
                 </div>
@@ -844,9 +834,9 @@ export default function LandingClient({
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">
-                    STREAK TAKİBİ
+                    {t.landing.bentoStreakLabel}
                   </p>
-                  <p className="text-[11px] text-zinc-500">Zinciri kırmadan devam et</p>
+                  <p className="text-[11px] text-zinc-500">{t.landing.bentoStreakSub}</p>
                 </div>
               </div>
               <div className="flex items-end justify-between py-2">
@@ -854,13 +844,13 @@ export default function LandingClient({
                   <p className="font-mono text-5xl font-black text-amber-400">
                     <Ct end={47} />
                   </p>
-                  <p className="text-xs text-zinc-400">gün kesintisiz aktif</p>
+                  <p className="text-xs text-zinc-400">{t.landing.bentoStreakDays}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-mono text-xl font-bold text-zinc-500">
                     <Ct end={94} />
                   </p>
-                  <p className="text-[10px] text-zinc-600 font-mono">rekor seri</p>
+                  <p className="text-[10px] text-zinc-600 font-mono">{t.landing.bentoStreakRecord}</p>
                 </div>
               </div>
               <div className="mt-4 flex items-end gap-[3px]">
@@ -880,9 +870,9 @@ export default function LandingClient({
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">
-                    DİL DAĞILIMI & EVRİMİ
+                    {t.landing.bentoLangsLabel}
                   </p>
-                  <p className="text-[11px] text-zinc-500">Kod tabanındaki teknoloji dengesi</p>
+                  <p className="text-[11px] text-zinc-500">{t.landing.bentoLangsSub}</p>
                 </div>
               </div>
               <div className="mb-4 flex h-2.5 w-full overflow-hidden rounded-full">
@@ -959,35 +949,34 @@ export default function LandingClient({
           <R>
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">
-                TAM KONTROL SENDE
+                {t.landing.sec2Pill}
               </p>
               <h2 className="mb-5 text-3xl font-black tracking-tight sm:text-4xl text-white">
-                Senin profilin,<br />senin kuralların.
+                {t.landing.sec2Title1}<br />{t.landing.sec2Title2}
               </h2>
               <p className="mb-8 text-sm leading-relaxed text-zinc-400">
-                Yenilenen sekme tabanlı ayarlar paneli ile profil bilgilerini, sosyal medya
-                bağlantılarını, tema rengini ve öne çıkan repolarını tek tıkla özelleştir.
+                {t.landing.sec2Desc}
               </p>
               <div className="space-y-4">
                 {[
                   {
-                    title: "Sekme Tabanlı Hızlı Ayarlar",
-                    desc: "Profil, Sosyal Ağlar, Görünüm ve Pinned Repolar arasında akıcı geçiş.",
+                    title: t.landing.sec2Item1Title,
+                    desc: t.landing.sec2Item1Desc,
                     color: "#34d399",
                   },
                   {
-                    title: "6 Dinamik Tema Rengi",
-                    desc: "Emerald, Violet, Rose, Amber, Sky ve Cyan — seçtiğin tema anında tüm panellere uygulanır.",
+                    title: t.landing.sec2Item2Title,
+                    desc: t.landing.sec2Item2Desc,
                     color: "#a78bfa",
                   },
                   {
-                    title: "Markdown README Desteği",
-                    desc: "Profil sayfana Markdown ile kendi biyografini ve projelerini yaz.",
+                    title: t.landing.sec2Item3Title,
+                    desc: t.landing.sec2Item3Desc,
                     color: "#22d3ee",
                   },
                   {
-                    title: "Herkese Açık Vitrin URL'i",
-                    desc: "devanalytics.app/u/kullaniciadi — CV'ne ve portfolyona ekleyebileceğin profesyonel sayfa.",
+                    title: t.landing.sec2Item4Title,
+                    desc: t.landing.sec2Item4Desc,
                     color: "#fb7185",
                   },
                 ].map((item) => (
@@ -1139,10 +1128,10 @@ export default function LandingClient({
           <R>
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 sm:gap-10">
               {[
-                { n: 21, suffix: "", l: "Widget & Grafik" },
-                { n: 10, suffix: "", l: "Sinematik Slayt & Poster" },
-                { n: 40, suffix: "+", l: "Rozet & Başarı" },
-                { n: 6, suffix: "", l: "Dinamik Tema" },
+                { n: 21, suffix: "", l: t.landing.metricWidgets },
+                { n: 10, suffix: "", l: t.landing.metricSlides },
+                { n: 40, suffix: "+", l: t.landing.metricBadges },
+                { n: 6, suffix: "", l: t.landing.metricThemes },
               ].map((item) => (
                 <div key={item.l} className="text-center">
                   <p className="font-mono text-4xl sm:text-5xl font-black tracking-tighter text-white">
@@ -1165,10 +1154,10 @@ export default function LandingClient({
         <R>
           <div className="text-center">
             <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white">
-              GitHub hesabını bağla.
+              {t.landing.ctaTitle}
             </h2>
             <p className="mt-3 text-sm text-zinc-400">
-              30 saniyede hazır &middot; Ücretsiz &middot; Açık kaynak &middot; Kredi kartı gerekmez
+              {t.landing.ctaSub}
             </p>
             <form action={signInAction} className="mt-8">
               <button
@@ -1176,7 +1165,7 @@ export default function LandingClient({
                 className="group inline-flex items-center gap-3 rounded-2xl bg-zinc-100 py-4 pl-7 pr-8 text-sm font-bold text-zinc-950 shadow-2xl transition-all hover:bg-white hover:scale-105 active:scale-95"
               >
                 <GH className="h-[18px] w-[18px]" />
-                <span>GitHub ile Başla</span>
+                <span>{t.landing.startWithGithub}</span>
                 <ArrowRight className="h-4 w-4 text-zinc-600 transition-transform group-hover:translate-x-1" />
               </button>
             </form>
@@ -1192,11 +1181,11 @@ export default function LandingClient({
             <span className="font-semibold text-zinc-400">Devboard</span>
             <span>&middot;</span>
             <Link href="/leaderboard" className="hover:text-zinc-300 transition-colors">
-              Sıralama
+              {t.nav.leaderboard}
             </Link>
           </div>
           <p className="text-[11px] text-zinc-600">
-            Açık kaynak &middot; Sadece okuma izni &middot; Veri yazılmaz &middot; 2026
+            {t.landing.footerText}
           </p>
         </div>
       </footer>

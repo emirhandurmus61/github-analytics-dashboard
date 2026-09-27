@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import {
   ChevronLeft, Star, GitFork, GitPullRequest, CircleDot,
   TrendingUp, Clock, Share2, Check, ExternalLink, Activity,
@@ -18,11 +19,11 @@ const LANG_COLORS: Record<string, string> = {
   Shell: "#89e051", PHP: "#4F5D95", Scala: "#c22d40",
 };
 
-const HEALTH_LABEL_TR: Record<string, string> = {
-  active: "Aktif",
-  slowing: "Yavaşlıyor",
-  idle: "Hareketsiz",
-  archived: "Arşiv",
+const HEALTH_LABEL: Record<string, { tr: string; en: string }> = {
+  active: { tr: "Aktif", en: "Active" },
+  slowing: { tr: "Yavaşlıyor", en: "Slowing" },
+  idle: { tr: "Hareketsiz", en: "Idle" },
+  archived: { tr: "Arşiv", en: "Archived" },
 };
 
 type Props = {
@@ -102,8 +103,13 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
 /* ─── 52‑week heatmap ─── */
 function WeeklyHeatmap({ days, max }: { days: { date: string; count: number }[]; max: number }) {
   const theme = useThemeColors();
-  const MONTHS = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
-  const DAYS = ["Pzt","","Çar","","Cum","","Paz"];
+  const { lang } = useLanguage();
+  const MONTHS = lang === "tr"
+    ? ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"]
+    : ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DAYS = lang === "tr"
+    ? ["Pzt","","Çar","","Cum","","Paz"]
+    : ["Mon","","Wed","","Fri","","Sun"];
 
   // weeks[col][row] = day
   const weeks: (typeof days[0] | null)[][] = [];
@@ -173,7 +179,8 @@ function CommitScatter({ data, fullName }: {
   data: Props["scatterData"]; fullName: string;
 }) {
   const theme = useThemeColors();
-  if (data.length === 0) return <p className="text-sm text-zinc-600">Değişiklik verisi yok</p>;
+  const { lang } = useLanguage();
+  if (data.length === 0) return <p className="text-sm text-zinc-600">{lang === "tr" ? "Değişiklik verisi yok" : "No change data"}</p>;
 
   const maxAdd = Math.max(...data.map((d) => d.additions), 1);
   const dates = data.map((d) => d.date).sort();
@@ -210,7 +217,7 @@ function CommitScatter({ data, fullName }: {
       </svg>
       <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
         <span>{dates[0]}</span>
-        <span className="text-zinc-700">← commit büyüklüğü →</span>
+        <span className="text-zinc-700">{lang === "tr" ? "← commit büyüklüğü →" : "← commit size →"}</span>
         <span>{dates[dates.length - 1]}</span>
       </div>
     </div>
@@ -220,6 +227,7 @@ function CommitScatter({ data, fullName }: {
 /* ─── Hour distribution ─── */
 function HourBars({ data }: { data: number[] }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const max = Math.max(...data, 1);
   const peakH = data.indexOf(Math.max(...data));
   return (
@@ -240,7 +248,7 @@ function HourBars({ data }: { data: number[] }) {
       <div className="flex justify-between text-[10px] text-zinc-700 mt-1">
         <span>00:00</span>
         <span style={{ color: theme.accent }}>
-          Pik: {String(peakH).padStart(2, "0")}:00
+          {lang === "tr" ? "Pik" : "Peak"}: {String(peakH).padStart(2, "0")}:00
         </span>
         <span>23:00</span>
       </div>
@@ -251,15 +259,16 @@ function HourBars({ data }: { data: number[] }) {
 /* ─── Issue trend bar chart ─── */
 function IssueTrend({ data }: { data: Props["issueTrend"] }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const maxVal = Math.max(...data.flatMap((d) => [d.opened, d.closed]), 1);
   if (data.every((d) => d.opened === 0 && d.closed === 0)) {
-    return <p className="text-sm text-zinc-600">Issue verisi yok</p>;
+    return <p className="text-sm text-zinc-600">{lang === "tr" ? "Issue verisi yok" : "No issue data"}</p>;
   }
   return (
     <div>
       <div className="flex items-end gap-1 h-24">
         {data.map((d, i) => (
-          <div key={i} className="flex-1 flex gap-px items-end" title={`${d.label}: ${d.opened} açıldı, ${d.closed} kapandı`}>
+          <div key={i} className="flex-1 flex gap-px items-end" title={`${d.label}: ${d.opened} ${lang === "tr" ? "açıldı" : "opened"}, ${d.closed} ${lang === "tr" ? "kapandı" : "closed"}`}>
             <div
               className="flex-1 rounded-t-sm"
               style={{ height: `${Math.max((d.opened / maxVal) * 100, d.opened > 0 ? 6 : 0)}%`, backgroundColor: "#f43f5e80" }}
@@ -274,8 +283,8 @@ function IssueTrend({ data }: { data: Props["issueTrend"] }) {
       <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
         <span>{data[0]?.label}</span>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500/70 inline-block"/>Açıldı</span>
-          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: `${theme.accent}80` }}/>Kapandı</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500/70 inline-block"/>{lang === "tr" ? "Açıldı" : "Opened"}</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: `${theme.accent}80` }}/>{lang === "tr" ? "Kapandı" : "Closed"}</span>
         </div>
         <span>{data[data.length - 1]?.label}</span>
       </div>
@@ -286,7 +295,8 @@ function IssueTrend({ data }: { data: Props["issueTrend"] }) {
 /* ─── Big commit timeline ─── */
 function BigCommitList({ commits, fullName }: { commits: Props["bigCommits"]; fullName: string }) {
   const theme = useThemeColors();
-  if (commits.length === 0) return <p className="text-sm text-zinc-600">Veri yok</p>;
+  const { lang } = useLanguage();
+  if (commits.length === 0) return <p className="text-sm text-zinc-600">{lang === "tr" ? "Veri yok" : "No data"}</p>;
   const maxLines = Math.max(...commits.map((c) => c.additions + c.deletions), 1);
 
   return (
@@ -311,9 +321,9 @@ function BigCommitList({ commits, fullName }: { commits: Props["bigCommits"]; fu
             </div>
             <div className="flex items-center gap-3 mb-1.5">
               <span className="text-[10px] text-zinc-600">{c.date}</span>
-              <span className="text-[10px] text-emerald-500">+{c.additions.toLocaleString("tr-TR")}</span>
-              <span className="text-[10px] text-red-500">-{c.deletions.toLocaleString("tr-TR")}</span>
-              <span className="text-[10px] text-zinc-600">{total.toLocaleString("tr-TR")} satır</span>
+              <span className="text-[10px] text-emerald-500">+{c.additions.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}</span>
+              <span className="text-[10px] text-red-500">-{c.deletions.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}</span>
+              <span className="text-[10px] text-zinc-600">{total.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")} {lang === "tr" ? "satır" : "lines"}</span>
             </div>
             {/* Additions/deletions bar */}
             <div className="h-1 w-full rounded-full bg-zinc-800 overflow-hidden">
@@ -334,11 +344,12 @@ function BigCommitList({ commits, fullName }: { commits: Props["bigCommits"]; fu
 
 /* ─── Health score card ─── */
 function HealthScoreCard({ health, color }: { health: RepoHealth; color: string }) {
+  const { lang } = useLanguage();
   const FACTOR_LABELS = [
-    { key: "recency" as const, label: "Güncellik", max: 40, desc: "Son commit ne kadar eski?" },
-    { key: "activity" as const, label: "Aktivite", max: 30, desc: "Son 90 günde commit sayısı" },
-    { key: "community" as const, label: "Topluluk", max: 20, desc: "Star ve fork engagement'ı" },
-    { key: "issues" as const, label: "Issue", max: 10, desc: "Kapatılmamış issue oranı" },
+    { key: "recency" as const, label: lang === "tr" ? "Güncellik" : "Recency", max: 40, desc: lang === "tr" ? "Son commit ne kadar eski?" : "How recent is latest commit?" },
+    { key: "activity" as const, label: lang === "tr" ? "Aktivite" : "Activity", max: 30, desc: lang === "tr" ? "Son 90 günde commit sayısı" : "Commits in last 90 days" },
+    { key: "community" as const, label: lang === "tr" ? "Topluluk" : "Community", max: 20, desc: lang === "tr" ? "Star ve fork engagement'ı" : "Star & fork engagement" },
+    { key: "issues" as const, label: lang === "tr" ? "Issue" : "Issues", max: 10, desc: lang === "tr" ? "Kapatılmamış issue oranı" : "Open issue ratio" },
   ];
 
   return (
@@ -351,7 +362,7 @@ function HealthScoreCard({ health, color }: { health: RepoHealth; color: string 
             className="text-xs font-semibold rounded-full px-2.5 py-1"
             style={{ backgroundColor: `${color}18`, color }}
           >
-            {HEALTH_LABEL_TR[health.status] ?? health.status}
+            {HEALTH_LABEL[health.status]?.[lang] ?? health.status}
           </span>
         </div>
       </div>
@@ -389,6 +400,7 @@ export default function RepoDetailClient({
   health, healthColor, username,
 }: Props) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const [copied, setCopied] = useState(false);
   const langColor = repo.language ? (LANG_COLORS[repo.language] ?? "#6b7280") : null;
 
@@ -411,7 +423,7 @@ export default function RepoDetailClient({
         className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
       >
         <ChevronLeft size={15} />
-        Dashboard
+        {lang === "tr" ? "Panoya Dön" : "Dashboard"}
       </Link>
 
       {/* ── Hero başlık ── */}
@@ -428,7 +440,7 @@ export default function RepoDetailClient({
                 className="hidden sm:inline text-[10px] font-semibold rounded-full px-2 py-0.5 shrink-0"
                 style={{ backgroundColor: `${healthColor}18`, color: healthColor }}
               >
-                {HEALTH_LABEL_TR[health.status]}
+                {HEALTH_LABEL[health.status]?.[lang] ?? health.status}
               </span>
             </div>
             {repo.description && <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{repo.description}</p>}
@@ -452,10 +464,10 @@ export default function RepoDetailClient({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={share}
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-all"
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-all cursor-pointer"
             >
               {copied ? <Check size={12} className="text-emerald-400" /> : <Share2 size={12} />}
-              {copied ? "Kopyalandı" : "Paylaş"}
+              {copied ? (lang === "tr" ? "Kopyalandı" : "Copied") : (lang === "tr" ? "Paylaş" : "Share")}
             </button>
             <a
               href={`https://github.com/${repo.full_name}`}
@@ -474,35 +486,35 @@ export default function RepoDetailClient({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard
           icon={<GitCommit size={13} />}
-          label="Commit (1 yıl)"
+          label={lang === "tr" ? "Commit (1 yıl)" : "Commits (1 year)"}
           value={commits.total}
           color={theme.accent}
         />
         <StatCard
           icon={<TrendingUp size={13} />}
-          label="Eklenen Satır"
-          value={`+${commits.totalAdded.toLocaleString("tr-TR")}`}
+          label={lang === "tr" ? "Eklenen Satır" : "Lines Added"}
+          value={`+${commits.totalAdded.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}`}
           color="#4ade80"
         />
         <StatCard
           icon={<Zap size={13} />}
-          label="Silinen Satır"
-          value={`-${commits.totalDeleted.toLocaleString("tr-TR")}`}
+          label={lang === "tr" ? "Silinen Satır" : "Lines Deleted"}
+          value={`-${commits.totalDeleted.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}`}
           color="#f87171"
         />
         <StatCard
           icon={<GitPullRequest size={13} />}
           label="PR"
           value={prs.total}
-          sub={`${prs.merged} merge, ${prs.open} açık`}
+          sub={lang === "tr" ? `${prs.merged} merge, ${prs.open} açık` : `${prs.merged} merged, ${prs.open} open`}
           color="#a78bfa"
         />
       </div>
 
       {/* ── 52 haftalık heatmap ── */}
-      <Section title="52 Haftalık Commit Haritası" icon={<Activity size={14} />}>
+      <Section title={lang === "tr" ? "52 Haftalık Commit Haritası" : "52-Week Commit Heatmap"} icon={<Activity size={14} />}>
         {commits.total === 0 ? (
-          <p className="text-sm text-zinc-600">Commit verisi yok</p>
+          <p className="text-sm text-zinc-600">{lang === "tr" ? "Commit verisi yok" : "No commit data"}</p>
         ) : (
           <WeeklyHeatmap days={heatmapDays} max={heatmapMax} />
         )}
@@ -511,23 +523,27 @@ export default function RepoDetailClient({
       {/* ── Commit büyüklük scatter + saat dağılımı ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Section title="Commit Büyüklük Dağılımı" icon={<TrendingUp size={14} />}>
-            <p className="text-[10px] text-zinc-600 mb-3">Her nokta bir commit — Y ekseni eklenen satır, boyut toplam değişiklik</p>
+          <Section title={lang === "tr" ? "Commit Büyüklük Dağılımı" : "Commit Size Distribution"} icon={<TrendingUp size={14} />}>
+            <p className="text-[10px] text-zinc-600 mb-3">
+              {lang === "tr" ? "Her nokta bir commit — Y ekseni eklenen satır, boyut toplam değişiklik" : "Each dot is a commit — Y-axis additions, size total diff"}
+            </p>
             <CommitScatter data={scatterData} fullName={repo.full_name} />
           </Section>
         </div>
-        <Section title="Saat Dağılımı" icon={<Clock size={14} />}>
-          <p className="text-[10px] text-zinc-600 mb-3">Hangi saatte commit atıldı</p>
+        <Section title={lang === "tr" ? "Saat Dağılımı" : "Hourly Distribution"} icon={<Clock size={14} />}>
+          <p className="text-[10px] text-zinc-600 mb-3">
+            {lang === "tr" ? "Hangi saatte commit atıldı" : "Commit frequency by hour"}
+          </p>
           <HourBars data={hourMap} />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3 text-center">
-              <p className="text-[10px] text-zinc-600 mb-1">Pik Saat</p>
+              <p className="text-[10px] text-zinc-600 mb-1">{lang === "tr" ? "Pik Saat" : "Peak Hour"}</p>
               <p className="text-lg font-bold tabular-nums" style={{ color: theme.accent }}>
                 {String(peakHour).padStart(2, "0")}:00
               </p>
             </div>
             <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3 text-center">
-              <p className="text-[10px] text-zinc-600 mb-1">Toplam</p>
+              <p className="text-[10px] text-zinc-600 mb-1">{lang === "tr" ? "Toplam" : "Total"}</p>
               <p className="text-lg font-bold tabular-nums" style={{ color: theme.accent }}>
                 {commits.total}
               </p>
@@ -539,12 +555,12 @@ export default function RepoDetailClient({
       {/* ── PR bilgisi + Issue trendi ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* PR */}
-        <Section title="Pull Request Özeti" icon={<GitPullRequest size={14} />}>
+        <Section title={lang === "tr" ? "Pull Request Özeti" : "Pull Request Summary"} icon={<GitPullRequest size={14} />}>
           <div className="grid grid-cols-3 gap-2 mb-4">
             {[
-              { label: "Toplam PR", value: prs.total, color: theme.accent },
-              { label: "Merge", value: prs.merged, color: "#4ade80" },
-              { label: "Açık", value: prs.open, color: "#f59e0b" },
+              { label: lang === "tr" ? "Toplam PR" : "Total PRs", value: prs.total, color: theme.accent },
+              { label: lang === "tr" ? "Merge" : "Merged", value: prs.merged, color: "#4ade80" },
+              { label: lang === "tr" ? "Açık" : "Open", value: prs.open, color: "#f59e0b" },
             ].map(({ label, value, color }) => (
               <div key={label} className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3 text-center">
                 <p className="text-[10px] text-zinc-600 mb-1">{label}</p>
@@ -556,20 +572,20 @@ export default function RepoDetailClient({
             <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-800/30 px-3 py-2.5">
               <Clock size={13} className="text-zinc-500 shrink-0" />
               <div>
-                <p className="text-xs text-zinc-400">Ortalama Merge Süresi</p>
+                <p className="text-xs text-zinc-400">{lang === "tr" ? "Ortalama Merge Süresi" : "Average Merge Time"}</p>
                 <p className="text-sm font-bold" style={{ color: theme.accent }}>
                   {prs.avgMergeHours < 24
-                    ? `${prs.avgMergeHours} saat`
-                    : `${Math.round(prs.avgMergeHours / 24)} gün`}
+                    ? `${prs.avgMergeHours} ${lang === "tr" ? "saat" : "hours"}`
+                    : `${Math.round(prs.avgMergeHours / 24)} ${lang === "tr" ? "gün" : "days"}`}
                 </p>
               </div>
             </div>
           )}
-          {prs.total === 0 && <p className="text-sm text-zinc-600">PR verisi yok</p>}
+          {prs.total === 0 && <p className="text-sm text-zinc-600">{lang === "tr" ? "PR verisi yok" : "No PR data"}</p>}
         </Section>
 
         {/* Issue trend */}
-        <Section title="Issue Trendi (12 Ay)" icon={<CircleDot size={14} />}>
+        <Section title={lang === "tr" ? "Issue Trendi (12 Ay)" : "Issue Trend (12 Months)"} icon={<CircleDot size={14} />}>
           <IssueTrend data={issueTrend} />
         </Section>
       </div>
@@ -577,8 +593,10 @@ export default function RepoDetailClient({
       {/* ── En büyük commitler + Dil dağılımı ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Section title="En Büyük Commitler" icon={<Zap size={14} />}>
-            <p className="text-[10px] text-zinc-600 mb-3">Eklenen + silinen satır sayısına göre sıralanmış top 10</p>
+          <Section title={lang === "tr" ? "En Büyük Commitler" : "Top Largest Commits"} icon={<Zap size={14} />}>
+            <p className="text-[10px] text-zinc-600 mb-3">
+              {lang === "tr" ? "Eklenen + silinen satır sayısına göre sıralanmış top 10" : "Top 10 sorted by additions + deletions"}
+            </p>
             <BigCommitList commits={bigCommits} fullName={repo.full_name} />
           </Section>
         </div>
@@ -586,9 +604,9 @@ export default function RepoDetailClient({
         {/* Dil + Sağlık */}
         <div className="space-y-4">
           {/* Dil dağılımı */}
-          <Section title="Dil Dağılımı" icon={<Code2 size={14} />}>
+          <Section title={lang === "tr" ? "Dil Dağılımı" : "Language Distribution"} icon={<Code2 size={14} />}>
             {langs.length === 0 ? (
-              <p className="text-sm text-zinc-600">Veri yok</p>
+              <p className="text-sm text-zinc-600">{lang === "tr" ? "Veri yok" : "No data"}</p>
             ) : (
               <div className="space-y-2.5">
                 {langs.map(({ language, pct }) => {
@@ -613,7 +631,7 @@ export default function RepoDetailClient({
           </Section>
 
           {/* Repo sağlık skoru */}
-          <Section title="Repo Sağlık Skoru" icon={<Activity size={14} />}>
+          <Section title={lang === "tr" ? "Repo Sağlık Skoru" : "Repo Health Score"} icon={<Activity size={14} />}>
             <HealthScoreCard health={health} color={healthColor} />
           </Section>
         </div>

@@ -97,14 +97,6 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-800/60">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">Ayarlar</h1>
-          <p className="mt-1 text-xs sm:text-sm text-zinc-400">
-            Arayüz temanızı, profil bilgilerinizi ve GitHub README entegrasyonlarınızı yönetin.
-          </p>
-        </div>
-      </div>
 
       <SettingsForm
         bio={user.bio}

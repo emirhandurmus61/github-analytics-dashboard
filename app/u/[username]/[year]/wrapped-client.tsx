@@ -22,6 +22,7 @@ import {
   FileText,
   X,
 } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 type LangEntry = { lang: string; bytes: number; pct: number; color: string };
 type BigCommit = { message: string; additions: number; deletions: number; date: string };
@@ -239,6 +240,7 @@ export default function WrappedClient({
   data: WrappedData;
   isOwner?: boolean;
 }) {
+  const { lang, t } = useLanguage();
   const [slide, setSlide] = useState(0);
   const [mode, setMode] = useState<"story" | "poster">("story");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -258,7 +260,10 @@ export default function WrappedClient({
       ? window.location.href
       : `https://devanalytics.app/u/${data.username}/${data.year}`;
 
-  const tweetText = `🚀 ${data.displayName} (@${data.username}) — ${data.year} GitHub Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("tr-TR")} commit\n🔥 ${data.longestStreak} gün kesintisiz seri\n🏆 Rolüm: ${data.archetype.title}\n\nDetaylı yıllık geliştirici özetim:`;
+  const tweetText =
+    lang === "tr"
+      ? `🚀 ${data.displayName} (@${data.username}) — ${data.year} Devboard Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("tr-TR")} commit\n🔥 ${data.longestStreak} gün kesintisiz seri\n🏆 Rolüm: ${data.archetype.title}\n\nDetaylı yıllık geliştirici özetim:`
+      : `🚀 ${data.displayName} (@${data.username}) — ${data.year} Devboard Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("en-US")} commits\n🔥 ${data.longestStreak}-day unbroken streak\n🏆 Archetype: ${data.archetype.title}\n\nDetailed annual developer summary:`;
 
   // Confetti trigger
   const fireConfetti = useCallback(() => {
@@ -464,7 +469,7 @@ export default function WrappedClient({
               }`}
             >
               <Layers className="h-3.5 w-3.5 text-[var(--accent)]" />
-              <span>Hikaye</span>
+              <span>{t.wrapped.storyMode}</span>
             </button>
             <button
               type="button"
@@ -476,7 +481,7 @@ export default function WrappedClient({
               }`}
             >
               <FileText className="h-3.5 w-3.5 text-amber-400" />
-              <span>Poster</span>
+              <span>{t.wrapped.posterMode}</span>
             </button>
           </div>
 
@@ -485,8 +490,8 @@ export default function WrappedClient({
             <button
               type="button"
               onClick={() => setIsPlaying((p) => !p)}
-              className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-100"
-              title={isPlaying ? "Durdur" : "Otomatik Oynat"}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-100 cursor-pointer"
+              title={isPlaying ? t.wrapped.pause : t.wrapped.autoPlay}
             >
               {isPlaying ? (
                 <Pause className="h-3.5 w-3.5" />
@@ -534,10 +539,10 @@ export default function WrappedClient({
           <button
             type="button"
             onClick={() => setShareModalOpen(true)}
-            className="flex h-8 items-center gap-1.5 rounded-xl border border-zinc-700/80 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-200 shadow-sm transition-all hover:border-[var(--accent)]/50 hover:bg-zinc-800 hover:text-white"
+            className="flex h-8 items-center gap-1.5 rounded-xl border border-zinc-700/80 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-200 shadow-sm transition-all hover:border-[var(--accent)]/50 hover:bg-zinc-800 hover:text-white cursor-pointer"
           >
             <Share2 className="h-3 w-3 text-[var(--accent)]" />
-            <span>Paylaş</span>
+            <span>{t.common.share}</span>
           </button>
         </div>
       </header>
@@ -555,19 +560,10 @@ export default function WrappedClient({
             <div className="flex items-center justify-between border-b border-zinc-800/40 pb-2.5">
               <div className="flex items-center gap-2.5">
                 <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-[var(--accent)]">
-                  {"//"} BÖLÜM {slide + 1}:
+                  {"//"} {t.wrapped.chapter} {slide + 1}:
                 </span>
                 <span className="text-xs font-semibold text-zinc-400">
-                  {slide === 0 && "BAŞLANGIÇ & GİRİŞ"}
-                  {slide === 1 && "COMMIT VELOCITY & ETKİ"}
-                  {slide === 2 && "KOD HACMİ & MATRİKS"}
-                  {slide === 3 && "ZİRVE VE RETİM ÇİZELGESİ"}
-                  {slide === 4 && "GELİŞTİRİCİ ARKETİPİ & DNA"}
-                  {slide === 5 && "TEKNOLOJİ CEPHANESİ & DİLLER"}
-                  {slide === 6 && "PROJE VE REPO EVRENİ"}
-                  {slide === 7 && "EFSANEVİ COMMİT REKORU"}
-                  {slide === 8 && "365 GÜNLÜK KOD MATRİKSİ"}
-                  {slide === 9 && "BÜYÜK FİNAL & KUTLAMA"}
+                  {t.wrapped.slideTitles[slide] || ""}
                 </span>
               </div>
 
@@ -986,27 +982,27 @@ export default function WrappedClient({
                     <button
                       type="button"
                       onClick={() => setMode("poster")}
-                      className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-xs sm:text-sm font-bold text-zinc-950 shadow-2xl transition-transform hover:scale-105 active:scale-95"
+                      className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-xs sm:text-sm font-bold text-zinc-950 shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer"
                       style={{ backgroundColor: ac }}
                     >
                       <FileText className="h-4 w-4" />
-                      <span>Posteri Görüntüle</span>
+                      <span>{lang === "tr" ? "Posteri Görüntüle" : "View Poster"}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setShareModalOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-800/80 px-5 py-3 text-xs sm:text-sm font-semibold text-zinc-100 transition-colors hover:bg-zinc-700"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-800/80 px-5 py-3 text-xs sm:text-sm font-semibold text-zinc-100 transition-colors hover:bg-zinc-700 cursor-pointer"
                     >
                       <Share2 className="h-4 w-4 text-[var(--accent)]" />
-                      <span>Sosyal Medyada Paylaş</span>
+                      <span>{lang === "tr" ? "Sosyal Medyada Paylaş" : "Share on Social Media"}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={fireConfetti}
-                      className="inline-flex items-center gap-1 rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-xs text-zinc-400 hover:text-white"
-                      title="Konfeti patlat"
+                      className="inline-flex items-center gap-1 rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-xs text-zinc-400 hover:text-white cursor-pointer"
+                      title={lang === "tr" ? "Konfeti patlat" : "Confetti"}
                     >
                       🎊
                     </button>
@@ -1017,15 +1013,17 @@ export default function WrappedClient({
 
             {/* Sahne Alt Bilgisi */}
             <div className="flex items-center justify-between border-t border-zinc-800/40 pt-2.5 text-[11px] font-mono text-zinc-500">
-              <span>DEVANALYTICS.APP {"//"} WRAPPED-{data.year}</span>
+              <span>DEVBOARD.APP {"//"} WRAPPED-{data.year}</span>
               <button
                 type="button"
                 onClick={() => downloadSlidePng(slide)}
                 disabled={sharing}
-                className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <Download className="h-3 w-3" />
-                <span className="hidden sm:inline">Bu Slaytı İndir (PNG)</span>
+                <span className="hidden sm:inline">
+                  {lang === "tr" ? "Bu Slaytı İndir (PNG)" : "Download Slide (PNG)"}
+                </span>
               </button>
             </div>
           </div>
@@ -1444,23 +1442,27 @@ export default function WrappedClient({
                 ) : (
                   <Download className="h-4 w-4" />
                 )}
-                <span>1080x1080 Story Görseli İndir (PNG)</span>
+                <span>
+                  {lang === "tr"
+                    ? "1080x1080 Story Görseli İndir (PNG)"
+                    : "Download 1080x1080 Story Image (PNG)"}
+                </span>
               </button>
 
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 py-2.5 text-xs font-semibold text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 py-2.5 text-xs font-semibold text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white cursor-pointer"
               >
                 {copied ? (
                   <>
                     <Check className="h-4 w-4 text-emerald-400" />
-                    <span className="text-emerald-400">Bağlantı Kopyalandı!</span>
+                    <span className="text-emerald-400">{t.wrapped.linkCopied}</span>
                   </>
                 ) : (
                   <>
                     <Copy className="h-4 w-4 text-zinc-400" />
-                    <span>Wrapped Bağlantısını Kopyala</span>
+                    <span>{t.wrapped.copyLink}</span>
                   </>
                 )}
               </button>

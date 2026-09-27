@@ -30,6 +30,7 @@ import {
   Sparkle,
 } from "lucide-react";
 import PushNotificationToggle from "@/components/push-notification-toggle";
+import { useLanguage } from "@/lib/i18n";
 import {
   WIDGET_KEYS,
   WIDGET_LABELS,
@@ -78,6 +79,17 @@ export type SettingsSectionId =
   | "bildirimler"
   | "gizlilik";
 
+export const VALID_SECTION_IDS: SettingsSectionId[] = [
+  "gorunum",
+  "profil",
+  "sosyal",
+  "profil-sayfasi",
+  "badge",
+  "readme-widgets",
+  "bildirimler",
+  "gizlilik",
+];
+
 interface NavItem {
   id: SettingsSectionId;
   label: string;
@@ -86,79 +98,6 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   group: "ozellestirme" | "entegrasyon" | "tercihler";
 }
-
-const NAV_GROUPS = [
-  { id: "ozellestirme", label: "Görünüm & Kimlik" },
-  { id: "entegrasyon", label: "Profil & Dokümantasyon" },
-  { id: "tercihler", label: "Tercihler & Güvenlik" },
-] as const;
-
-const NAV_ITEMS: NavItem[] = [
-  {
-    id: "gorunum",
-    label: "Görünüm",
-    shortDesc: "Tema rengi ve arayüz vurguları",
-    badgeText: "Tema",
-    icon: Palette,
-    group: "ozellestirme",
-  },
-  {
-    id: "profil",
-    label: "Profil Bilgileri",
-    shortDesc: "Biyografi, hedef, teknolojiler ve repolar",
-    badgeText: "Profil",
-    icon: User,
-    group: "ozellestirme",
-  },
-  {
-    id: "sosyal",
-    label: "Sosyal Linkler",
-    shortDesc: "X, LinkedIn, web sitesi ve Discord",
-    badgeText: "Sosyal",
-    icon: Share2,
-    group: "ozellestirme",
-  },
-  {
-    id: "profil-sayfasi",
-    label: "Profil Sayfası",
-    shortDesc: "README içeriği ve widget düzeni",
-    badgeText: "README",
-    icon: LayoutTemplate,
-    group: "entegrasyon",
-  },
-  {
-    id: "badge",
-    label: "README Rozeti",
-    shortDesc: "GitHub profil istatistik rozeti",
-    badgeText: "Rozet",
-    icon: Award,
-    group: "entegrasyon",
-  },
-  {
-    id: "readme-widgets",
-    label: "README Widget'ları",
-    shortDesc: "Streak, istatistik ve dil kartları",
-    badgeText: "Widget",
-    icon: Sparkles,
-    group: "entegrasyon",
-  },
-  {
-    id: "bildirimler",
-    label: "Bildirimler",
-    shortDesc: "Web push bildirim tercihleri",
-    badgeText: "Push",
-    icon: Bell,
-    group: "tercihler",
-  },
-  {
-    id: "gizlilik",
-    label: "Gizlilik & Sıralama",
-    shortDesc: "Liderlik tablosu görünürlüğü",
-    badgeText: "Gizlilik",
-    icon: Shield,
-    group: "tercihler",
-  },
-];
 
 const SUGGESTED_TAGS = [
   "TypeScript",
@@ -236,11 +175,86 @@ export default function SettingsForm({
     hour: 20,
   });
 
+  const { lang, setLang, t } = useLanguage();
+
+  const navGroups = [
+    { id: "ozellestirme", label: t.settings.groupCustomization },
+    { id: "entegrasyon", label: t.settings.groupIntegration },
+    { id: "tercihler", label: t.settings.groupPreferences },
+  ] as const;
+
+  const navItems: NavItem[] = [
+    {
+      id: "gorunum",
+      label: t.settings.navAppearance,
+      shortDesc: t.settings.navAppearanceDesc,
+      badgeText: lang === "tr" ? "Tema" : "Theme",
+      icon: Palette,
+      group: "ozellestirme",
+    },
+    {
+      id: "profil",
+      label: t.settings.navProfile,
+      shortDesc: t.settings.navProfileDesc,
+      badgeText: lang === "tr" ? "Profil" : "Profile",
+      icon: User,
+      group: "ozellestirme",
+    },
+    {
+      id: "sosyal",
+      label: t.settings.navSocial,
+      shortDesc: t.settings.navSocialDesc,
+      badgeText: lang === "tr" ? "Sosyal" : "Social",
+      icon: Share2,
+      group: "ozellestirme",
+    },
+    {
+      id: "profil-sayfasi",
+      label: t.settings.navProfilePage,
+      shortDesc: t.settings.navProfilePageDesc,
+      badgeText: "README",
+      icon: LayoutTemplate,
+      group: "entegrasyon",
+    },
+    {
+      id: "badge",
+      label: t.settings.navBadge,
+      shortDesc: t.settings.navBadgeDesc,
+      badgeText: lang === "tr" ? "Rozet" : "Badge",
+      icon: Award,
+      group: "entegrasyon",
+    },
+    {
+      id: "readme-widgets",
+      label: t.settings.navReadmeWidgets,
+      shortDesc: t.settings.navReadmeWidgetsDesc,
+      badgeText: "Widget",
+      icon: Sparkles,
+      group: "entegrasyon",
+    },
+    {
+      id: "bildirimler",
+      label: t.settings.navNotifications,
+      shortDesc: t.settings.navNotificationsDesc,
+      badgeText: "Push",
+      icon: Bell,
+      group: "tercihler",
+    },
+    {
+      id: "gizlilik",
+      label: t.settings.navPrivacy,
+      shortDesc: t.settings.navPrivacyDesc,
+      badgeText: lang === "tr" ? "Gizlilik" : "Privacy",
+      icon: Shield,
+      group: "tercihler",
+    },
+  ];
+
   // URL hash kontrolü ve dinleyici
   useEffect(() => {
     function handleHashChange() {
       const hash = window.location.hash.replace("#", "") as SettingsSectionId;
-      if (NAV_ITEMS.some((n) => n.id === hash)) {
+      if (VALID_SECTION_IDS.includes(hash)) {
         setActiveSection(hash);
       }
     }
@@ -328,11 +342,21 @@ export default function SettingsForm({
   const accentBg = previewColors.accentBg;
   const accentBorder = previewColors.accentBorder;
 
-  const currentNav = NAV_ITEMS.find((n) => n.id === activeSection) || NAV_ITEMS[0];
+  const currentNav = navItems.find((n) => n.id === activeSection) || navItems[0];
   const CurrentIcon = currentNav.icon;
 
   return (
     <div className="relative">
+      {/* ── Sayfa Başlığı ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-800/60 mb-6">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">{t.settings.title}</h1>
+          <p className="mt-1 text-xs sm:text-sm text-zinc-400">
+            {t.settings.subtitle}
+          </p>
+        </div>
+      </div>
+
       {/* Başarı Toast */}
       <div
         className="fixed top-20 right-4 sm:right-8 z-50 transition-all duration-300 pointer-events-none"
@@ -356,8 +380,12 @@ export default function SettingsForm({
             <Check className="h-4 w-4" />
           </div>
           <div>
-            <p className="font-semibold text-zinc-100">Ayarlar kaydedildi</p>
-            <p className="text-xs text-zinc-400">Değişikliklerin anında profiline uygulandı.</p>
+            <p className="font-semibold text-zinc-100">{t.settings.saved}</p>
+            <p className="text-xs text-zinc-400">
+              {lang === "tr"
+                ? "Değişikliklerin anında profiline uygulandı."
+                : "Changes have been applied to your profile."}
+            </p>
           </div>
         </div>
       </div>
@@ -373,7 +401,7 @@ export default function SettingsForm({
       {/* ── Mobil Sekme Çubuğu (Yatay Kaydırılabilir) ── */}
       <div className="lg:hidden mb-6">
         <div className="flex items-center gap-1.5 overflow-x-auto p-1.5 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md custom-scroll">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = activeSection === item.id;
             const Icon = item.icon;
             return (
@@ -410,8 +438,8 @@ export default function SettingsForm({
         <aside className="hidden lg:block w-72 shrink-0">
           <div className="sticky top-24 space-y-4">
             <nav className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 backdrop-blur-md p-3 space-y-4">
-              {NAV_GROUPS.map((group) => {
-                const groupItems = NAV_ITEMS.filter((item) => item.group === group.id);
+              {navGroups.map((group) => {
+                const groupItems = navItems.filter((item) => item.group === group.id);
                 return (
                   <div key={group.id} className="space-y-1">
                     <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
@@ -479,10 +507,12 @@ export default function SettingsForm({
             <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 text-[11px] text-zinc-400 space-y-1.5">
               <div className="flex items-center gap-2 font-medium text-zinc-300">
                 <Info className="h-3.5 w-3.5" style={{ color: accent }} />
-                <span>Tek Tıkla Kayıt</span>
+                <span>{lang === "tr" ? "Tek Tıkla Kayıt" : "One-Click Save"}</span>
               </div>
               <p className="leading-relaxed text-zinc-500">
-                Tüm sekmelerdeki değişiklikler kaydedilene kadar tek bir formda saklanır. Sekmeler arasında güvenle geçiş yapabilirsiniz.
+                {lang === "tr"
+                  ? "Tüm sekmelerdeki değişiklikler kaydedilene kadar tek bir formda saklanır. Sekmeler arasında güvenle geçiş yapabilirsiniz."
+                  : "Changes across all tabs are preserved within the form until saved. You can switch tabs freely without losing data."}
               </p>
             </div>
           </div>
@@ -494,25 +524,83 @@ export default function SettingsForm({
           <div className={activeSection === "gorunum" ? "block" : "hidden"}>
             <Section
               icon={Palette}
-              title="Görünüm & Tema"
-              desc="Tema rengin dashboard, grafikler, ısı haritası ve public profilinde her yerde anında uygulanır."
-              badge="Tema & Arayüz"
+              title={t.settings.tabAppearance}
+              desc={t.settings.themeDesc}
+              badge={t.settings.navAppearance}
               accent={accent}
               accentBorder={accentBorder}
               accentBg={accentBg}
             >
               <div className="space-y-6">
+                {/* Arayüz Dili / Interface Language */}
+                <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-4 sm:p-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" style={{ color: accent }} />
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
+                          {t.settings.selectLanguage}
+                        </p>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">
+                          {t.settings.languageDesc}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className="rounded-full px-2.5 py-0.5 text-[11px] font-medium border"
+                      style={{ borderColor: accentBorder, color: accent, backgroundColor: accentBg }}
+                    >
+                      {lang.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 max-w-sm">
+                    <button
+                      type="button"
+                      onClick={() => setLang("tr")}
+                      className="flex items-center justify-between rounded-xl border p-3 text-left transition-all cursor-pointer"
+                      style={
+                        lang === "tr"
+                          ? { borderColor: accentBorder, backgroundColor: accentBg }
+                          : { borderColor: "#27272a", backgroundColor: "rgba(24, 24, 27, 0.4)" }
+                      }
+                    >
+                      <div>
+                        <span className="block text-xs font-semibold text-white">Türkçe</span>
+                        <span className="text-[10px] text-zinc-500">TR · Varsayılan</span>
+                      </div>
+                      {lang === "tr" && <Check className="h-4 w-4" style={{ color: accent }} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLang("en")}
+                      className="flex items-center justify-between rounded-xl border p-3 text-left transition-all cursor-pointer"
+                      style={
+                        lang === "en"
+                          ? { borderColor: accentBorder, backgroundColor: accentBg }
+                          : { borderColor: "#27272a", backgroundColor: "rgba(24, 24, 27, 0.4)" }
+                      }
+                    >
+                      <div>
+                        <span className="block text-xs font-semibold text-white">English</span>
+                        <span className="text-[10px] text-zinc-500">EN · International</span>
+                      </div>
+                      {lang === "en" && <Check className="h-4 w-4" style={{ color: accent }} />}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Tema Izgarası */}
                 <div>
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                      Renk Paleti
+                      {t.settings.colorPalette}
                     </p>
                     <span
                       className="rounded-full px-2.5 py-0.5 text-[11px] font-medium border"
                       style={{ borderColor: accentBorder, color: accent, backgroundColor: accentBg }}
                     >
-                      Aktif: {THEMES[selectedTheme].label}
+                      {t.settings.active}: {THEMES[selectedTheme].label}
                     </span>
                   </div>
 
@@ -1255,8 +1343,17 @@ export default function SettingsForm({
                   <CurrentIcon className="h-3.5 w-3.5" />
                 </span>
                 <p className="text-xs text-zinc-400">
-                  <span className="text-zinc-200 font-medium">Aktif Sekme:</span> {currentNav.label}
-                  <span className="hidden md:inline text-zinc-500"> — Tüm sekmelerdeki değişiklikler birlikte kaydedilir.</span>
+                  <span className="text-zinc-200 font-medium">
+                    {lang === "tr" ? "Aktif Sekme:" : "Active Tab:"}
+                  </span>{" "}
+                  {currentNav.label}
+                  <span className="hidden md:inline text-zinc-500">
+                    {" "}
+                    —{" "}
+                    {lang === "tr"
+                      ? "Tüm sekmelerdeki değişiklikler birlikte kaydedilir."
+                      : "Changes across all tabs are saved together."}
+                  </span>
                 </p>
               </div>
 
@@ -1273,12 +1370,12 @@ export default function SettingsForm({
                 {pending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Kaydediliyor...
+                    {t.settings.saving}
                   </>
                 ) : (
                   <>
                     <Check className="h-4 w-4" />
-                    Değişiklikleri Kaydet
+                    {t.settings.saveChanges}
                   </>
                 )}
               </button>
