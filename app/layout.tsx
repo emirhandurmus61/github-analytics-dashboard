@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dev Analytics Dashboard",
+  title: "Devboard — GitHub Developer Analytics & Profile",
   description: "Your GitHub activity, beautifully visualized.",
 };
 

@@ -1,4 +1,4 @@
-// Dev Analytics — Service Worker (Web Push)
+// Devboard — Service Worker (Web Push)
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
@@ -6,11 +6,11 @@ self.addEventListener("push", (e) => {
   if (!e.data) return;
   const data = e.data.json();
   e.waitUntil(
-    self.registration.showNotification(data.title ?? "Dev Analytics", {
+    self.registration.showNotification(data.title ?? "Devboard", {
       body: data.body ?? "",
       icon: data.icon ?? "/favicon.ico",
       badge: "/favicon.ico",
-      tag: data.tag ?? "dev-analytics",
+      tag: data.tag ?? "devboard",
       data: { url: data.url ?? "/dashboard" },
     })
   );

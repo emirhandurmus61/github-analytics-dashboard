@@ -33,7 +33,7 @@ const LANG_COLORS: Record<string, string> = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   return {
-    title: `${username} — Dev Analytics`,
+    title: `${username} — Devboard`,
     description: `${username} kullanicisinin GitHub aktivite istatistikleri.`,
   };
 }

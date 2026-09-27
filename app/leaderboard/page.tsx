@@ -8,7 +8,7 @@ import Navbar from "@/components/navbar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Liderlik Tablosu · Dev Analytics",
+  title: "Liderlik Tablosu · Devboard",
   description: "Bu haftanın en aktif geliştiricileri.",
 };
 

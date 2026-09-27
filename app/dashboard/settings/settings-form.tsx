@@ -1121,7 +1121,7 @@ export default function SettingsForm({
                   <p className="mb-2 text-xs font-semibold text-zinc-400">Canlı Rozet Görünümü</p>
                   <div className="flex items-center justify-center rounded-2xl border border-zinc-800/80 bg-zinc-950 p-6">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={badgeUrl} alt="Dev Analytics Rozet" className="block max-w-full drop-shadow-md" />
+                    <img src={badgeUrl} alt="Devboard Rozet" className="block max-w-full drop-shadow-md" />
                   </div>
                 </div>
 
@@ -1129,7 +1129,7 @@ export default function SettingsForm({
                   <div>
                     <p className="mb-2 text-xs font-medium text-zinc-400">Markdown Kodu (GitHub Profiliniz İçin)</p>
                     <CopyBox
-                      value={`[![Dev Analytics](${badgeUrl})](https://devanalytics.app/u/${username})`}
+                      value={`[![Devboard](${badgeUrl})](https://devboard.app/u/${username})`}
                       accentColor={accent}
                       accentBg={accentBg}
                       accentBorder={accentBorder}
@@ -1138,7 +1138,7 @@ export default function SettingsForm({
                   <div>
                     <p className="mb-2 text-xs font-medium text-zinc-400">HTML Kodu</p>
                     <CopyBox
-                      value={`<a href="https://devanalytics.app/u/${username}"><img src="${badgeUrl}" alt="Dev Analytics"></a>`}
+                      value={`<a href="https://devboard.app/u/${username}"><img src="${badgeUrl}" alt="Devboard"></a>`}
                       accentColor={accent}
                       accentBg={accentBg}
                       accentBorder={accentBorder}

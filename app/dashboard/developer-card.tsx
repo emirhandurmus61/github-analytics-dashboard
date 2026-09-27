@@ -20,9 +20,9 @@ export default function DeveloperCard({ username }: { username: string }) {
 
   const cardUrl = `/api/card/${username}?format=${format}`;
   const tweetText = encodeURIComponent(
-    `GitHub aktivitelerime bakın! 🚀\nDev Analytics üzerinde istatistiklerinizi görün`
+    `GitHub aktivitelerime bakın! 🚀\nDevboard üzerinde istatistiklerinizi görün`
   );
-  const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(`https://devanalytics.app/u/${username}`)}`;
+  const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(`https://devboard.app/u/${username}`)}`;
 
   async function handleDownload() {
     setDownloading(true);

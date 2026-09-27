@@ -1741,7 +1741,7 @@ function ProfileShareButtons({ username }: { username: string }) {
 
   const cardUrl = `/api/card/${username}?format=og`;
   const tweetText = encodeURIComponent(
-    `GitHub istatistiklerime bakın! 🚀 Dev Analytics`
+    `GitHub istatistiklerime bakın! 🚀 Devboard`
   );
   const profileUrl = typeof window !== "undefined"
     ? `${window.location.origin}/u/${username}`
@@ -2200,7 +2200,7 @@ export default function ProfileClient(props: ProfileProps) {
             <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.accent }} />
             <p className="text-xs text-zinc-600">
               <Link href="/" className="text-zinc-500 hover:text-zinc-300 transition-colors">
-                Dev Analytics
+                Devboard
               </Link>{" "}
               ile olusturuldu
             </p>

@@ -204,7 +204,7 @@ export default function PushNotificationToggle({
             onClick={async () => {
               try {
                 const reg = await navigator.serviceWorker.ready;
-                await reg.showNotification("Dev Analytics", {
+                await reg.showNotification("Devboard", {
                   body: "Bildirimler düzgün çalışıyor!",
                   icon: "/favicon.ico",
                   tag: "test",

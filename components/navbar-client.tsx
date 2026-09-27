@@ -146,7 +146,7 @@ export default function NavbarClient({
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-semibold tracking-tight text-zinc-100 transition-colors group-hover:text-white">
-                  Dev Analytics
+                  Devboard
                 </span>
                 <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400">
                   <span className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" />

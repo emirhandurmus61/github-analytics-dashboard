@@ -130,7 +130,7 @@ export async function GET(
           <img src={user.avatar_url} width={160} height={160} style={{ borderRadius: "50%", border: `6px solid ${ac}` }} alt={username} />
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={{ color: "#71717a", fontSize: 22 }}>Dev Analytics Sunuyor</span>
+          <span style={{ color: "#71717a", fontSize: 22 }}>Devboard Sunuyor</span>
           <span style={{ color: "#f4f4f5", fontSize: 96, fontWeight: 900, lineHeight: 1 }}>{yearNum}</span>
           <span style={{ color: ac, fontSize: 80, fontWeight: 900, lineHeight: 1 }}>Wrapped</span>
         </div>

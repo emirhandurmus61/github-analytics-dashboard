@@ -131,8 +131,8 @@ function buildBadgeSvg({
   const col2 = 115; // weekly commits
   const col3 = W - col1 - col2; // top lang
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" role="img" aria-label="Dev Analytics: ${username}">
-  <title>${username} — Dev Analytics</title>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" role="img" aria-label="Devboard: ${username}">
+  <title>${username} — Devboard</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="${labelBg}" stop-opacity="1"/>

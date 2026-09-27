@@ -474,7 +474,7 @@ export default function LandingClient({
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-zinc-400 sm:text-base">
               GitHub profilinizdeki commit sayıları kodlama tutkunuzun yalnızca küçük bir parçasıdır.
-              Dev Analytics, tüm geliştirme alışkanlıklarınızı ve proje dinamiklerinizi sıfır konfigürasyonla
+              Devboard, tüm geliştirme alışkanlıklarınızı ve proje dinamiklerinizi sıfır konfigürasyonla
               anlamlandırır; oyunlaştırılmış, derin ve paylaşılabilir bir başarı ekosistemine dönüştürür.
             </p>
           </div>
@@ -1189,7 +1189,7 @@ export default function LandingClient({
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 sm:flex-row text-xs text-zinc-500">
           <div className="flex items-center gap-2">
             <GH className="h-3.5 w-3.5 text-zinc-500" />
-            <span className="font-semibold text-zinc-400">Dev Analytics</span>
+            <span className="font-semibold text-zinc-400">Devboard</span>
             <span>&middot;</span>
             <Link href="/leaderboard" className="hover:text-zinc-300 transition-colors">
               Sıralama

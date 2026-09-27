@@ -13,7 +13,7 @@ type Props = { params: Promise<{ username: string; year: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username, year } = await params;
   return {
-    title: `${username} — ${year} Wrapped · Dev Analytics`,
+    title: `${username} — ${year} Wrapped · Devboard`,
     description: `${username} kullanıcısının ${year} yılı GitHub özeti.`,
   };
 }

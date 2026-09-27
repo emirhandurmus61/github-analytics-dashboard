@@ -166,7 +166,7 @@ export default function MobileMenu({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold tracking-tight text-zinc-100">
-                    Dev Analytics
+                    Devboard
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400">
                     <span className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" />
