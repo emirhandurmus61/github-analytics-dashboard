@@ -38,8 +38,10 @@ type WrappedData = {
   totalLinesDeleted: number;
   activeDays: number;
   longestStreak: number;
+  peakMonthIdx?: number;
   peakMonth: string;
   peakMonthCommits: number;
+  peakDayIdx?: number;
   peakDay: string;
   peakHour: number;
   topLangs: LangEntry[];
@@ -56,8 +58,20 @@ type WrappedData = {
     badge: string;
     desc: string;
     color: string;
+    en?: {
+      title: string;
+      tagline: string;
+      badge: string;
+      desc: string;
+    };
   };
-  identity: { label: string; emoji: string };
+  identity: {
+    label: string;
+    emoji: string;
+    en?: {
+      label: string;
+    };
+  };
   monthlyData: MonthPoint[];
   accentColor: string;
   accentBg: string;
@@ -110,13 +124,32 @@ function CountUp({
   );
 }
 
+const MONTH_SHORT_TR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+const MONTH_SHORT_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_NAMES_TR = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+];
+const MONTH_NAMES_EN = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+const DAY_NAMES_TR = [
+  "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"
+];
+const DAY_NAMES_EN = [
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+];
+
 // 12 Aylık dalga formu grafik
 function MonthWaveform({
   data,
   accentColor,
+  lang = "tr",
 }: {
   data: MonthPoint[];
   accentColor: string;
+  lang?: "tr" | "en";
 }) {
   const max = Math.max(...data.map((d) => d.commits), 1);
   const peak = data.reduce(
@@ -130,6 +163,7 @@ function MonthWaveform({
       {data.map((d, i) => {
         const h = Math.max((d.commits / max) * 100, d.commits > 0 ? 8 : 4);
         const isPeak = i === peak;
+        const monthLabel = lang === "en" ? (MONTH_SHORT_EN[i] || d.month) : (MONTH_SHORT_TR[i] || d.month);
         return (
           <div key={d.month} className="flex flex-1 flex-col items-center gap-1.5 group">
             <div
@@ -150,7 +184,7 @@ function MonthWaveform({
                 fontWeight: isPeak ? 700 : 400,
               }}
             >
-              {d.month}
+              {monthLabel}
             </span>
           </div>
         );
@@ -255,15 +289,28 @@ export default function WrappedClient({
   const ac = data.accentColor;
   const TOTAL_SLIDES = 10;
 
+  const archetypeTitle = (lang === "en" && data.archetype.en?.title) ? data.archetype.en.title : data.archetype.title;
+  const archetypeTagline = (lang === "en" && data.archetype.en?.tagline) ? data.archetype.en.tagline : data.archetype.tagline;
+  const archetypeBadge = (lang === "en" && data.archetype.en?.badge) ? data.archetype.en.badge : data.archetype.badge;
+  const archetypeDesc = (lang === "en" && data.archetype.en?.desc) ? data.archetype.en.desc : data.archetype.desc;
+
+  const peakMonthDisplay = (data.peakMonthIdx !== undefined && lang === "en")
+    ? MONTH_NAMES_EN[data.peakMonthIdx]
+    : data.peakMonth;
+
+  const peakDayDisplay = (data.peakDayIdx !== undefined && lang === "en")
+    ? DAY_NAMES_EN[data.peakDayIdx]
+    : data.peakDay;
+
   const shareUrl =
     typeof window !== "undefined"
       ? window.location.href
-      : `https://devanalytics.app/u/${data.username}/${data.year}`;
+      : `https://devboard.app/u/${data.username}/${data.year}`;
 
   const tweetText =
     lang === "tr"
-      ? `🚀 ${data.displayName} (@${data.username}) — ${data.year} Devboard Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("tr-TR")} commit\n🔥 ${data.longestStreak} gün kesintisiz seri\n🏆 Rolüm: ${data.archetype.title}\n\nDetaylı yıllık geliştirici özetim:`
-      : `🚀 ${data.displayName} (@${data.username}) — ${data.year} Devboard Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("en-US")} commits\n🔥 ${data.longestStreak}-day unbroken streak\n🏆 Archetype: ${data.archetype.title}\n\nDetailed annual developer summary:`;
+      ? `🚀 ${data.displayName} (@${data.username}) — ${data.year} Devboard Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("tr-TR")} commit\n🔥 ${data.longestStreak} gün kesintisiz seri\n🏆 Rolüm: ${archetypeTitle}\n\nDetaylı yıllık geliştirici özetim:`
+      : `🚀 ${data.displayName} (@${data.username}) — ${data.year} Devboard Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("en-US")} commits\n🔥 ${data.longestStreak}-day unbroken streak\n🏆 Archetype: ${archetypeTitle}\n\nDetailed annual developer summary:`;
 
   // Confetti trigger
   const fireConfetti = useCallback(() => {
@@ -424,7 +471,7 @@ export default function WrappedClient({
                   key={i}
                   type="button"
                   onClick={() => setSlide(i)}
-                  title={`Bölüm ${i + 1}`}
+                  title={lang === "tr" ? `Bölüm ${i + 1}` : `Chapter ${i + 1}`}
                   className="group relative h-1.5 flex-1 rounded-full bg-zinc-800/80 overflow-hidden transition-all hover:h-2"
                 >
                   <div
@@ -606,13 +653,15 @@ export default function WrappedClient({
 
                   <div>
                     <span className="inline-block rounded-full border border-zinc-700/60 bg-zinc-900/80 px-4 py-1 text-xs font-mono font-medium text-zinc-400">
-                      DEV ANALYTICS {"//"} ANNUAL DEVELOPER ARCHIVE
+                      DEVBOARD {"//"} ANNUAL DEVELOPER ARCHIVE
                     </span>
                     <h1 className="mt-3 text-5xl sm:text-7xl font-black tracking-tight text-white">
                       {data.year} <span style={{ color: ac }}>WRAPPED</span>
                     </h1>
                     <p className="mt-3 text-sm sm:text-base text-zinc-300 max-w-lg mx-auto">
-                      Bir yıl boyunca klavyenden dökülen her satır kod, çözdüğün her problem ve ulaştığın geliştirici zirveleri hazır.
+                      {lang === "tr"
+                        ? "Bir yıl boyunca klavyenden dökülen her satır kod, çözdüğün her problem ve ulaştığın geliştirici zirveleri hazır."
+                        : "Every line of code poured from your keyboard, every problem solved, and every developer milestone reached this year is ready."}
                     </p>
                   </div>
 
@@ -620,11 +669,11 @@ export default function WrappedClient({
                     <button
                       type="button"
                       onClick={() => setSlide(1)}
-                      className="inline-flex items-center gap-2 rounded-2xl px-8 py-3.5 text-sm font-bold text-zinc-950 shadow-2xl transition-all hover:scale-105 active:scale-95"
+                      className="inline-flex items-center gap-2 rounded-2xl px-8 py-3.5 text-sm font-bold text-zinc-950 shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
                       style={{ backgroundColor: ac }}
                     >
                       <Sparkles className="h-4 w-4" />
-                      <span>Hikayeyi Keşfet</span>
+                      <span>{lang === "tr" ? "Hikayeyi Keşfet" : "Explore Your Story"}</span>
                     </button>
                   </div>
                 </div>
@@ -634,7 +683,7 @@ export default function WrappedClient({
               {slide === 1 && (
                 <div className="space-y-5 animate-in fade-in duration-500 max-w-3xl w-full">
                   <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    KOD TABANINA ATTIĞIN İMZA
+                    {lang === "tr" ? "KOD TABANINA ATTIĞIN İMZA" : "YOUR MARK ON THE CODEBASE"}
                   </span>
 
                   <div>
@@ -645,28 +694,34 @@ export default function WrappedClient({
                       <CountUp value={data.totalCommits} active={slide === 1} />
                     </p>
                     <p className="mt-2 text-3xl sm:text-4xl font-extrabold text-white">
-                      Commit ile Dünyayı Kodladın!
+                      {lang === "tr" ? "Commit ile Dünyayı Kodladın!" : "You Coded the World with Commits!"}
                     </p>
                   </div>
 
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 px-5 py-3 text-left">
-                      <span className="block text-[11px] font-mono text-zinc-500">AKTİF GÜN</span>
+                      <span className="block text-[11px] font-mono text-zinc-500">
+                        {lang === "tr" ? "AKTİF GÜN" : "ACTIVE DAYS"}
+                      </span>
                       <strong className="text-xl font-bold text-zinc-100">
-                        {data.activeDays} Gün
+                        {data.activeDays} {lang === "tr" ? "Gün" : "Days"}
                       </strong>
                     </div>
 
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 px-5 py-3 text-left">
-                      <span className="block text-[11px] font-mono text-zinc-500">GÜNLÜK TEMPO</span>
+                      <span className="block text-[11px] font-mono text-zinc-500">
+                        {lang === "tr" ? "GÜNLÜK TEMPO" : "DAILY PACE"}
+                      </span>
                       <strong className="text-xl font-bold text-zinc-100">
-                        {(data.totalCommits / Math.max(data.activeDays, 1)).toFixed(1)} commit / gün
+                        {(data.totalCommits / Math.max(data.activeDays, 1)).toFixed(1)} {lang === "tr" ? "commit / gün" : "commits / day"}
                       </strong>
                     </div>
                   </div>
 
                   <p className="text-xs sm:text-sm text-zinc-400 italic max-w-md mx-auto">
-                    &ldquo;Terminalin ve editörün bu yıl neredeyse hiç soğumadı; projelerin her commit ile bir adım daha ileri taşındı.&rdquo;
+                    {lang === "tr"
+                      ? "“Terminalin ve editörün bu yıl neredeyse hiç soğumadı; projelerin her commit ile bir adım daha ileri taşındı.”"
+                      : "“Your terminal and editor barely cooled down this year; your projects advanced with every single commit.”"}
                   </p>
                 </div>
               )}
@@ -675,38 +730,42 @@ export default function WrappedClient({
               {slide === 2 && (
                 <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl w-full">
                   <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    KOD MATRIXİ VE HACİM DENGESİ
+                    {lang === "tr" ? "KOD MATRIXİ VE HACİM DENGESİ" : "CODE MATRIX & VOLUME BALANCE"}
                   </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
                     <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center backdrop-blur-md shadow-[0_0_30px_rgba(16,185,129,0.15)]">
                       <span className="font-mono text-xs font-bold text-emerald-400">
-                        + DÜNYAYA EKLENEN KOD
+                        {lang === "tr" ? "+ DÜNYAYA EKLENEN KOD" : "+ CODE ADDED TO THE WORLD"}
                       </span>
                       <p className="mt-2 text-4xl sm:text-6xl font-black text-emerald-400">
                         +<CountUp value={data.totalLinesAdded} active={slide === 2} />
                       </p>
-                      <span className="mt-1 block text-xs text-zinc-400">satır yeni kod üretildi</span>
+                      <span className="mt-1 block text-xs text-zinc-400">
+                        {lang === "tr" ? "satır yeni kod üretildi" : "lines of new code written"}
+                      </span>
                     </div>
 
                     <div className="rounded-3xl border border-red-500/30 bg-red-500/10 p-6 text-center backdrop-blur-md shadow-[0_0_30px_rgba(239,68,68,0.15)]">
                       <span className="font-mono text-xs font-bold text-red-400">
-                        − REFACTOR EDİLEN KOD
+                        {lang === "tr" ? "− REFACTOR EDİLEN KOD" : "− REFACTORED CODE"}
                       </span>
                       <p className="mt-2 text-4xl sm:text-6xl font-black text-red-400">
                         −<CountUp value={data.totalLinesDeleted} active={slide === 2} />
                       </p>
-                      <span className="mt-1 block text-xs text-zinc-400">satır silindi ve temizlendi</span>
+                      <span className="mt-1 block text-xs text-zinc-400">
+                        {lang === "tr" ? "satır silindi ve temizlendi" : "lines deleted and cleaned"}
+                      </span>
                     </div>
                   </div>
 
                   <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 max-w-lg mx-auto">
                     <p className="text-xs text-zinc-300">
-                      Net Kod Katkın:{" "}
+                      {lang === "tr" ? "Net Kod Katkın: " : "Net Code Contribution: "}
                       <strong className="text-white font-mono text-sm">
-                        {(data.totalLinesAdded - data.totalLinesDeleted).toLocaleString("tr-TR")}
+                        {(data.totalLinesAdded - data.totalLinesDeleted).toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
                       </strong>{" "}
-                      satır
+                      {lang === "tr" ? "satır" : "lines"}
                     </p>
                   </div>
                 </div>
@@ -716,20 +775,24 @@ export default function WrappedClient({
               {slide === 3 && (
                 <div className="space-y-5 animate-in fade-in duration-500 max-w-3xl w-full">
                   <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    EN BÜYÜK ÜRETİM PATLAMASI
+                    {lang === "tr" ? "EN BÜYÜK ÜRETİM PATLAMASI" : "BIGGEST PRODUCTION BURST"}
                   </span>
 
                   <div>
                     <p className="text-5xl sm:text-7xl font-black" style={{ color: ac }}>
-                      {data.peakMonth.toUpperCase()}
+                      {peakMonthDisplay.toUpperCase()}
                     </p>
                     <p className="mt-2 text-sm text-zinc-300">
-                      Bu ay tam <strong className="text-white font-bold">{data.peakMonthCommits} commit</strong> ile yılın zirvesini yaşadın.
+                      {lang === "tr" ? (
+                        <>Bu ay tam <strong className="text-white font-bold">{data.peakMonthCommits} commit</strong> ile yılın zirvesini yaşadın.</>
+                      ) : (
+                        <>You hit your peak this year with <strong className="text-white font-bold">{data.peakMonthCommits} commits</strong> in this month.</>
+                      )}
                     </p>
                   </div>
 
                   <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/60 p-4 sm:p-6 backdrop-blur-xl">
-                    <MonthWaveform data={data.monthlyData} accentColor={ac} />
+                    <MonthWaveform data={data.monthlyData} accentColor={ac} lang={lang} />
                   </div>
                 </div>
               )}
@@ -738,7 +801,7 @@ export default function WrappedClient({
               {slide === 4 && (
                 <div className="space-y-4 animate-in fade-in duration-500 max-w-2xl w-full">
                   <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    KODLAMA TARZIN VE DNA ROZETİN
+                    {lang === "tr" ? "KODLAMA TARZIN VE DNA ROZETİN" : "CODING STYLE & DNA BADGE"}
                   </span>
 
                   <div
@@ -757,33 +820,33 @@ export default function WrappedClient({
                         border: `1px solid ${data.archetype.color}60`,
                       }}
                     >
-                      {data.archetype.badge}
+                      {archetypeBadge}
                     </span>
 
                     <h2
                       className="mt-3 text-3xl sm:text-5xl font-black tracking-tight"
                       style={{ color: data.archetype.color }}
                     >
-                      {data.archetype.title}
+                      {archetypeTitle}
                     </h2>
 
                     <p className="mt-2 text-sm font-semibold text-zinc-200">
-                      &ldquo;{data.archetype.tagline}&rdquo;
+                      &ldquo;{archetypeTagline}&rdquo;
                     </p>
 
                     <p className="mt-3 text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-lg mx-auto">
-                      {data.archetype.desc}
+                      {archetypeDesc}
                     </p>
 
                     <div className="mt-5 grid grid-cols-2 gap-3 pt-3 border-t border-zinc-800/60">
                       <div className="flex items-center justify-center gap-2 text-xs">
                         <Calendar className="h-4 w-4 text-zinc-400" />
-                        <span className="text-zinc-400">Zirve Gün:</span>
-                        <strong className="text-white">{data.peakDay}</strong>
+                        <span className="text-zinc-400">{lang === "tr" ? "Zirve Gün:" : "Peak Day:"}</span>
+                        <strong className="text-white">{peakDayDisplay}</strong>
                       </div>
                       <div className="flex items-center justify-center gap-2 text-xs">
                         <Clock className="h-4 w-4 text-zinc-400" />
-                        <span className="text-zinc-400">Zirve Saat:</span>
+                        <span className="text-zinc-400">{lang === "tr" ? "Zirve Saat:" : "Peak Hour:"}</span>
                         <strong className="text-white">
                           {String(data.peakHour).padStart(2, "0")}:00
                         </strong>
@@ -797,16 +860,20 @@ export default function WrappedClient({
               {slide === 5 && (
                 <div className="space-y-5 animate-in fade-in duration-500 max-w-2xl w-full">
                   <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    FAVORİ PROGRAMLAMA DİLLERİN
+                    {lang === "tr" ? "FAVORİ PROGRAMLAMA DİLLERİN" : "FAVORITE PROGRAMMING LANGUAGES"}
                   </span>
 
                   <div>
-                    <span className="text-xs font-mono text-zinc-400">#1 NUMARALI SİLAHIN</span>
+                    <span className="text-xs font-mono text-zinc-400">
+                      {lang === "tr" ? "#1 NUMARALI SİLAHIN" : "#1 PRIMARY WEAPON"}
+                    </span>
                     <p className="text-4xl sm:text-6xl font-black text-white mt-1">
                       {data.topLangs[0]?.lang ?? "Code"}
                     </p>
                     <span className="font-mono text-sm text-[var(--accent)] font-bold">
-                      %{data.topLangs[0]?.pct ?? 0} pay ile zirvede
+                      {lang === "tr"
+                        ? `%{data.topLangs[0]?.pct ?? 0} pay ile zirvede`
+                        : `leading with %${data.topLangs[0]?.pct ?? 0} share`}
                     </span>
                   </div>
 
@@ -843,33 +910,41 @@ export default function WrappedClient({
               {slide === 6 && (
                 <div className="space-y-5 animate-in fade-in duration-500 max-w-3xl w-full">
                   <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    REPO & PROJE EVRENİ
+                    {lang === "tr" ? "REPO & PROJE EVRENİ" : "REPO & PROJECT UNIVERSE"}
                   </span>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                      <span className="block text-[10px] font-mono text-zinc-500">YENİ REPO</span>
+                      <span className="block text-[10px] font-mono text-zinc-500">
+                        {lang === "tr" ? "YENİ REPO" : "NEW REPOS"}
+                      </span>
                       <strong className="text-3xl font-black" style={{ color: ac }}>
                         <CountUp value={data.reposCreated} active={slide === 6} />
                       </strong>
                     </div>
 
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                      <span className="block text-[10px] font-mono text-zinc-500">AKTİF REPO</span>
+                      <span className="block text-[10px] font-mono text-zinc-500">
+                        {lang === "tr" ? "AKTİF REPO" : "ACTIVE REPOS"}
+                      </span>
                       <strong className="text-3xl font-black text-white">
                         <CountUp value={data.activeRepos} active={slide === 6} />
                       </strong>
                     </div>
 
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                      <span className="block text-[10px] font-mono text-zinc-500">PULL REQUEST</span>
+                      <span className="block text-[10px] font-mono text-zinc-500">
+                        {lang === "tr" ? "PULL REQUEST" : "PULL REQUESTS"}
+                      </span>
                       <strong className="text-3xl font-black text-purple-400">
                         <CountUp value={data.totalPRs} active={slide === 6} />
                       </strong>
                     </div>
 
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                      <span className="block text-[10px] font-mono text-zinc-500">YILDIZLAR</span>
+                      <span className="block text-[10px] font-mono text-zinc-500">
+                        {lang === "tr" ? "YILDIZLAR" : "STARS"}
+                      </span>
                       <strong className="text-3xl font-black text-amber-400">
                         <CountUp value={data.totalStars} active={slide === 6} />
                       </strong>
@@ -880,7 +955,7 @@ export default function WrappedClient({
                     <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-5 text-left max-w-lg mx-auto flex items-center justify-between">
                       <div>
                         <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold">
-                          YILIN EN ÇOK GELİŞTİRİLEN REPOSU
+                          {lang === "tr" ? "YILIN EN ÇOK GELİŞTİRİLEN REPOSU" : "MOST DEVELOPED REPO OF THE YEAR"}
                         </span>
                         <h4 className="text-base font-bold text-white mt-0.5">
                           {data.topRepo.name}
@@ -890,7 +965,7 @@ export default function WrappedClient({
                         </span>
                       </div>
                       <span className="rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-1 font-mono text-xs font-bold text-zinc-100">
-                        {data.topRepo.commits} commit
+                        {data.topRepo.commits} {lang === "tr" ? "commit" : "commits"}
                       </span>
                     </div>
                   )}
@@ -901,27 +976,31 @@ export default function WrappedClient({
               {slide === 7 && (
                 <div className="space-y-5 animate-in fade-in duration-500 max-w-2xl w-full">
                   <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    TEK SEFERDE EN BÜYÜK DEĞİŞİKLİK
+                    {lang === "tr" ? "TEK SEFERDE EN BÜYÜK DEĞİŞİKLİK" : "LARGEST SINGLE CHANGE"}
                   </span>
 
                   {data.biggestCommit ? (
                     <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 sm:p-8 text-left space-y-4 shadow-2xl">
                       <span className="text-4xl text-[var(--accent)] font-serif leading-none">“</span>
                       <p className="text-lg sm:text-2xl font-bold text-white leading-snug">
-                        {data.biggestCommit.message || "(mesajsız commit)"}
+                        {data.biggestCommit.message || (lang === "tr" ? "(mesajsız commit)" : "(commit with no message)")}
                       </p>
                       <div className="flex flex-wrap items-center gap-4 text-xs font-mono pt-2 border-t border-zinc-800/60">
                         <span className="font-bold text-emerald-400">
-                          +{data.biggestCommit.additions.toLocaleString("tr-TR")} satır eklendi
+                          +{data.biggestCommit.additions.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}{" "}
+                          {lang === "tr" ? "satır eklendi" : "lines added"}
                         </span>
                         <span className="font-bold text-red-400">
-                          −{data.biggestCommit.deletions.toLocaleString("tr-TR")} satır silindi
+                          −{data.biggestCommit.deletions.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}{" "}
+                          {lang === "tr" ? "satır silindi" : "lines deleted"}
                         </span>
                         <span className="text-zinc-500">{data.biggestCommit.date}</span>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-zinc-500">Commit verisi bulunamadı.</p>
+                    <p className="text-sm text-zinc-500">
+                      {lang === "tr" ? "Commit verisi bulunamadı." : "No commit data found."}
+                    </p>
                   )}
                 </div>
               )}
@@ -930,7 +1009,7 @@ export default function WrappedClient({
               {slide === 8 && (
                 <div className="space-y-5 animate-in fade-in duration-500 max-w-3xl w-full">
                   <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    365 GÜNLÜK KONTRIBÜSYON MATRİKSİ
+                    {lang === "tr" ? "365 GÜNLÜK KONTRIBÜSYON MATRİKSİ" : "365-DAY CONTRIBUTION MATRIX"}
                   </span>
 
                   <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/80 p-4 sm:p-6 backdrop-blur-xl">
@@ -946,14 +1025,16 @@ export default function WrappedClient({
                     <div className="flex items-center gap-2">
                       <Flame className="h-5 w-5 text-amber-400" />
                       <span>
-                        En Uzun Seri:{" "}
-                        <strong className="text-white text-base">{data.longestStreak} Gün</strong>
+                        {lang === "tr" ? "En Uzun Seri: " : "Longest Streak: "}
+                        <strong className="text-white text-base">
+                          {data.longestStreak} {lang === "tr" ? "Gün" : "Days"}
+                        </strong>
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
                       <span>
-                        Yıllık Aktiflik Oranı:{" "}
+                        {lang === "tr" ? "Yıllık Aktiflik Oranı: " : "Annual Activity Rate: "}
                         <strong className="text-white text-base">
                           %{Math.round((data.activeDays / 365) * 100)}
                         </strong>
@@ -968,13 +1049,15 @@ export default function WrappedClient({
                 <div className="space-y-5 animate-in fade-in zoom-in-95 duration-500 max-w-xl">
                   <div>
                     <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-mono font-bold text-emerald-400">
-                      🎉 2026 RESMİ RAPORU TAMAMLANDI!
+                      🎉 {lang === "tr" ? `${data.year} RESMİ RAPORU TAMAMLANDI!` : `${data.year} OFFICIAL REPORT COMPLETE!`}
                     </span>
                     <h2 className="mt-3 text-4xl sm:text-5xl font-black text-white">
-                      Harika bir yıldı, {data.displayName}!
+                      {lang === "tr" ? `Harika bir yıldı, ${data.displayName}!` : `It was a fantastic year, ${data.displayName}!`}
                     </h2>
                     <p className="mt-2 text-sm text-zinc-300">
-                      Topladığın tüm metrikler, yazdığın kodlar ve kurduğun sistemler seninle gurur duyuyor.
+                      {lang === "tr"
+                        ? "Topladığın tüm metrikler, yazdığın kodlar ve kurduğun sistemler seninle gurur duyuyor."
+                        : "Every metric you gathered, every line of code you wrote, and every system you built is proud of you."}
                     </p>
                   </div>
 
@@ -1002,7 +1085,7 @@ export default function WrappedClient({
                       type="button"
                       onClick={fireConfetti}
                       className="inline-flex items-center gap-1 rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-xs text-zinc-400 hover:text-white cursor-pointer"
-                      title={lang === "tr" ? "Konfeti patlat" : "Confetti"}
+                      title={lang === "tr" ? "Konfeti patlat" : "Celebrate with confetti"}
                     >
                       🎊
                     </button>
@@ -1048,7 +1131,7 @@ export default function WrappedClient({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs font-black tracking-widest text-zinc-100">
-                      DEV ANALYTICS
+                      DEVBOARD
                     </span>
                     <span className="rounded-md border border-zinc-700 bg-zinc-900 px-1.5 py-0.2 font-mono text-[9px] font-bold text-zinc-400">
                       OFFICIAL ARCHIVE
@@ -1110,10 +1193,10 @@ export default function WrappedClient({
                       border: `1px solid ${data.archetype.color}60`,
                     }}
                   >
-                    {data.archetype.badge}
+                    {archetypeBadge}
                   </span>
                   <span className="block mt-0.5 font-mono text-[11px] font-bold text-zinc-300">
-                    {data.archetype.title}
+                    {archetypeTitle}
                   </span>
                 </div>
               </div>
@@ -1133,12 +1216,18 @@ export default function WrappedClient({
                   className="text-5xl sm:text-6xl font-black tracking-tight"
                   style={{ color: ac }}
                 >
-                  {data.totalCommits.toLocaleString("tr-TR")}
+                  {data.totalCommits.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
                 </p>
                 <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-300 mt-1">
-                  <span>{data.activeDays} Aktif Gün</span>
+                  <span>
+                    {data.activeDays} {lang === "tr" ? "Aktif Gün" : "Active Days"}
+                  </span>
                   <span>·</span>
-                  <span>Ort. {(data.totalCommits / Math.max(data.activeDays, 1)).toFixed(1)} / gün</span>
+                  <span>
+                    {lang === "tr"
+                      ? `Ort. ${(data.totalCommits / Math.max(data.activeDays, 1)).toFixed(1)} / gün`
+                      : `Avg. ${(data.totalCommits / Math.max(data.activeDays, 1)).toFixed(1)} / day`}
+                  </span>
                 </div>
               </div>
 
@@ -1146,46 +1235,56 @@ export default function WrappedClient({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-1">
                 {/* Modül: Kod Satırları */}
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5">
-                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">KOD HACMİ</span>
+                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">
+                    {lang === "tr" ? "KOD HACMİ" : "CODE VOLUME"}
+                  </span>
                   <p className="font-mono text-xs font-bold text-emerald-400">
-                    +{data.totalLinesAdded.toLocaleString("tr-TR")}
+                    +{data.totalLinesAdded.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
                   </p>
                   <p className="font-mono text-xs font-bold text-red-400">
-                    −{data.totalLinesDeleted.toLocaleString("tr-TR")}
+                    −{data.totalLinesDeleted.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
                   </p>
                 </div>
 
                 {/* Modül: Seri (Streak) */}
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5">
-                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">SERİ (STREAK)</span>
+                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">
+                    {lang === "tr" ? "SERİ (STREAK)" : "STREAK"}
+                  </span>
                   <div className="flex items-center gap-1">
                     <Flame className="h-3.5 w-3.5 text-amber-400" />
                     <span className="font-mono text-base font-black text-amber-400">
-                      {data.longestStreak} Gün
+                      {data.longestStreak} {lang === "tr" ? "Gün" : "Days"}
                     </span>
                   </div>
-                  <span className="text-[9px] text-zinc-500">kesintisiz</span>
+                  <span className="text-[9px] text-zinc-500">
+                    {lang === "tr" ? "kesintisiz" : "unbroken"}
+                  </span>
                 </div>
 
                 {/* Modül: Ana Dil */}
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5">
-                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">ANA DİL</span>
+                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">
+                    {lang === "tr" ? "ANA DİL" : "PRIMARY LANGUAGE"}
+                  </span>
                   <p className="font-mono text-sm font-bold text-white truncate">
                     {data.topLangs[0]?.lang ?? "Code"}
                   </p>
                   <span className="font-mono text-[9px] text-[var(--accent)] font-semibold">
-                    %{data.topLangs[0]?.pct ?? 0} pay
+                    %{data.topLangs[0]?.pct ?? 0} {lang === "tr" ? "pay" : "share"}
                   </span>
                 </div>
 
                 {/* Modül: Projeler & Yıldız */}
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5">
-                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">PROJELER</span>
+                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">
+                    {lang === "tr" ? "PROJELER" : "PROJECTS"}
+                  </span>
                   <p className="font-mono text-xs font-bold text-zinc-100">
-                    {data.activeRepos} repo · {data.totalPRs} PR
+                    {data.activeRepos} {lang === "tr" ? "repo" : "repos"} · {data.totalPRs} PR
                   </p>
                   <p className="font-mono text-[9px] text-amber-400 font-semibold">
-                    ★ {data.totalStars} star
+                    ★ {data.totalStars} {lang === "tr" ? "star" : "stars"}
                   </p>
                 </div>
               </div>
@@ -1202,7 +1301,7 @@ export default function WrappedClient({
 
               {/* POSTER 6: ALT İMZA & WATERMARK */}
               <div className="flex items-center justify-between border-t border-zinc-800/80 pt-2 text-[10px] font-mono text-zinc-500">
-                <span>VERIFIED BY DEVANALYTICS.APP</span>
+                <span>VERIFIED BY DEVBOARD.APP</span>
                 <span className="tracking-wider">LAT 41.0082° N, LON 28.9784° E</span>
               </div>
             </div>
@@ -1213,27 +1312,27 @@ export default function WrappedClient({
                 type="button"
                 onClick={() => downloadSlidePng(9)}
                 disabled={sharing}
-                className="flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
               >
                 <Download className="h-3.5 w-3.5" />
-                <span>Posteri İndir (PNG)</span>
+                <span>{lang === "tr" ? "Posteri İndir (PNG)" : "Download Poster (PNG)"}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShareModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-zinc-950 shadow-md transition-transform active:scale-95"
+                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-zinc-950 shadow-md transition-transform active:scale-95 cursor-pointer"
                 style={{ backgroundColor: ac }}
               >
                 <Share2 className="h-3.5 w-3.5" />
-                <span>Paylaş</span>
+                <span>{lang === "tr" ? "Paylaş" : "Share"}</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-white"
-                title="Linki kopyala"
+                className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+                title={lang === "tr" ? "Linki kopyala" : "Copy link"}
               >
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
@@ -1250,10 +1349,10 @@ export default function WrappedClient({
               type="button"
               onClick={() => setSlide((s) => Math.max(0, s - 1))}
               disabled={slide === 0}
-              className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
             >
               <ChevronLeft className="h-4 w-4" />
-              <span>Geri</span>
+              <span>{lang === "tr" ? "Geri" : "Back"}</span>
             </button>
 
             <div className="flex items-center gap-2">
@@ -1261,7 +1360,7 @@ export default function WrappedClient({
                 {slide + 1} / {TOTAL_SLIDES}
               </span>
               <span className="hidden sm:inline text-[11px] text-zinc-600">
-                · Klavye ok tuşları ile gezinebilirsiniz
+                {lang === "tr" ? "· Klavye ok tuşları ile gezinebilirsiniz" : "· Navigate with arrow keys"}
               </span>
             </div>
 
@@ -1269,34 +1368,34 @@ export default function WrappedClient({
               <button
                 type="button"
                 onClick={() => setMode("poster")}
-                className="flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-md"
+                className="flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-md cursor-pointer"
                 style={{ backgroundColor: ac }}
               >
                 <FileText className="h-3.5 w-3.5" />
-                <span>Posteri Gör</span>
+                <span>{lang === "tr" ? "Posteri Gör" : "View Poster"}</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setSlide((s) => Math.min(TOTAL_SLIDES - 1, s + 1))}
-                className="flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-md transition-transform active:scale-95"
+                className="flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-md transition-transform active:scale-95 cursor-pointer"
                 style={{ backgroundColor: ac }}
               >
-                <span>İleri</span>
+                <span>{lang === "tr" ? "İleri" : "Next"}</span>
                 <ChevronRight className="h-4 w-4" />
               </button>
             )}
           </>
         ) : (
           <div className="flex w-full items-center justify-between text-xs text-zinc-500 font-mono">
-            <span>{"//"} DEVANALYTICS ANNUAL DEVELOPER POSTER</span>
+            <span>{"//"} DEVBOARD ANNUAL DEVELOPER POSTER</span>
             <button
               type="button"
               onClick={() => setMode("story")}
-              className="flex items-center gap-1 text-zinc-300 hover:text-white font-sans text-xs underline"
+              className="flex items-center gap-1 text-zinc-300 hover:text-white font-sans text-xs underline cursor-pointer"
             >
               <RotateCcw className="h-3 w-3" />
-              <span>Hikaye Moduna Dön</span>
+              <span>{lang === "tr" ? "Hikaye Moduna Dön" : "Back to Story Mode"}</span>
             </button>
           </div>
         )}
@@ -1320,13 +1419,13 @@ export default function WrappedClient({
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[var(--accent)]" />
                 <h3 className="text-sm font-bold text-zinc-100">
-                  {data.year} Wrapped&apos;ini Paylaş
+                  {lang === "tr" ? `${data.year} Wrapped'ini Paylaş` : `Share Your ${data.year} Wrapped`}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShareModalOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -1347,18 +1446,23 @@ export default function WrappedClient({
                   color: data.archetype.color,
                 }}
               >
-                {data.archetype.badge}
+                {archetypeBadge}
               </span>
               <p
                 className="text-lg font-black"
                 style={{ color: data.archetype.color }}
               >
-                {data.archetype.title}
+                {archetypeTitle}
               </p>
               <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-300 pt-1">
-                <span>{data.totalCommits.toLocaleString("tr-TR")} Commit</span>
+                <span>
+                  {data.totalCommits.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}{" "}
+                  {lang === "tr" ? "Commit" : "Commits"}
+                </span>
                 <span>·</span>
-                <span>{data.longestStreak} Gün Streak</span>
+                <span>
+                  {data.longestStreak} {lang === "tr" ? "Gün Streak" : "Days Streak"}
+                </span>
                 <span>·</span>
                 <span>{data.topLangs[0]?.lang ?? "Code"}</span>
               </div>
@@ -1367,7 +1471,7 @@ export default function WrappedClient({
             {/* 1-Tıkla Sosyal Medya Butonları */}
             <div className="space-y-1.5">
               <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
-                Hızlı Paylaşım Kanalları
+                {lang === "tr" ? "Hızlı Paylaşım Kanalları" : "Quick Share Channels"}
               </span>
               <div className="grid grid-cols-2 gap-2">
                 {/* 𝕏 / Twitter */}
@@ -1434,7 +1538,7 @@ export default function WrappedClient({
                 type="button"
                 onClick={() => downloadSlidePng(9)}
                 disabled={sharing}
-                className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-zinc-950 transition-transform active:scale-95 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-zinc-950 transition-transform active:scale-95 disabled:opacity-50 cursor-pointer"
                 style={{ backgroundColor: ac }}
               >
                 {sharing ? (

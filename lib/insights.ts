@@ -1,3 +1,5 @@
+import type { Language } from "./i18n/types";
+
 export type Insight = {
   type: "positive" | "negative" | "neutral" | "warning";
   message: string;
@@ -14,9 +16,17 @@ type HourData = {
   count: number;
 };
 
-const DAY_NAMES = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
-const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const DAY_NAMES_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+const DAY_NAMES_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+const MONTH_NAMES_TR = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+];
+const MONTH_NAMES_EN = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
 export function generateInsights(
   heatmapData: DailyStat[],
@@ -28,8 +38,13 @@ export function generateInsights(
   linesAdded: number,
   linesDeleted: number,
   topLanguage: string | null,
+  lang: Language = "tr",
 ): Insight[] {
   const insights: Insight[] = [];
+  const isEn = lang === "en";
+
+  const DAY_NAMES = isEn ? DAY_NAMES_EN : DAY_NAMES_TR;
+  const MONTH_NAMES = isEn ? MONTH_NAMES_EN : MONTH_NAMES_TR;
 
   if (heatmapData.length === 0) return insights;
 
@@ -52,12 +67,16 @@ export function generateInsights(
     if (pct >= 20) {
       insights.push({
         type: "positive",
-        message: `${monthName} ayında geçen aya göre %${pct} daha fazla commit attın 🚀`,
+        message: isEn
+          ? `You made ${pct}% more commits in ${monthName} compared to last month 🚀`
+          : `${monthName} ayında geçen aya göre %${pct} daha fazla commit attın 🚀`,
       });
     } else if (pct <= -20) {
       insights.push({
         type: "warning",
-        message: `${monthName} ayında geçen aya göre %${Math.abs(pct)} daha az commit attın`,
+        message: isEn
+          ? `You made ${Math.abs(pct)}% fewer commits in ${monthName} compared to last month`
+          : `${monthName} ayında geçen aya göre %${Math.abs(pct)} daha az commit attın`,
       });
     }
   }
@@ -68,11 +87,14 @@ export function generateInsights(
       hourData.filter((h) => h.day === i).reduce((s, h) => s + h.count, 0)
     );
     const peakDay = dayTotals.indexOf(Math.max(...dayTotals));
-    const worstDay = dayTotals.indexOf(Math.min(...dayTotals.filter((v) => v > 0)));
+    const nonZeroDays = dayTotals.filter((v) => v > 0);
+    const worstDay = nonZeroDays.length > 0 ? dayTotals.indexOf(Math.min(...nonZeroDays)) : 0;
 
     insights.push({
       type: "neutral",
-      message: `En verimli günün ${DAY_NAMES[peakDay]}, en az aktif günün ${DAY_NAMES[worstDay]}`,
+      message: isEn
+        ? `Your most productive day is ${DAY_NAMES[peakDay]}, least active is ${DAY_NAMES[worstDay]}`
+        : `En verimli günün ${DAY_NAMES[peakDay]}, en az aktif günün ${DAY_NAMES[worstDay]}`,
     });
 
     // En verimli saat
@@ -80,10 +102,14 @@ export function generateInsights(
       hourData.filter((d) => d.hour === h).reduce((s, d) => s + d.count, 0)
     );
     const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
-    const period = peakHour < 12 ? "sabah" : peakHour < 17 ? "öğleden sonra" : peakHour < 21 ? "akşam" : "gece";
+    const period = isEn
+      ? peakHour < 12 ? "in the morning" : peakHour < 17 ? "in the afternoon" : peakHour < 21 ? "in the evening" : "at night"
+      : peakHour < 12 ? "sabah" : peakHour < 17 ? "öğleden sonra" : peakHour < 21 ? "akşam" : "gece";
     insights.push({
       type: "neutral",
-      message: `En çok ${period} kodluyorsun — pik saatin ${String(peakHour).padStart(2, "0")}:00–${String(peakHour + 1).padStart(2, "0")}:00 ⏰`,
+      message: isEn
+        ? `You code mostly ${period} — peak hours are ${String(peakHour).padStart(2, "0")}:00–${String(peakHour + 1).padStart(2, "0")}:00 ⏰`
+        : `En çok ${period} kodluyorsun — pik saatin ${String(peakHour).padStart(2, "0")}:00–${String(peakHour + 1).padStart(2, "0")}:00 ⏰`,
     });
   }
 
@@ -91,7 +117,9 @@ export function generateInsights(
   if (topRepo && topRepoCommits > 0) {
     insights.push({
       type: "positive",
-      message: `Bu yıl en çok "${topRepo}" reposuna commit attın (${topRepoCommits} commit) 🏆`,
+      message: isEn
+        ? `You committed most to "${topRepo}" this year (${topRepoCommits} commits) 🏆`
+        : `Bu yıl en çok "${topRepo}" reposuna commit attın (${topRepoCommits} commit) 🏆`,
     });
   }
 
@@ -99,12 +127,16 @@ export function generateInsights(
   if (currentStreak >= 7) {
     insights.push({
       type: "positive",
-      message: `${currentStreak} günlük streak devam ediyor — muhteşem! 🔥`,
+      message: isEn
+        ? `${currentStreak}-day streak going strong — awesome! 🔥`
+        : `${currentStreak} günlük streak devam ediyor — muhteşem! 🔥`,
     });
   } else if (currentStreak === 0 && longestStreak > 0) {
     insights.push({
       type: "warning",
-      message: `Streak kırıldı. En uzun strekin ${longestStreak} gündü, tekrar başlayabilirsin!`,
+      message: isEn
+        ? `Streak broken. Your longest streak was ${longestStreak} days, time to start a new one!`
+        : `Streak kırıldı. En uzun strekin ${longestStreak} gündü, tekrar başlayabilirsin!`,
     });
   }
 
@@ -114,7 +146,9 @@ export function generateInsights(
     if (ratio > 0.6) {
       insights.push({
         type: "positive",
-        message: `Eklediğinin %${Math.round(ratio * 100)}'ini silen birisin — kod temizliğine önem veriyorsun 🧹`,
+        message: isEn
+          ? `You delete ${Math.round(ratio * 100)}% of what you write — keeping code clean and sustainable 🧹`
+          : `Eklediğinin %${Math.round(ratio * 100)}'ini silen birisin — kod temizliğine önem veriyorsun 🧹`,
       });
     }
   }
@@ -132,7 +166,9 @@ export function generateInsights(
     if (weekendPct >= 30) {
       insights.push({
         type: "neutral",
-        message: `Commitlerin %${weekendPct}'i hafta sonunda — hafta sonları da aktifsin 💪`,
+        message: isEn
+          ? `${weekendPct}% of your commits are on weekends — you stay active on weekends too 💪`
+          : `Commitlerin %${weekendPct}'i hafta sonunda — hafta sonları da aktifsin 💪`,
       });
     }
   }
@@ -141,7 +177,9 @@ export function generateInsights(
   if (topLanguage) {
     insights.push({
       type: "neutral",
-      message: `Birincil dilin ${topLanguage} — kod tabanının büyük çoğunluğu bu dilde`,
+      message: isEn
+        ? `Your primary language is ${topLanguage} — dominant in most of your codebase`
+        : `Birincil dilin ${topLanguage} — kod tabanının büyük çoğunluğu bu dilde`,
     });
   }
 

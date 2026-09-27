@@ -198,10 +198,18 @@ export default async function WrappedPage({ params }: Props) {
   const nightCommits     = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 22 || h < 6; }).length;
   const maxP = Math.max(morningCommits, afternoonCommits, eveningCommits, nightCommits);
 
-  let identity = { label: "Öğleden Sonra Kodcusu", emoji: "☀️" };
-  if (maxP === morningCommits && morningCommits > 0) identity = { label: "Sabah Kodcusu", emoji: "🌅" };
-  else if (maxP === eveningCommits && eveningCommits > 0) identity = { label: "Akşam Kodcusu", emoji: "🌆" };
-  else if (maxP === nightCommits && nightCommits > 0) identity = { label: "Gece Kodcusu", emoji: "🌙" };
+  let identity = {
+    label: "Öğleden Sonra Kodcusu",
+    emoji: "☀️",
+    en: { label: "Afternoon Coder" },
+  };
+  if (maxP === morningCommits && morningCommits > 0) {
+    identity = { label: "Sabah Kodcusu", emoji: "🌅", en: { label: "Morning Coder" } };
+  } else if (maxP === eveningCommits && eveningCommits > 0) {
+    identity = { label: "Akşam Kodcusu", emoji: "🌆", en: { label: "Evening Coder" } };
+  } else if (maxP === nightCommits && nightCommits > 0) {
+    identity = { label: "Gece Kodcusu", emoji: "🌙", en: { label: "Night Coder" } };
+  }
 
   // Eğlenceli ve heyecan verici geliştirici arketipi
   let archetype = {
@@ -210,6 +218,12 @@ export default async function WrappedPage({ params }: Props) {
     badge: "🚀 EXPLORER",
     desc: `${totalCommits} commit ve ${activeRepoCount} aktif repo ile yılını dolu dolu üreterek geçirdin.`,
     color: "#38bdf8",
+    en: {
+      title: "Open Source Explorer",
+      tagline: "A visionary developer shaping the world through code",
+      badge: "🚀 EXPLORER",
+      desc: `You spent the year producing intensely with ${totalCommits} commits across ${activeRepoCount} active repositories.`,
+    },
   };
   if (nightCommits > 0 && nightCommits >= maxP && (nightCommits / Math.max(totalCommits, 1)) > 0.25) {
     archetype = {
@@ -218,6 +232,12 @@ export default async function WrappedPage({ params }: Props) {
       badge: "🌙 NOCTURNAL",
       desc: "Herkes uyurken sen en çetrefilli bug'ları avladın. Gece sessizliği senin gizli süper gücün.",
       color: "#a855f7",
+      en: {
+        title: "Night Crawler",
+        tagline: "A legend coding under the moonlight",
+        badge: "🌙 NOCTURNAL",
+        desc: "Hunting the trickiest bugs while the world sleeps. Midnight quiet is your secret superpower.",
+      },
     };
   } else if (morningCommits > 0 && morningCommits >= maxP && (morningCommits / Math.max(totalCommits, 1)) > 0.25) {
     archetype = {
@@ -226,6 +246,12 @@ export default async function WrappedPage({ params }: Props) {
       badge: "🌅 EARLY BIRD",
       desc: "Güne erken başlayıp kahvenle birlikte ilk PR'ını açtın. Disiplinin ve odaklanma gücün benzersiz.",
       color: "#f59e0b",
+      en: {
+        title: "Early Bird",
+        tagline: "The morning person pushing commits before sunrise",
+        badge: "🌅 EARLY BIRD",
+        desc: "Starting your day early and opening your first PR over coffee. Your discipline and focus are unmatched.",
+      },
     };
   } else if (longestStreak >= 10) {
     archetype = {
@@ -234,6 +260,12 @@ export default async function WrappedPage({ params }: Props) {
       badge: "🔥 UNSTOPPABLE",
       desc: `${longestStreak} günlük kesintisiz kodlama serisi! Yıl boyunca kararlılığınla harikalar yarattın.`,
       color: "#ef4444",
+      en: {
+        title: "Streak Master",
+        tagline: "A paragon of consistency who never breaks the chain",
+        badge: "🔥 UNSTOPPABLE",
+        desc: `An unbroken ${longestStreak}-day coding streak! Your determination created wonders throughout the year.`,
+      },
     };
   } else if (totalCommits >= 250) {
     archetype = {
@@ -242,6 +274,12 @@ export default async function WrappedPage({ params }: Props) {
       badge: "⚡ POWERHOUSE",
       desc: "Yıl boyunca durmaksızın ürettin, klavyen neredeyse hiç soğumadı.",
       color: "#10b981",
+      en: {
+        title: "The Code Machine",
+        tagline: "An unstoppable productive powerhouse whose terminal never cools down",
+        badge: "⚡ POWERHOUSE",
+        desc: "Producing non-stop all year round, your keyboard barely had a moment to cool off.",
+      },
     };
   } else if (totalLinesDeleted > totalLinesAdded * 0.35 && totalLinesDeleted > 500) {
     archetype = {
@@ -250,6 +288,12 @@ export default async function WrappedPage({ params }: Props) {
       badge: "🧹 ELEGANT",
       desc: "Gereksiz karmaşıklığı temizleyip kod tabanını hafif ve sürdürülebilir kıldın.",
       color: "#06b6d4",
+      en: {
+        title: "The Zen Cleaner",
+        tagline: "Master of the 'less code, more impact' philosophy",
+        badge: "🧹 ELEGANT",
+        desc: "Eliminating unnecessary complexity, keeping the codebase lean and sustainable.",
+      },
     };
   }
 
@@ -267,8 +311,10 @@ export default async function WrappedPage({ params }: Props) {
     totalLinesDeleted,
     activeDays: totalActiveDays,
     longestStreak,
+    peakMonthIdx,
     peakMonth: MONTH_NAMES[peakMonthIdx],
     peakMonthCommits,
+    peakDayIdx,
     peakDay: DAY_NAMES[peakDayIdx],
     peakHour,
     topLangs: topLangs.map(([lang, bytes]) => ({

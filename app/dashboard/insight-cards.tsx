@@ -1,6 +1,7 @@
 "use client";
 
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import {
   TrendingUp,
   TrendingDown,
@@ -13,28 +14,28 @@ import type { Insight } from "@/lib/insights";
 const TYPE_META = {
   positive: {
     Icon: TrendingUp,
-    label: "İyi gidişat",
+    label: { tr: "İyi gidişat", en: "Good progress" },
     badgeBg: "rgba(52,211,153,0.12)",
     badgeBorder: "rgba(52,211,153,0.25)",
     badgeText: "#34d399",
   },
   negative: {
     Icon: TrendingDown,
-    label: "Dikkat",
+    label: { tr: "Dikkat", en: "Attention" },
     badgeBg: "rgba(239,68,68,0.10)",
     badgeBorder: "rgba(239,68,68,0.22)",
     badgeText: "#f87171",
   },
   warning: {
     Icon: AlertTriangle,
-    label: "Uyarı",
+    label: { tr: "Uyarı", en: "Warning" },
     badgeBg: "rgba(234,179,8,0.10)",
     badgeBorder: "rgba(234,179,8,0.22)",
     badgeText: "#facc15",
   },
   neutral: {
     Icon: Info,
-    label: "Bilgi",
+    label: { tr: "Bilgi", en: "Info" },
     badgeBg: "rgba(96,165,250,0.10)",
     badgeBorder: "rgba(96,165,250,0.20)",
     badgeText: "#60a5fa",
@@ -43,6 +44,7 @@ const TYPE_META = {
 
 export default function InsightCards({ insights }: { insights: Insight[] }) {
   const theme = useThemeColors();
+  const { lang, t } = useLanguage();
 
   if (insights.length === 0) return null;
 
@@ -55,7 +57,7 @@ export default function InsightCards({ insights }: { insights: Insight[] }) {
           style={{ color: theme.accent }}
         />
         <h2 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-          İçgörüler
+          {lang === "en" ? "Insights" : "İçgörüler"}
         </h2>
         <span
           className="ml-auto text-[10px] font-medium rounded-full px-2 py-0.5"
@@ -88,6 +90,7 @@ export default function InsightCards({ insights }: { insights: Insight[] }) {
             ? `${theme.accentBg}`
             : meta.badgeBg;
           const badgeBorder = isPositive ? theme.accentBorder : meta.badgeBorder;
+          const label = meta.label[lang] || meta.label.tr;
 
           return (
             <li
@@ -115,7 +118,7 @@ export default function InsightCards({ insights }: { insights: Insight[] }) {
                   className="text-[9px] font-semibold uppercase tracking-widest leading-none"
                   style={{ color: badgeText, opacity: 0.75 }}
                 >
-                  {meta.label}
+                  {label}
                 </span>
                 <p className="text-xs leading-snug text-zinc-300">
                   {insight.message}

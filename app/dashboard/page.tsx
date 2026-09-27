@@ -191,7 +191,9 @@ export default async function DashboardPage({ searchParams }: Props) {
     }
 
     // Aylık dil → commit sayısı
-    const MONTH_LABELS = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+    const MONTH_LABELS_TR = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+    const MONTH_LABELS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const MONTH_LABELS = lang === "en" ? MONTH_LABELS_EN : MONTH_LABELS_TR;
     const monthLangMap = new Map<string, Map<string, number>>(); // "YYYY-MM" → lang → count
     for (const { committed_at, repo_id } of allCommitsRes.data ?? []) {
       const lang = repoLangMap.get(repo_id);
@@ -455,7 +457,9 @@ export default async function DashboardPage({ searchParams }: Props) {
     }
 
     // Bu ay vs geçen ay karşılaştırması
-    const MONTH_NAMES = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+    const MONTH_NAMES_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+    const MONTH_NAMES_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const MONTH_NAMES = lang === "en" ? MONTH_NAMES_EN : MONTH_NAMES_TR;
     const now2 = new Date();
     const thisMonthStart = new Date(now2.getFullYear(), now2.getMonth(), 1).toISOString().slice(0, 10);
     const lastMonthStart = new Date(now2.getFullYear(), now2.getMonth() - 1, 1).toISOString().slice(0, 10);
@@ -496,6 +500,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       linesAdded,
       linesDeleted,
       topLang,
+      lang,
     );
 
     // Rozetler
