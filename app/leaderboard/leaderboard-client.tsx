@@ -106,7 +106,7 @@ export default function LeaderboardClient({
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-24">
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 space-y-8">
+      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-12 lg:px-8 space-y-8">
         {/* ── Header ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-zinc-800/80">
           <div className="flex items-center gap-3.5">

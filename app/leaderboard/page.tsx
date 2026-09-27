@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { auth } from "@/lib/auth";
 import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import { calculateStreaks } from "@/lib/streak";
+import { calcBadges } from "@/lib/badges";
 import LeaderboardClient from "./leaderboard-client";
 import Navbar from "@/components/navbar";
 import type { Metadata } from "next";
@@ -72,31 +73,144 @@ async function getCurrentStreaks(userIds: string[]): Promise<Map<string, number>
 }
 
 async function getBadgeCounts(userIds: string[]): Promise<Map<string, number>> {
-  // Her kullanıcının son 365 gün verisinden rozet sayısını hesapla
-  const { data } = await supabaseAdmin
-    .from("daily_stats")
-    .select("user_id, date, commit_count")
-    .in("user_id", userIds)
-    .gte("date", new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10));
+  if (userIds.length === 0) return new Map();
 
-  const grouped = new Map<string, { dates: string[]; commits: number[] }>();
-  for (const row of data ?? []) {
-    if (!grouped.has(row.user_id)) grouped.set(row.user_id, { dates: [], commits: [] });
-    const g = grouped.get(row.user_id)!;
-    g.dates.push(row.date);
-    g.commits.push(row.commit_count);
+  const [reposRes, dailyStatsRes] = await Promise.all([
+    supabaseAdmin
+      .from("repositories")
+      .select("id, user_id, stars, is_fork")
+      .in("user_id", userIds),
+    supabaseAdmin
+      .from("daily_stats")
+      .select("user_id, date, commit_count, lines_added")
+      .in("user_id", userIds)
+      .gte("date", new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10)),
+  ]);
+
+  const repos = reposRes.data ?? [];
+  const repoToUser = new Map<string, string>();
+  const repoForkMap = new Map<string, boolean>();
+  const userRepos = new Map<string, typeof repos>();
+
+  for (const r of repos) {
+    repoToUser.set(r.id, r.user_id);
+    repoForkMap.set(r.id, r.is_fork);
+    if (!userRepos.has(r.user_id)) userRepos.set(r.user_id, []);
+    userRepos.get(r.user_id)!.push(r);
+  }
+
+  const allRepoIds = repos.map((r) => r.id);
+  const ownRepoIds = repos.filter((r) => !r.is_fork).map((r) => r.id);
+
+  const [langsRes, prsRes, issuesRes, commitsRes] = await Promise.all([
+    allRepoIds.length > 0
+      ? supabaseAdmin
+          .from("repo_languages")
+          .select("repo_id, language")
+          .in("repo_id", allRepoIds)
+      : Promise.resolve({ data: [] }),
+    ownRepoIds.length > 0
+      ? supabaseAdmin
+          .from("pull_requests")
+          .select("repo_id, merged")
+          .in("repo_id", ownRepoIds)
+          .eq("merged", true)
+      : Promise.resolve({ data: [] }),
+    ownRepoIds.length > 0
+      ? supabaseAdmin
+          .from("issues")
+          .select("repo_id, state")
+          .in("repo_id", ownRepoIds)
+          .eq("state", "closed")
+      : Promise.resolve({ data: [] }),
+    allRepoIds.length > 0
+      ? supabaseAdmin
+          .from("commits")
+          .select("repo_id, committed_at, additions, deletions")
+          .in("repo_id", allRepoIds)
+          .gte("committed_at", new Date(Date.now() - 400 * 86400000).toISOString())
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  // Diller
+  const userLanguages = new Map<string, Set<string>>();
+  for (const row of langsRes.data ?? []) {
+    const uid = repoToUser.get(row.repo_id);
+    if (!uid) continue;
+    if (!userLanguages.has(uid)) userLanguages.set(uid, new Set());
+    userLanguages.get(uid)!.add(row.language);
+  }
+
+  // PR'lar
+  const userPRs = new Map<string, number>();
+  for (const row of prsRes.data ?? []) {
+    const uid = repoToUser.get(row.repo_id);
+    if (!uid) continue;
+    userPRs.set(uid, (userPRs.get(uid) ?? 0) + 1);
+  }
+
+  // Issue'lar
+  const userIssues = new Map<string, number>();
+  for (const row of issuesRes.data ?? []) {
+    const uid = repoToUser.get(row.repo_id);
+    if (!uid) continue;
+    userIssues.set(uid, (userIssues.get(uid) ?? 0) + 1);
+  }
+
+  // Commit'ler
+  const userCommits = new Map<string, { committed_at: string; repo_id: string; additions: number | null; deletions: number | null }[]>();
+  for (const row of commitsRes.data ?? []) {
+    const uid = repoToUser.get(row.repo_id);
+    if (!uid) continue;
+    if (!userCommits.has(uid)) userCommits.set(uid, []);
+    userCommits.get(uid)!.push(row);
+  }
+
+  // Günlük istatistikler
+  const userDaily = new Map<string, { date: string; commit_count: number; lines_added: number | null }[]>();
+  for (const row of dailyStatsRes.data ?? []) {
+    if (!userDaily.has(row.user_id)) userDaily.set(row.user_id, []);
+    userDaily.get(row.user_id)!.push(row);
   }
 
   const map = new Map<string, number>();
-  for (const [uid, { dates, commits }] of grouped) {
-    const activeDates = dates.filter((_, i) => commits[i] > 0);
-    const { longestStreak } = calculateStreaks(activeDates);
-    let count = 1; // synced
-    if (longestStreak >= 7) count++;
-    if (longestStreak >= 30) count++;
-    if (activeDates.length >= 50) count++;
-    map.set(uid, count);
+  for (const uid of userIds) {
+    const daily = userDaily.get(uid) ?? [];
+    const activeDates = daily.filter((d) => d.commit_count > 0).map((d) => d.date);
+    const { longestStreak, totalActiveDays } = calculateStreaks(activeDates);
+
+    const uCommits = userCommits.get(uid) ?? [];
+    const uRepos = userRepos.get(uid) ?? [];
+    const uLangs = userLanguages.get(uid) ?? new Set();
+
+    const linesAdded =
+      daily.reduce((s, d) => s + (d.lines_added ?? 0), 0) ||
+      uCommits.reduce((s, c) => s + (c.additions ?? 0), 0);
+    const totalCommits =
+      daily.reduce((s, d) => s + (d.commit_count ?? 0), 0) || uCommits.length;
+    const totalStars = uRepos.reduce((s, r) => s + (r.stars ?? 0), 0);
+
+    const badges = calcBadges({
+      hasSynced: true,
+      longestStreak,
+      commitTimestamps: uCommits.map((c) => c.committed_at),
+      repoForkMap,
+      commitRepoIds: uCommits.map((c) => c.repo_id),
+      commitDeletions: uCommits.map((c) => c.deletions ?? 0),
+      languageCount: uLangs.size,
+      totalCommits,
+      repoCount: uRepos.length,
+      mergedPRs: userPRs.get(uid) ?? 0,
+      closedIssues: userIssues.get(uid) ?? 0,
+      linesAdded,
+      totalActiveDays,
+      totalStars,
+    });
+
+    const earnedCount = badges.filter((b) => b.earned).length;
+    map.set(uid, earnedCount);
   }
+
   return map;
 }
 
