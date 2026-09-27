@@ -125,10 +125,7 @@ export default function NavbarClient({
   ];
 
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-800/60 bg-zinc-950/75 backdrop-blur-xl shadow-sm">
-      {/* İnce dinamik tema ışığı yansıması */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent" />
-
+    <header className="sticky top-0 z-50 bg-zinc-950/60 backdrop-blur-xl transition-all">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Sol: Logo & Marka Kimliği */}
         <div className="flex items-center gap-6">
