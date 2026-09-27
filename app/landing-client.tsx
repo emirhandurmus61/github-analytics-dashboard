@@ -11,6 +11,9 @@ import {
   Share2,
   Check,
   ArrowRight,
+  ShieldCheck,
+  Cpu,
+  BarChart3,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════
@@ -450,6 +453,247 @@ export default function LandingClient({
           className="pointer-events-none absolute bottom-0 left-0 right-0 h-24"
           style={{ background: "linear-gradient(to top, #08080a, transparent)" }}
         />
+      </section>
+
+      {/* ════════════════════════════════════════════════
+           SECTION 0 — Ne İşe Yarar & Nasıl Çalışır?
+           ════════════════════════════════════════════════ */}
+      <section className="relative z-10 mx-auto max-w-6xl px-5 pt-8 pb-16 sm:px-8 sm:pt-14 sm:pb-24">
+        {/* Bölüm Başlığı & Giriş Açıklaması */}
+        <R>
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-400 backdrop-blur-md">
+              <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+              <span>MİMARİ &amp; ÇALIŞMA PRENSİBİ</span>
+            </div>
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-5xl">
+              Ham GitHub verilerinden, <br className="hidden sm:inline" />
+              <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-sky-400 bg-clip-text text-transparent">
+                yaşayan bir geliştirici kimliğine.
+              </span>
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-zinc-400 sm:text-base">
+              GitHub profilinizdeki commit sayıları kodlama tutkunuzun yalnızca küçük bir parçasıdır.
+              Dev Analytics, tüm geliştirme alışkanlıklarınızı ve proje dinamiklerinizi sıfır konfigürasyonla
+              anlamlandırır; oyunlaştırılmış, derin ve paylaşılabilir bir başarı ekosistemine dönüştürür.
+            </p>
+          </div>
+        </R>
+
+        {/* 1. Kısım: Ne İşe Yarar? (3 Temel Değer Kartı) */}
+        <div className="mt-14 sm:mt-16">
+          <R>
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">
+                01 &middot; NE İŞE YARAR?
+              </h3>
+              <span className="text-xs font-mono text-zinc-600">3 TEMEL FAYDA</span>
+            </div>
+          </R>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            {/* Kart 1: Derin Analitik & Geliştirici DNA'sı */}
+            <R d={40}>
+              <div className="group relative h-full flex flex-col justify-between overflow-hidden rounded-3xl border border-zinc-800/60 bg-zinc-900/30 p-6 sm:p-7 backdrop-blur-xl transition-all duration-300 hover:border-emerald-500/40 hover:bg-zinc-900/50 hover:-translate-y-1">
+                <div
+                  className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
+                  style={{ background: "radial-gradient(circle, rgba(52,211,153,0.15), transparent 70%)" }}
+                />
+                <div>
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/20 transition-transform duration-300 group-hover:scale-110">
+                    <BarChart3 className="h-6 w-6 text-emerald-400" />
+                  </div>
+                  <h4 className="text-lg font-bold text-white group-hover:text-emerald-300 transition-colors">
+                    Derin Analitik &amp; Geliştirici DNA&apos;sı
+                  </h4>
+                  <p className="mt-3 text-xs sm:text-sm leading-relaxed text-zinc-400">
+                    Sıradan bir katkı grafiğinin ötesine geçin. Gece/gündüz çalışma ritminizi, 
+                    en üretken olduğunuz saatleri, dil uzmanlıklarınızı ve küresel lig yüzdelik diliminizi 
+                    21 interaktif widget ile haritalandırır.
+                  </p>
+                </div>
+                <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-4 text-[11px] font-mono text-emerald-400/90">
+                  <span className="rounded-md bg-emerald-950/40 px-2 py-0.5 border border-emerald-500/20">Punch Card</span>
+                  <span className="rounded-md bg-emerald-950/40 px-2 py-0.5 border border-emerald-500/20">Streak &amp; Hedef</span>
+                  <span className="rounded-md bg-emerald-950/40 px-2 py-0.5 border border-emerald-500/20">Dil Matrisi</span>
+                </div>
+              </div>
+            </R>
+
+            {/* Kart 2: Oyunlaştırma & Küresel Lig */}
+            <R d={80}>
+              <div className="group relative h-full flex flex-col justify-between overflow-hidden rounded-3xl border border-zinc-800/60 bg-zinc-900/30 p-6 sm:p-7 backdrop-blur-xl transition-all duration-300 hover:border-amber-500/40 hover:bg-zinc-900/50 hover:-translate-y-1">
+                <div
+                  className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
+                  style={{ background: "radial-gradient(circle, rgba(251,191,36,0.15), transparent 70%)" }}
+                />
+                <div>
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/20 transition-transform duration-300 group-hover:scale-110">
+                    <Trophy className="h-6 w-6 text-amber-400" />
+                  </div>
+                  <h4 className="text-lg font-bold text-white group-hover:text-amber-300 transition-colors">
+                    Oyunlaştırma &amp; Başarı Vitrini
+                  </h4>
+                  <p className="mt-3 text-xs sm:text-sm leading-relaxed text-zinc-400">
+                    Kodlama disiplininizi motive edici bir maceraya dönüştürün. Commit serileriniz, 
+                    PR katkılarınız ve gece mesailerinizle 40&apos;tan fazla özgün rozet kazanın, 
+                    küresel geliştirici liginde üst kademelere yükselin.
+                  </p>
+                </div>
+                <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-4 text-[11px] font-mono text-amber-400/90">
+                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">40+ Rozet</span>
+                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">Geliştirici Ligi</span>
+                  <span className="rounded-md bg-amber-950/40 px-2 py-0.5 border border-amber-500/20">Seviye &amp; Puan</span>
+                </div>
+              </div>
+            </R>
+
+            {/* Kart 3: Sinematik Yıllık Hikaye & Festival Posteri */}
+            <R d={120}>
+              <div className="group relative h-full flex flex-col justify-between overflow-hidden rounded-3xl border border-zinc-800/60 bg-zinc-900/30 p-6 sm:p-7 backdrop-blur-xl transition-all duration-300 hover:border-violet-500/40 hover:bg-zinc-900/50 hover:-translate-y-1">
+                <div
+                  className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
+                  style={{ background: "radial-gradient(circle, rgba(167,139,250,0.15), transparent 70%)" }}
+                />
+                <div>
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/10 ring-1 ring-violet-500/20 transition-transform duration-300 group-hover:scale-110">
+                    <Sparkles className="h-6 w-6 text-violet-400" />
+                  </div>
+                  <h4 className="text-lg font-bold text-white group-hover:text-violet-300 transition-colors">
+                    Sinematik Wrapped &amp; Festival Posteri
+                  </h4>
+                  <p className="mt-3 text-xs sm:text-sm leading-relaxed text-zinc-400">
+                    Tüm yıl döktüğünüz her satır kodu Spotify Wrapped deneyiminde 10 parçalık hikaye 
+                    slaytlarına ve 1080x1080 editoryal festival posterine dönüştürün. 
+                    Portfolyonuzda veya LinkedIn&apos;de tek tıkla paylaşın.
+                  </p>
+                </div>
+                <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-4 text-[11px] font-mono text-violet-400/90">
+                  <span className="rounded-md bg-violet-950/40 px-2 py-0.5 border border-violet-500/20">1080x1080 Poster</span>
+                  <span className="rounded-md bg-violet-950/40 px-2 py-0.5 border border-violet-500/20">Arketip Kimliği</span>
+                  <span className="rounded-md bg-violet-950/40 px-2 py-0.5 border border-violet-500/20">1-Tıkla Paylaş</span>
+                </div>
+              </div>
+            </R>
+          </div>
+        </div>
+
+        {/* 2. Kısım: Nasıl Çalışır? (3 Adımlı Akış) */}
+        <div className="mt-16 sm:mt-24">
+          <R>
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">
+                  02 &middot; NASIL ÇALIŞIR?
+                </h3>
+                <h4 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
+                  3 Basit Adımda Sıfır Kurulum &amp; Güvenli Akış
+                </h4>
+              </div>
+              <p className="text-xs text-zinc-500 max-w-xs">
+                Karmaşık CLI araçları veya webhook ayarlarıyla uğraşmayın. Her şey bulutta otomatik gerçekleşir.
+              </p>
+            </div>
+          </R>
+
+          <div className="relative grid gap-6 md:grid-cols-3">
+            {/* Adım 1: GitHub ile Tek Tıkla Bağlan */}
+            <R d={40}>
+              <div className="relative h-full flex flex-col justify-between rounded-3xl border border-zinc-800/70 bg-zinc-900/40 p-6 sm:p-7 backdrop-blur-xl">
+                <div>
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/25 font-mono text-xs font-bold text-emerald-400">
+                      01
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400 border border-emerald-500/20">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>Sadece Okuma İzni</span>
+                    </span>
+                  </div>
+                  <h5 className="text-base font-bold text-white">
+                    GitHub ile Bağlanın
+                  </h5>
+                  <p className="mt-2 text-xs sm:text-sm leading-relaxed text-zinc-400">
+                    OAuth üzerinden güvenle oturum açın. Kodlarınıza veya özel depolarınıza yazma yetkisi
+                    talep edilmez. Verileriniz tamamen güvendedir ve hiçbir şey değiştirilmez.
+                  </p>
+                </div>
+                <div className="mt-5 rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-[11px] font-mono text-zinc-400">
+                  <div className="flex items-center gap-2 text-zinc-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <span>read:user &middot; public_repo</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">Repo yazma veya silme izni istenmez</span>
+                </div>
+              </div>
+            </R>
+
+            {/* Adım 2: Otomatik Senkronizasyon & Analiz */}
+            <R d={80}>
+              <div className="relative h-full flex flex-col justify-between rounded-3xl border border-zinc-800/70 bg-zinc-900/40 p-6 sm:p-7 backdrop-blur-xl">
+                <div>
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10 border border-sky-500/25 font-mono text-xs font-bold text-sky-400">
+                      02
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 px-2.5 py-1 text-[11px] font-medium text-sky-400 border border-sky-500/20">
+                      <Cpu className="h-3.5 w-3.5" />
+                      <span>Anlık Analiz Motoru</span>
+                    </span>
+                  </div>
+                  <h5 className="text-base font-bold text-white">
+                    Otomatik Veri Çözümleme
+                  </h5>
+                  <p className="mt-2 text-xs sm:text-sm leading-relaxed text-zinc-400">
+                    GitHub GraphQL &amp; REST API üzerinden commitleriniz, PR&apos;larınız, dilleriniz ve 
+                    katkı zamanlarınız taranır; algoritmalar geliştirici DNA&apos;nızı saniyeler içinde hesaplar.
+                  </p>
+                </div>
+                <div className="mt-5 rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-[11px] font-mono text-zinc-400">
+                  <div className="flex items-center gap-2 text-zinc-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+                    <span>GraphQL &middot; REST &middot; Cron Sync</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">40+ Rozet kuralı ve percentile ligi taranır</span>
+                </div>
+              </div>
+            </R>
+
+            {/* Adım 3: Keşfet, Yarış ve Paylaş */}
+            <R d={120}>
+              <div className="relative h-full flex flex-col justify-between rounded-3xl border border-zinc-800/70 bg-zinc-900/40 p-6 sm:p-7 backdrop-blur-xl">
+                <div>
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 border border-violet-500/25 font-mono text-xs font-bold text-violet-400">
+                      03
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/10 px-2.5 py-1 text-[11px] font-medium text-violet-400 border border-violet-500/20">
+                      <Share2 className="h-3.5 w-3.5" />
+                      <span>Canlı Vitrin &amp; Poster</span>
+                    </span>
+                  </div>
+                  <h5 className="text-base font-bold text-white">
+                    Keşfet, Yarış ve Paylaş
+                  </h5>
+                  <p className="mt-2 text-xs sm:text-sm leading-relaxed text-zinc-400">
+                    21 interaktif widget içeren kişisel dashboard&apos;unuz açılır. Rozetlerinizin 
+                    kilidi kalkar, lig sıralamanız belirlenir ve Wrapped posterinizi tek tıkla dünyaya sunarsınız.
+                  </p>
+                </div>
+                <div className="mt-5 rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-[11px] font-mono text-zinc-400">
+                  <div className="flex items-center gap-2 text-zinc-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+                    <span>21 Widget &middot; Liderlik &middot; PNG Poster</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">Profil kartları ve sosyal medya vitrini hazır</span>
+                </div>
+              </div>
+            </R>
+          </div>
+        </div>
+
+        {/* Bölüm Ayırıcı Gradient Çizgi */}
+        <div className="mt-20 sm:mt-28 h-[1px] bg-gradient-to-r from-transparent via-zinc-800/80 to-transparent" />
       </section>
 
       {/* ════════════════════════════════════════════════
