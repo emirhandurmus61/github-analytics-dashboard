@@ -64,8 +64,8 @@ export default async function SettingsPage() {
       .select("leaderboard_opt_in")
       .eq("id", user.id)
       .single();
-    if (lb && (lb as any).leaderboard_opt_in !== undefined) {
-      leaderboardOptInDb = (lb as any).leaderboard_opt_in !== false;
+    if (lb && (lb as Record<string, unknown>).leaderboard_opt_in !== undefined) {
+      leaderboardOptInDb = (lb as Record<string, unknown>).leaderboard_opt_in !== false;
     }
   } catch {
     // Kolon henüz yoksa varsayılan: true
@@ -97,11 +97,13 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-100">Ayarlar</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Temanı, profilini ve badge'ini özelleştir.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-800/60">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">Ayarlar</h1>
+          <p className="mt-1 text-xs sm:text-sm text-zinc-400">
+            Arayüz temanızı, profil bilgilerinizi ve GitHub README entegrasyonlarınızı yönetin.
+          </p>
+        </div>
       </div>
 
       <SettingsForm
