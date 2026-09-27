@@ -1,6 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import { calculateStreaks } from "@/lib/streak";
 import { ThemeProvider } from "@/components/theme-provider";
 import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
@@ -26,9 +25,13 @@ const LANG_COLORS: Record<string, string> = {
   Swift: "#F05138", Kotlin: "#7F52FF", Ruby: "#701516",
 };
 
-const MONTH_NAMES = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
-  "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
-const DAY_NAMES = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"];
+const MONTH_NAMES = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+];
+const DAY_NAMES = [
+  "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"
+];
 
 export default async function WrappedPage({ params }: Props) {
   const { username, year } = await params;
@@ -64,7 +67,7 @@ export default async function WrappedPage({ params }: Props) {
   const ownRepoIds = (allRepos ?? []).filter((r) => !r.is_fork).map((r) => r.id);
 
   // Paralel veri çekme
-  const [heatmapRes, commitsRes, langsRes, issuesRes] = await Promise.all([
+  const [heatmapRes, commitsRes, langsRes, issuesRes, prsRes] = await Promise.all([
     supabaseAdmin
       .from("daily_stats")
       .select("date, commit_count, lines_added, lines_deleted")
@@ -88,11 +91,18 @@ export default async function WrappedPage({ params }: Props) {
       .in("repo_id", ownRepoIds)
       .gte("created_at", `${yearStart}T00:00:00Z`)
       .lte("created_at", `${yearEnd}T23:59:59Z`),
+    supabaseAdmin
+      .from("pull_requests")
+      .select("merged, state, created_at, repo_id")
+      .in("repo_id", ownRepoIds)
+      .gte("created_at", `${yearStart}T00:00:00Z`)
+      .lte("created_at", `${yearEnd}T23:59:59Z`),
   ]);
 
   const heatmap = heatmapRes.data ?? [];
   const commits = commitsRes.data ?? [];
   const langs = langsRes.data ?? [];
+  const prs = prsRes.data ?? [];
 
   // ── Temel istatistikler ────────────────────────────────────────────
   const totalCommits = commits.length;
@@ -100,6 +110,11 @@ export default async function WrappedPage({ params }: Props) {
   const totalLinesDeleted = heatmap.reduce((s, d) => s + (d.lines_deleted ?? 0), 0);
   const activeDates = heatmap.filter((d) => d.commit_count > 0).map((d) => d.date);
   const { longestStreak, totalActiveDays } = calculateStreaks(activeDates);
+
+  // PR ve Yıldız istatistikleri
+  const totalPRs = prs.length;
+  const mergedPRs = prs.filter((p) => p.merged || p.state === "merged" || p.state === "closed").length;
+  const totalStars = (allRepos ?? []).filter((r) => !r.is_fork).reduce((acc, r) => acc + (r.stars ?? 0), 0);
 
   // ── En aktif ay ────────────────────────────────────────────────────
   const monthCounts = new Array(12).fill(0);
@@ -149,22 +164,94 @@ export default async function WrappedPage({ params }: Props) {
   const activeRepoIds = new Set(commits.map((c) => c.repo_id));
   const activeRepoCount = activeRepoIds.size;
 
+  // En çok commit yapılan favori repo
+  const repoCommitMap = new Map<number, number>();
+  for (const c of commits) {
+    repoCommitMap.set(c.repo_id, (repoCommitMap.get(c.repo_id) ?? 0) + 1);
+  }
+  let topRepo: { name: string; fullName: string; commits: number; stars: number; language: string } | null = null;
+  if (repoCommitMap.size > 0) {
+    const sorted = Array.from(repoCommitMap.entries()).sort((a, b) => b[1] - a[1]);
+    const topId = sorted[0][0];
+    const match = (allRepos ?? []).find((r) => r.id === topId);
+    if (match) {
+      topRepo = {
+        name: match.name,
+        fullName: match.full_name,
+        commits: sorted[0][1],
+        stars: match.stars ?? 0,
+        language: match.language ?? "Code",
+      };
+    }
+  }
+
   // ── Aylık commit dağılımı (grafik için) ────────────────────────────
   const monthlyData = monthCounts.map((count, i) => ({
     month: MONTH_NAMES[i].slice(0, 3),
     commits: count,
   }));
 
-  // ── Çalışma kimliği ────────────────────────────────────────────────
+  // ── Çalışma kimliği & Arketip ───────────────────────────────────────
   const morningCommits   = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 6 && h < 12; }).length;
   const afternoonCommits = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 12 && h < 18; }).length;
   const eveningCommits   = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 18 && h < 22; }).length;
   const nightCommits     = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 22 || h < 6; }).length;
   const maxP = Math.max(morningCommits, afternoonCommits, eveningCommits, nightCommits);
+
   let identity = { label: "Öğleden Sonra Kodcusu", emoji: "☀️" };
   if (maxP === morningCommits && morningCommits > 0) identity = { label: "Sabah Kodcusu", emoji: "🌅" };
   else if (maxP === eveningCommits && eveningCommits > 0) identity = { label: "Akşam Kodcusu", emoji: "🌆" };
   else if (maxP === nightCommits && nightCommits > 0) identity = { label: "Gece Kodcusu", emoji: "🌙" };
+
+  // Eğlenceli ve heyecan verici geliştirici arketipi
+  let archetype = {
+    title: "Açık Kaynak Kaşifi",
+    tagline: "Kodla dünyayı şekillendiren vizyoner geliştirici",
+    badge: "🚀 EXPLORER",
+    desc: `${totalCommits} commit ve ${activeRepoCount} aktif repo ile yılını dolu dolu üreterek geçirdin.`,
+    color: "#38bdf8",
+  };
+  if (nightCommits > 0 && nightCommits >= maxP && (nightCommits / Math.max(totalCommits, 1)) > 0.25) {
+    archetype = {
+      title: "Gece Savaşçısı (Night Crawler)",
+      tagline: "Ay ışığında kod yazan bir efsane",
+      badge: "🌙 NOCTURNAL",
+      desc: "Herkes uyurken sen en çetrefilli bug'ları avladın. Gece sessizliği senin gizli süper gücün.",
+      color: "#a855f7",
+    };
+  } else if (morningCommits > 0 && morningCommits >= maxP && (morningCommits / Math.max(totalCommits, 1)) > 0.25) {
+    archetype = {
+      title: "Şafak Kodcusu (Early Bird)",
+      tagline: "Güneş doğmadan ilk commit'i atan sabah insanı",
+      badge: "🌅 EARLY BIRD",
+      desc: "Güne erken başlayıp kahvenle birlikte ilk PR'ını açtın. Disiplinin ve odaklanma gücün benzersiz.",
+      color: "#f59e0b",
+    };
+  } else if (longestStreak >= 10) {
+    archetype = {
+      title: "Ateş Koruyucu (Streak Master)",
+      tagline: "Zinciri kırmayan istikrar abidesi",
+      badge: "🔥 UNSTOPPABLE",
+      desc: `${longestStreak} günlük kesintisiz kodlama serisi! Yıl boyunca kararlılığınla harikalar yarattın.`,
+      color: "#ef4444",
+    };
+  } else if (totalCommits >= 250) {
+    archetype = {
+      title: "Kod Fabrikası (The Code Machine)",
+      tagline: "Terminalin sıcaklığı hiç düşmeyen üretici güç",
+      badge: "⚡ POWERHOUSE",
+      desc: "Yıl boyunca durmaksızın ürettin, klavyen neredeyse hiç soğumadı.",
+      color: "#10b981",
+    };
+  } else if (totalLinesDeleted > totalLinesAdded * 0.35 && totalLinesDeleted > 500) {
+    archetype = {
+      title: "Refactor Mimarı (The Zen Cleaner)",
+      tagline: "Az kod, çok iş felsefesinin ustası",
+      badge: "🧹 ELEGANT",
+      desc: "Gereksiz karmaşıklığı temizleyip kod tabanını hafif ve sürdürülebilir kıldın.",
+      color: "#06b6d4",
+    };
+  }
 
   // ── Haftalık heatmap verisi ────────────────────────────────────────
   const dateCountMap = new Map(heatmap.map((d) => [d.date, d.commit_count]));
@@ -200,6 +287,11 @@ export default async function WrappedPage({ params }: Props) {
       : null,
     reposCreated: reposCreatedThisYear,
     activeRepos: activeRepoCount,
+    topRepo,
+    totalPRs,
+    mergedPRs,
+    totalStars,
+    archetype,
     identity,
     monthlyData,
     accentColor: theme.accent,
