@@ -188,3 +188,56 @@ export function calcDeveloperDNA(input: DNAInput): DeveloperDNA {
 
   return { workTime, commitRhythm, langProfile, msgQuality, focusStyle, developerType, topLang, confidence };
 }
+
+export function translateDeveloperType(typeStr: string, lang: string = "tr"): string {
+  if (lang !== "en") return typeStr;
+  return typeStr
+    .replace("Gece Çalışan", "Night Owl")
+    .replace("Sabah Erken Kalkan", "Early Bird")
+    .replace("Akşamcı", "Evening Worker")
+    .replace("Öğleden Sonra Üretken", "Afternoon Achiever")
+    .replace("Uzmanı", "Specialist")
+    .replace("Poliglot Geliştirici", "Polyglot Developer")
+    .replace("Yazarı", "Developer")
+    .replace("· Proje Gezgini", "· Project Explorer")
+    .replace("· Sprint Ustası", "· Sprint Master")
+    .replace("· Sürekli Teslimatçı", "· Continuous Shipper")
+    .replace("Bağımsız Geliştirici", "Independent Developer");
+}
+
+export const DNA_DIM_LABELS_EN: Record<string, string> = {
+  // Work Time
+  "Gece Kuşu": "Night Owl",
+  "Sabahçı": "Early Bird",
+  "Öğleden Sonracı": "Afternoon Coder",
+  "Akşamcı": "Evening Worker",
+  "Her Saatte": "All Hours",
+
+  // Commit Rhythm
+  "Küçük & Sık": "Small & Frequent",
+  "Büyük & Seyrek": "Large & Infrequent",
+  "Patlama Yapan": "Burst",
+  "Dengeli": "Balanced",
+
+  // Lang Profile
+  "Uzman": "Specialist",
+  "Poliglot": "Polyglot",
+  "Geçiş Aşamasında": "Transitioning",
+  "Keşifçi": "Explorer",
+
+  // Msg Quality
+  "Konvansiyonalist": "Conventionalist",
+  "Minimalist": "Minimalist",
+  "Anlatıcı": "Storyteller",
+  "Karma": "Mixed",
+
+  // Focus Style
+  "Tek Proje": "Single Project",
+  "Çok Ön Yüz": "Multi-Repo",
+};
+
+export function getLocalizedDnaValue(val: string, lang: string = "tr"): string {
+  if (lang === "en") return DNA_DIM_LABELS_EN[val] ?? val;
+  return val;
+}
+

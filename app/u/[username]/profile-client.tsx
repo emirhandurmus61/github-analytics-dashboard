@@ -19,8 +19,8 @@ import {
   Terminal, FileCode, Info, Lightbulb, AlertTriangle, AlertCircle, ShieldAlert,
   Dna, CheckCircle2, ChevronDown, Pencil,
 } from "lucide-react";
-import type { Badge } from "@/lib/badges";
-import type { DeveloperDNA } from "@/lib/developer-dna";
+import { type Badge, getLocalizedBadge } from "@/lib/badges";
+import { type DeveloperDNA, translateDeveloperType, getLocalizedDnaValue } from "@/lib/developer-dna";
 import { useLanguage } from "@/lib/i18n";
 
 /* ─── Types ─── */
@@ -224,6 +224,7 @@ function LanguageDonut({ languages, size = 160 }: { languages: LangData[]; size?
 
 function MiniHeatmap({ data }: { data: DayData[] }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const mapEntries = data.map((d): [string, number] => [d.date, d.commit_count]);
   const map = new Map(mapEntries);
   const max = Math.max(...data.map((d) => d.commit_count), 1);
@@ -262,14 +263,17 @@ function MiniHeatmap({ data }: { data: DayData[] }) {
     <div className="flex gap-[3px]">
       {weeks.map((week, wi) => (
         <div key={wi} className="flex flex-col gap-[3px]">
-          {week.map((day) => (
-            <div
-              key={day.date}
-              className="rounded-[2px] transition-all hover:scale-150 hover:z-10 relative"
-              style={{ width: 10, height: 10, backgroundColor: getColor(day.count) }}
-              title={`${day.date}: ${day.count} commit`}
-            />
-          ))}
+          {week.map((day) => {
+            const commitWord = lang === "en" ? (day.count === 1 ? "commit" : "commits") : "commit";
+            return (
+              <div
+                key={day.date}
+                className="rounded-[2px] transition-all hover:scale-150 hover:z-10 relative"
+                style={{ width: 10, height: 10, backgroundColor: getColor(day.count) }}
+                title={`${day.date}: ${day.count} ${commitWord}`}
+              />
+            );
+          })}
         </div>
       ))}
     </div>
@@ -328,9 +332,12 @@ type DimMeta = {
   icon: React.ReactNode;
   color: string;
   score: number;
-  badge: string;
-  desc: string;
-  superpower: string;
+  badgeTr: string;
+  badgeEn: string;
+  descTr: string;
+  descEn: string;
+  superpowerTr: string;
+  superpowerEn: string;
 };
 
 const DNA_DIM_META: Record<string, DimMeta> = {
@@ -338,157 +345,214 @@ const DNA_DIM_META: Record<string, DimMeta> = {
     icon: <Moon className="w-4 h-4" />,
     color: "#818cf8",
     score: 85,
-    badge: "22:00 – 06:00 Zirve",
-    desc: "Gece yarısı ve sabaha karşı en yüksek konsantrasyona ulaşıyorsun. Dış uyaranların kesildiği sessiz saatlerde derin mimari ve karmaşık kod bloklarına odaklanıyorsun.",
-    superpower: "Gürültüsüz saatlerde kesintisiz odaklanma ve yüksek kaliteli kod üretimi.",
+    badgeTr: "22:00 – 06:00 Zirve",
+    badgeEn: "10:00 PM – 6:00 AM Peak",
+    descTr: "Gece yarısı ve sabaha karşı en yüksek konsantrasyona ulaşıyorsun. Dış uyaranların kesildiği sessiz saatlerde derin mimari ve karmaşık kod bloklarına odaklanıyorsun.",
+    descEn: "You reach peak concentration from midnight to dawn. You dive into deep architecture and complex code during quiet, distraction-free hours.",
+    superpowerTr: "Gürültüsüz saatlerde kesintisiz odaklanma ve yüksek kaliteli kod üretimi.",
+    superpowerEn: "Uninterrupted deep focus and high-quality code generation during quiet hours.",
   },
   "Sabahçı": {
     icon: <Sunrise className="w-4 h-4" />,
     color: "#fb923c",
     score: 80,
-    badge: "06:00 – 12:00 Zirve",
-    desc: "Günü kod yazarak başlatıyor, zihnin en taze olduğu erken sabah saatlerinde en kritik teslimatlarını yapıyorsun.",
-    superpower: "Günün başında kritik görevleri tamamlayarak takıma erken ivme kazandırma.",
+    badgeTr: "06:00 – 12:00 Zirve",
+    badgeEn: "6:00 AM – 12:00 PM Peak",
+    descTr: "Günü kod yazarak başlatıyor, zihnin en taze olduğu erken sabah saatlerinde en kritik teslimatlarını yapıyorsun.",
+    descEn: "You start your day with coding, shipping critical deliverables in the early morning when your mind is freshest.",
+    superpowerTr: "Günün başında kritik görevleri tamamlayarak takıma erken ivme kazandırma.",
+    superpowerEn: "Providing early team momentum by completing mission-critical tasks first thing in the morning.",
   },
   "Öğleden Sonracı": {
     icon: <Sun className="w-4 h-4" />,
     color: "#fbbf24",
     score: 65,
-    badge: "12:00 – 17:00 Zirve",
-    desc: "Öğleden sonra doruk noktasına ulaşıyorsun. Sabah planlama ve toplantıları tamamlandıktan sonra asıl geliştirme ritmine giriyorsun.",
-    superpower: "Toplantı ve planlama sonrası taze kararlarla yüksek hacimli üretim.",
+    badgeTr: "12:00 – 17:00 Zirve",
+    badgeEn: "12:00 PM – 5:00 PM Peak",
+    descTr: "Öğleden sonra doruk noktasına ulaşıyorsun. Sabah planlama ve toplantıları tamamlandıktan sonra asıl geliştirme ritmine giriyorsun.",
+    descEn: "You hit your peak in the afternoon. Once morning planning and meetings wrap up, you get into your true development groove.",
+    superpowerTr: "Toplantı ve planlama sonrası taze kararlarla yüksek hacimli üretim.",
+    superpowerEn: "High-volume delivery with fresh decision-making following morning planning and syncs.",
   },
   "Akşamcı": {
     icon: <Sunset className="w-4 h-4" />,
     color: "#f97316",
     score: 75,
-    badge: "17:00 – 22:00 Zirve",
-    desc: "İş günü bittikten sonra gerçek üretkenliğin başlıyor. Akşam saatlerinde kesintisiz akış moduna girerek commit hacmini katlıyorsun.",
-    superpower: "Günün son saatlerinde biriken fikirleri hızlıca çalışan koda dönüştürme.",
+    badgeTr: "17:00 – 22:00 Zirve",
+    badgeEn: "5:00 PM – 10:00 PM Peak",
+    descTr: "İş günü bittikten sonra gerçek üretkenliğin başlıyor. Akşam saatlerinde kesintisiz akış moduna girerek commit hacmini katlıyorsun.",
+    descEn: "Your real productivity ignites after the standard workday. In the evening, you enter flow state and multiply your commit volume.",
+    superpowerTr: "Günün son saatlerinde biriken fikirleri hızlıca çalışan koda dönüştürme.",
+    superpowerEn: "Rapidly translating the day's accumulated ideas into robust working code.",
   },
   "Her Saatte": {
     icon: <Clock className="w-4 h-4" />,
     color: "#94a3b8",
     score: 55,
-    badge: "24 Saat Dengeli",
-    desc: "Commitlerin gün boyunca dengeli dağılmış. Belirli bir kalıba sıkışmadan, ihtiyaç duydukça ve problem olgunlaştıkça çözüm üretiyorsun.",
-    superpower: "Zaman kısıtlamalarından bağımsız, yüksek esneklik ve her an hazır olma.",
+    badgeTr: "24 Saat Dengeli",
+    badgeEn: "24H Balanced",
+    descTr: "Commitlerin gün boyunca dengeli dağılmış. Belirli bir kalıba sıkışmadan, ihtiyaç duydukça ve problem olgunlaştıkça çözüm üretiyorsun.",
+    descEn: "Your commits are evenly balanced throughout the day. Without being constrained to a pattern, you deliver solutions as needed.",
+    superpowerTr: "Zaman kısıtlamalarından bağımsız, yüksek esneklik ve her an hazır olma.",
+    superpowerEn: "Time-agnostic adaptability, high flexibility, and constant readiness.",
   },
 
   "Küçük & Sık": {
     icon: <GitCommit className="w-4 h-4" />,
     color: "#34d399",
     score: 85,
-    badge: "CI/CD & PR Dostu",
-    desc: "Sık sık küçük ve anlamlı değişiklikler gönderiyorsun. CI/CD dostu, geri alması kolay ve ekip üyeleri için incelenmesi son derece rahat bir stil.",
-    superpower: "Düşük riskli deploymentlar, kolay merge süreçleri ve hızlı iterasyon.",
+    badgeTr: "CI/CD & PR Dostu",
+    badgeEn: "CI/CD & PR Friendly",
+    descTr: "Sık sık küçük ve anlamlı değişiklikler gönderiyorsun. CI/CD dostu, geri alması kolay ve ekip üyeleri için incelenmesi son derece rahat bir stil.",
+    descEn: "You push small, meaningful changes frequently. CI/CD friendly, easily reversible, and effortless for teammates to review.",
+    superpowerTr: "Düşük riskli deploymentlar, kolay merge süreçleri ve hızlı iterasyon.",
+    superpowerEn: "Low-risk deployments, friction-free merge cycles, and rapid iteration.",
   },
   "Büyük & Seyrek": {
     icon: <Zap className="w-4 h-4" />,
     color: "#60a5fa",
     score: 70,
-    badge: "Büyük Özellik Teslimatı",
-    desc: "Az sayıda ama kapsamlı commitler. Büyük özellikleri yerel ortamında eksiksiz tamamlayıp tek seferde sağlam adımlarla göndermeyi tercih ediyorsun.",
-    superpower: "Bütünsel düşünme, kapsamlı mimari değişiklikleri tek hamlede bitirme.",
+    badgeTr: "Büyük Özellik Teslimatı",
+    badgeEn: "Big Feature Delivery",
+    descTr: "Az sayıda ama kapsamlı commitler. Büyük özellikleri yerel ortamında eksiksiz tamamlayıp tek seferde sağlam adımlarla göndermeyi tercih ediyorsun.",
+    descEn: "Fewer but comprehensive commits. You polish entire features locally and ship them in solid, self-contained milestones.",
+    superpowerTr: "Bütünsel düşünme, kapsamlı mimari değişiklikleri tek hamlede bitirme.",
+    superpowerEn: "Holistic systems thinking, landing complex architectural milestones in cohesive steps.",
   },
   "Patlama Yapan": {
     icon: <TrendingUp className="w-4 h-4" />,
     color: "#f43f5e",
     score: 90,
-    badge: "Sprint & Hackathon",
-    desc: "Kısa sürede çok yüksek sayıda commit: sprint veya hackathon tarzı yoğun çalışma. Enerjini biriktirip yüksek yoğunluklu teslimat patlamaları yapıyorsun.",
-    superpower: "Kritik teslim tarihlerinde ve kriz anlarında devasa çıktı üretme gücü.",
+    badgeTr: "Sprint & Hackathon",
+    badgeEn: "Sprint & Hackathon",
+    descTr: "Kısa sürede çok yüksek sayıda commit: sprint veya hackathon tarzı yoğun çalışma. Enerjini biriktirip yüksek yoğunluklu teslimat patlamaları yapıyorsun.",
+    descEn: "A burst of commits in tight timeframes: sprint or hackathon intensity. You channel energy into high-impact delivery sprints.",
+    superpowerTr: "Kritik teslim tarihlerinde ve kriz anlarında devasa çıktı üretme gücü.",
+    superpowerEn: "Delivering massive output during crunch deadlines and critical project milestones.",
   },
   "Dengeli": {
     icon: <Shuffle className="w-4 h-4" />,
     color: "#a78bfa",
     score: 60,
-    badge: "Esnek Ritim",
-    desc: "Küçük düzeltmeler ile büyük modüller arasında doğal bir denge. Görevin kapsamına göre esneyebilen, pragmatik bir teslimat stili.",
-    superpower: "Farklı görev gereksinimlerine hızla adapte olabilen çok yönlü ritim.",
+    badgeTr: "Esnek Ritim",
+    badgeEn: "Flexible Rhythm",
+    descTr: "Küçük düzeltmeler ile büyük modüller arasında doğal bir denge. Görevin kapsamına göre esneyebilen, pragmatik bir teslimat stili.",
+    descEn: "A natural equilibrium between quick fixes and large modules. A pragmatic style adapting fluidly to task scope.",
+    superpowerTr: "Farklı görev gereksinimlerine hızla adapte olabilen çok yönlü ritim.",
+    superpowerEn: "Versatile rhythm capable of adapting on the fly to diverse task demands.",
   },
 
   "Uzman": {
     icon: <Code2 className="w-4 h-4" />,
     color: "#22d3ee",
     score: 95,
-    badge: "Derin Uzmanlık",
-    desc: "Tek bir birincil dilde derin uzmanlık. Dilin ekosistemini, tasarım kalıplarını, idiomlarını ve performans inceliklerini içselleştirmişsin.",
-    superpower: "Karmaşık dil dinamiklerinde ve mimari kararlarda referans mühendis rolü.",
+    badgeTr: "Derin Uzmanlık",
+    badgeEn: "Deep Specialization",
+    descTr: "Tek bir birincil dilde derin uzmanlık. Dilin ekosistemini, tasarım kalıplarını, idiomlarını ve performans inceliklerini içselleştirmişsin.",
+    descEn: "Deep specialization in a primary language. You've internalized its ecosystem, design patterns, idioms, and performance nuances.",
+    superpowerTr: "Karmaşık dil dinamiklerinde ve mimari kararlarda referans mühendis rolü.",
+    superpowerEn: "Serving as the authority and go-to engineer for complex language paradigms and architecture.",
   },
   "Poliglot": {
     icon: <Globe className="w-4 h-4" />,
     color: "#4ade80",
     score: 88,
-    badge: "5+ Çoklu Dil",
-    desc: "Birden fazla farklı dili aktif olarak kullanıyorsun. Yeni teknolojilere hızlı adaptasyon, geniş teknik bakış açısı ve platform bağımsız vizyon.",
-    superpower: "Farklı dil paradigmalarını (fonksiyonel, OOP, sistem) birleştirme ustalığı.",
+    badgeTr: "5+ Çoklu Dil",
+    badgeEn: "5+ Multi-Language",
+    descTr: "Birden fazla farklı dili aktif olarak kullanıyorsun. Yeni teknolojilere hızlı adaptasyon, geniş teknik bakış açısı ve platform bağımsız vizyon.",
+    descEn: "You actively code across 5+ languages. Rapid adoption of new tech stacks, broad technical vision, and platform agnosticism.",
+    superpowerTr: "Farklı dil paradigmalarını (fonksiyonel, OOP, sistem) birleştirme ustalığı.",
+    superpowerEn: "Mastery in synthesizing diverse paradigms (functional, OOP, systems) across projects.",
   },
   "Geçiş Aşamasında": {
     icon: <Layers className="w-4 h-4" />,
     color: "#fb923c",
     score: 65,
-    badge: "Aktif Dönüşüm",
-    desc: "Birincil dilinden yeni bir teknoloji yığınına geçiş yapıyorsun. Sürekli öğrenme, dönüşüm ve kendini yenileme sürecindesin.",
-    superpower: "Eski alışkanlıkları yeni paradigmalarla harmanlayarak hızla büyüme.",
+    badgeTr: "Aktif Dönüşüm",
+    badgeEn: "Active Transition",
+    descTr: "Birincil dilinden yeni bir teknoloji yığınına geçiş yapıyorsun. Sürekli öğrenme, dönüşüm ve kendini yenileme sürecindesin.",
+    descEn: "Transitioning from your primary language to a new modern stack. You are in a dynamic journey of continuous learning and evolution.",
+    superpowerTr: "Eski alışkanlıkları yeni paradigmalarla harmanlayarak hızla büyüme.",
+    superpowerEn: "Rapid growth by combining past architectural experience with fresh modern paradigms.",
   },
   "Keşifçi": {
     icon: <Compass className="w-4 h-4" />,
     color: "#f59e0b",
     score: 72,
-    badge: "Teknoloji Kaşifi",
-    desc: "Farklı diller ve projeler arasında dengeli dağılım. Teknoloji dünyasındaki yenilikleri denemekten ve çok yönlü araçlar geliştirmekten keyif alıyorsun.",
-    superpower: "Doğru iş için doğru aracı seçebilen geniş vizyon ve cesur denemeler.",
+    badgeTr: "Teknoloji Kaşifi",
+    badgeEn: "Tech Explorer",
+    descTr: "Farklı diller ve projeler arasında dengeli dağılım. Teknoloji dünyasındaki yenilikleri denemekten ve çok yönlü araçlar geliştirmekten keyif alıyorsun.",
+    descEn: "A balanced footprint across multiple languages and repos. You love trying cutting-edge innovations and building versatile tooling.",
+    superpowerTr: "Doğru iş için doğru aracı seçebilen geniş vizyon ve cesur denemeler.",
+    superpowerEn: "Choosing the right tool for the job with broad perspective and fearless exploration.",
   },
 
   "Konvansiyonalist": {
     icon: <AlignLeft className="w-4 h-4" />,
     color: "#a78bfa",
     score: 92,
-    badge: "Conventional Commits",
-    desc: "feat:, fix:, chore:, refactor: gibi semantik commit standartlarını titizlikle uyguluyorsun. Otomatik changelog ve sürümleme için mükemmel.",
-    superpower: "Ekip standartlarına kusursuz uyum ve otomatik sürümleme altyapısı.",
+    badgeTr: "Conventional Commits",
+    badgeEn: "Conventional Commits",
+    descTr: "feat:, fix:, chore:, refactor: gibi semantik commit standartlarını titizlikle uyguluyorsun. Otomatik changelog ve sürümleme için mükemmel.",
+    descEn: "Meticulously following semantic conventions like feat:, fix:, chore:, refactor:. Perfect for automated changelogs and semantic release.",
+    superpowerTr: "Ekip standartlarına kusursuz uyum ve otomatik sürümleme altyapısı.",
+    superpowerEn: "Seamless alignment with team standards and turnkey release automation.",
   },
   "Minimalist": {
     icon: <Minus className="w-4 h-4" />,
     color: "#94a3b8",
     score: 45,
-    badge: "Kısa & Öz Mesajlar",
-    desc: "Kısa ve doğrudan mesajlar yazıyorsun. Kodun kendisini konuşturmayı tercih eden, hıza ve pratikliğe odaklı bir yaklaşım.",
-    superpower: "Bürokrasiden uzak, hızlı ve pragmatik geliştirme döngüsü.",
+    badgeTr: "Kısa & Öz Mesajlar",
+    badgeEn: "Concise Messages",
+    descTr: "Kısa ve doğrudan mesajlar yazıyorsun. Kodun kendisini konuşturmayı tercih eden, hıza ve pratikliğe odaklı bir yaklaşım.",
+    descEn: "Concise and direct commit messages. You let the code speak for itself, prioritizing speed and pragmatic delivery.",
+    superpowerTr: "Bürokrasiden uzak, hızlı ve pragmatik geliştirme döngüsü.",
+    superpowerEn: "Frictionless, rapid development cycles unburdened by overhead.",
   },
   "Anlatıcı": {
     icon: <BookOpen className="w-4 h-4" />,
     color: "#34d399",
     score: 85,
-    badge: "Ayrıntılı Dokümantasyon",
-    desc: "Sadece ne yapıldığını değil, 'neden' yapıldığını da anlatan ayrıntılı commit mesajları. Gelecekteki geliştiriciler ve kod arkeolojisi için altın değerinde.",
-    superpower: "Kod geçmişini yaşayan bir dokümantasyona dönüştürerek bilgi kaybını önleme.",
+    badgeTr: "Ayrıntılı Dokümantasyon",
+    badgeEn: "Detailed Documentation",
+    descTr: "Sadece ne yapıldığını değil, 'neden' yapıldığını da anlatan ayrıntılı commit mesajları. Gelecekteki geliştiriciler ve kod arkeolojisi için altın değerinde.",
+    descEn: "Explanatory commit messages answering not just 'what' was changed, but 'why'. Pure gold for future maintainers and code archaeology.",
+    superpowerTr: "Kod geçmişini yaşayan bir dokümantasyona dönüştürerek bilgi kaybını önleme.",
+    superpowerEn: "Turning commit history into living documentation, preventing institutional knowledge loss.",
   },
   "Karma": {
     icon: <Blend className="w-4 h-4" />,
     color: "#fbbf24",
     score: 62,
-    badge: "Doğal Akış",
-    desc: "Katı kalıplara bağlı kalmadan duruma göre şekillenen doğal bir mesaj akışı. Acil durumlarda hızlı, kritik yerlerde açıklayıcı.",
-    superpower: "Durumun ciddiyetine ve ihtiyacına göre serbestçe şekil alan esneklik.",
+    badgeTr: "Doğal Akış",
+    badgeEn: "Natural Flow",
+    descTr: "Katı kalıplara bağlı kalmadan duruma göre şekillenen doğal bir mesaj akışı. Acil durumlarda hızlı, kritik yerlerde açıklayıcı.",
+    descEn: "Natural, flexible messaging adapting to situation. Quick in hotfixes, thoroughly descriptive in core architecture.",
+    superpowerTr: "Durumun ciddiyetine ve ihtiyacına göre serbestçe şekil alan esneklik.",
+    superpowerEn: "Flexibility to calibrate communication depth to the criticality of each change.",
   },
 
   "Tek Proje": {
     icon: <FolderGit2 className="w-4 h-4" />,
     color: "#22d3ee",
     score: 90,
-    badge: "Derin Odaklanma",
-    desc: "Commitlerinin büyük çoğunluğu ana projende toplanıyor. Monorepo dostu, yüksek süreklilik ve derin ürün sahiplenmesi göstergesi.",
-    superpower: "Ürünü baştan sona avucunun içi gibi bilme ve derin konsantrasyon.",
+    badgeTr: "Derin Odaklanma",
+    badgeEn: "Deep Focus",
+    descTr: "Commitlerinin büyük çoğunluğu ana projende toplanıyor. Monorepo dostu, yüksek süreklilik ve derin ürün sahiplenmesi göstergesi.",
+    descEn: "Most of your commits concentrate in your flagship project. Monorepo friendly, high continuity, and strong product ownership.",
+    superpowerTr: "Ürünü baştan sona avucunun içi gibi bilme ve derin konsantrasyon.",
+    superpowerEn: "Knowing every inch of the product from end to end with singular concentration.",
   },
   "Çok Ön Yüz": {
     icon: <LayoutGrid className="w-4 h-4" />,
     color: "#a78bfa",
     score: 75,
-    badge: "Multi-Repo Yönetimi",
-    desc: "2-5 farklı repo arasında dengeli dağılım. Birden fazla mikroservisi veya kütüphaneyi eşzamanlı yürütebilen, yüksek context-switch kapasitesi.",
-    superpower: "Bölünmüş sistemlerde ve çoklu projelerde yüksek koordinasyon yeteneği.",
+    badgeTr: "Multi-Repo Yönetimi",
+    badgeEn: "Multi-Repo Management",
+    descTr: "2-5 farklı repo arasında dengeli dağılım. Birden fazla mikroservisi veya kütüphaneyi eşzamanlı yürütebilen, yüksek context-switch kapasitesi.",
+    descEn: "Balanced distribution across 2-5 repositories. High context-switch capacity, managing microservices or packages concurrently.",
+    superpowerTr: "Bölünmüş sistemlerde ve çoklu projelerde yüksek koordinasyon yeteneği.",
+    superpowerEn: "High coordination and architectural agility across distributed projects and services.",
   },
 };
 
@@ -519,13 +583,17 @@ function DeveloperDNASection({
     icon: <Code2 className="w-4 h-4" />,
     color: accent,
     score: 70,
-    badge: lang === "tr" ? "Özel Profil" : "Custom Profile",
-    desc: "",
-    superpower: "",
+    badgeTr: "Özel Profil",
+    badgeEn: "Custom Profile",
+    descTr: "",
+    descEn: "",
+    superpowerTr: "",
+    superpowerEn: "",
   };
 
   const handleShare = () => {
-    const text = `${username} · Developer DNA: ${dna.developerType} (${lang === "tr" ? `%${dna.confidence} Doğruluk` : `${dna.confidence}% Accuracy`})`;
+    const devType = translateDeveloperType(dna.developerType, lang);
+    const text = `${username} · Developer DNA: ${devType} (${lang === "tr" ? `%${dna.confidence} Doğruluk` : `${dna.confidence}% Accuracy`})`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -614,7 +682,7 @@ function DeveloperDNASection({
               </div>
 
               <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                {dna.developerType}
+                {translateDeveloperType(dna.developerType, lang)}
               </h3>
 
               <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl leading-relaxed">
@@ -629,7 +697,7 @@ function DeveloperDNASection({
                   const m = DNA_DIM_META[d.value];
                   return (
                     <span
-                      key={d.label}
+                      key={d.key}
                       className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium border"
                       style={{
                         borderColor: m ? `${m.color}25` : "#27272a",
@@ -638,7 +706,7 @@ function DeveloperDNASection({
                       }}
                     >
                       {m?.icon}
-                      <span>{d.value}</span>
+                      <span>{getLocalizedDnaValue(d.value, lang)}</span>
                     </span>
                   );
                 })}
@@ -668,9 +736,12 @@ function DeveloperDNASection({
             icon: <Code2 className="w-4 h-4" />,
             color: "#6b7280",
             score: 50,
-            badge: "Standart",
-            desc: "",
-            superpower: "",
+            badgeTr: "Standart",
+            badgeEn: "Standard",
+            descTr: "",
+            descEn: "",
+            superpowerTr: "",
+            superpowerEn: "",
           };
           const isSelected = selectedDim === idx;
 
@@ -705,7 +776,7 @@ function DeveloperDNASection({
                     className="rounded-full px-1.5 py-0.5 text-[8px] font-bold tracking-wide uppercase"
                     style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
                   >
-                    {meta.badge}
+                    {lang === "en" ? meta.badgeEn : meta.badgeTr}
                   </span>
                 </div>
 
@@ -714,7 +785,7 @@ function DeveloperDNASection({
                   className="text-sm font-bold mt-1 tracking-tight"
                   style={{ color: meta.color }}
                 >
-                  {value}
+                  {getLocalizedDnaValue(value, lang)}
                 </h4>
 
                 {/* Progress Intensity bar */}
@@ -730,7 +801,7 @@ function DeveloperDNASection({
 
                 {/* Description */}
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  {meta.desc}
+                  {lang === "en" ? meta.descEn : meta.descTr}
                 </p>
               </div>
 
@@ -761,10 +832,10 @@ function DeveloperDNASection({
         </div>
         <div className="space-y-0.5">
           <p className="text-xs font-bold" style={{ color: currentMeta.color }}>
-            {dims[selectedDim].label}: {dims[selectedDim].value} {lang === "tr" ? "— Süper Güç & Ekip Avantajı" : "— Superpower & Team Edge"}
+            {dims[selectedDim].label}: {getLocalizedDnaValue(dims[selectedDim].value, lang)} {lang === "tr" ? "— Süper Güç & Ekip Avantajı" : "— Superpower & Team Edge"}
           </p>
           <p className="text-xs text-zinc-300 leading-relaxed">
-            {currentMeta.superpower}
+            {lang === "en" ? currentMeta.superpowerEn : currentMeta.superpowerTr}
           </p>
         </div>
       </div>
@@ -775,8 +846,10 @@ function DeveloperDNASection({
 /* ─── Badge card ─── */
 
 function BadgeCard({ badge, index }: { badge: Badge; index: number }) {
-  const style = RARITY_STYLES[badge.rarity] ?? RARITY_STYLES.common;
-  const Icon = BADGE_ICONS[badge.id] ?? Award;
+  const { lang } = useLanguage();
+  const locBadge = getLocalizedBadge(badge, lang);
+  const style = RARITY_STYLES[locBadge.rarity] ?? RARITY_STYLES.common;
+  const Icon = BADGE_ICONS[locBadge.id] ?? Award;
 
   return (
     <div
@@ -796,15 +869,15 @@ function BadgeCard({ badge, index }: { badge: Badge; index: number }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold truncate" style={{ color: style.text }}>{badge.name}</p>
+          <p className="text-sm font-semibold truncate" style={{ color: style.text }}>{locBadge.name}</p>
           <span
             className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider"
             style={{ color: style.text, backgroundColor: `${style.text}12`, border: `1px solid ${style.text}15` }}
           >
-            {badge.rarity === "common" ? "C" : badge.rarity === "rare" ? "R" : "E"}
+            {locBadge.rarity === "common" ? "C" : locBadge.rarity === "rare" ? "R" : "E"}
           </span>
         </div>
-        <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{badge.description}</p>
+        <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{locBadge.description}</p>
       </div>
     </div>
   );
@@ -1005,6 +1078,7 @@ function renderBlockquote(children: React.ReactNode, themeAccent: string) {
 /* ─── Code Block with Copy ─── */
 
 function CodeBlock({ children, className }: { children: React.ReactNode; className?: string }) {
+  const { lang: uiLang } = useLanguage();
   const [copied, setCopied] = useState(false);
   const langMatch = /language-(\w+)/.exec(className || "");
   const lang = langMatch ? langMatch[1] : "";
@@ -1040,18 +1114,18 @@ function CodeBlock({ children, className }: { children: React.ReactNode; classNa
         <button
           onClick={handleCopy}
           type="button"
-          title="Kodu Kopyala"
+          title={uiLang === "en" ? "Copy Code" : "Kodu Kopyala"}
           className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
         >
           {copied ? (
             <>
               <Check className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400 font-medium">Kopyalandı</span>
+              <span className="text-emerald-400 font-medium">{uiLang === "en" ? "Copied" : "Kopyalandı"}</span>
             </>
           ) : (
             <>
               <Copy className="w-3 h-3 text-zinc-500" />
-              <span>Kopyala</span>
+              <span>{uiLang === "en" ? "Copy" : "Kopyala"}</span>
             </>
           )}
         </button>
@@ -2143,7 +2217,7 @@ export default function ProfileClient(props: ProfileProps) {
                 {lang === "tr" ? "Kazanılan Rozetler" : "Earned Badges"}
               </h2>
               <span className="text-[10px] text-zinc-700 tabular-nums">
-                {earnedBadges.length} {lang === "tr" ? "rozet" : "badges"}
+                {earnedBadges.length} {lang === "tr" ? "rozet" : (earnedBadges.length === 1 ? "badge" : "badges")}
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -2179,7 +2253,9 @@ export default function ProfileClient(props: ProfileProps) {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Activity className="w-3.5 h-3.5 text-zinc-500" />
-                    <h2 className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">Contributions</h2>
+                    <h2 className="text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-medium">
+                      {lang === "tr" ? "Katkılar" : "Contributions"}
+                    </h2>
                   </div>
                   <span className="text-xs text-zinc-600 tabular-nums">
                     {stats.commitCount.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")} {lang === "tr" ? "commit" : "commits"}

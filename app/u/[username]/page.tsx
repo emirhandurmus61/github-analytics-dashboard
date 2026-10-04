@@ -7,6 +7,8 @@ import { WIDGET_KEYS, type WidgetKey } from "@/lib/widgets";
 import { calcBadges } from "@/lib/badges";
 import { calcDeveloperDNA } from "@/lib/developer-dna";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import type { Language } from "@/lib/i18n";
 import ProfileClient from "./profile-client";
 import { recordProfileView } from "./actions";
 import { auth } from "@/lib/auth";
@@ -32,9 +34,13 @@ const LANG_COLORS: Record<string, string> = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
+  const cookieStore = await cookies();
+  const lang = (cookieStore.get("devboard_lang")?.value as Language) || "tr";
   return {
     title: `${username} — Devboard`,
-    description: `${username} kullanicisinin GitHub aktivite istatistikleri.`,
+    description: lang === "en"
+      ? `GitHub developer analytics and activity for ${username}.`
+      : `${username} kullanıcısının GitHub aktivite istatistikleri.`,
   };
 }
 
