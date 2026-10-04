@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid,
 } from "recharts";
@@ -93,6 +94,11 @@ function CustomTooltip({ active, payload, label, color, lang }: { active?: boole
 }
 
 export default function VelocityChart({ data }: Props) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const theme = useThemeColors();
   const { lang } = useLanguage();
   const weeks = buildWeeklyData(data, lang);
@@ -132,46 +138,50 @@ export default function VelocityChart({ data }: Props) {
       </div>
 
       {/* Chart — fills remaining space */}
-      <div className="flex-1 min-h-[200px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={weeks} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-            <defs>
-              <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={theme.accent} stopOpacity={0.2} />
-                <stop offset="95%" stopColor={theme.accent} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid stroke="#1f1f23" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" tick={{ fill: "#3f3f46", fontSize: 10 }} axisLine={false} tickLine={false} interval={1} />
-            <YAxis tick={{ fill: "#3f3f46", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, maxVal + 2]} />
-            <Tooltip content={<CustomTooltip color={theme.accent} lang={lang} />} />
-            <ReferenceLine x={weeks[weeks.length - 1].label} stroke={theme.accentBorder} strokeDasharray="4 4" />
-            <Area
-              type="monotone" dataKey="commits" name="commits"
-              stroke={theme.accent} strokeWidth={2} fill="url(#velocityGrad)"
-              dot={(p) => {
-                const { cx, cy, index } = p;
-                if (index === weeks.length - 1) return <circle key={index} cx={cx} cy={cy} r={4} fill={theme.accent} stroke="#09090b" strokeWidth={2} />;
-                return <circle key={index} cx={cx} cy={cy} r={0} fill="none" />;
-              }}
-              activeDot={{ r: 4, fill: theme.accent, stroke: "#09090b", strokeWidth: 2 }}
-            />
-            <Area
-              type="monotone" dataKey="avg" name="avg"
-              stroke={theme.accentMid} strokeWidth={1.5} strokeDasharray="5 3"
-              fill="none" dot={false} activeDot={false}
-            />
-            <Area
-              type="monotone" dataKey="projection" name="projection"
-              stroke="#71717a" strokeWidth={1.5} strokeDasharray="3 3"
-              fill="none" dot={(p) => {
-                const { cx, cy, index } = p;
-                if (index === weeks.length - 1) return <circle key={index} cx={cx} cy={cy} r={3} fill="#71717a" stroke="#09090b" strokeWidth={2} />;
-                return <circle key={index} cx={cx} cy={cy} r={0} fill="none" />;
-              }} activeDot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      <div className="w-full h-[220px] min-h-[220px] flex-1">
+        {mounted ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={weeks} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <defs>
+                <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={theme.accent} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={theme.accent} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="#1f1f23" strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: "#3f3f46", fontSize: 10 }} axisLine={false} tickLine={false} interval={1} />
+              <YAxis tick={{ fill: "#3f3f46", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, maxVal + 2]} />
+              <Tooltip content={<CustomTooltip color={theme.accent} lang={lang} />} />
+              <ReferenceLine x={weeks[weeks.length - 1].label} stroke={theme.accentBorder} strokeDasharray="4 4" />
+              <Area
+                type="monotone" dataKey="commits" name="commits"
+                stroke={theme.accent} strokeWidth={2} fill="url(#velocityGrad)"
+                dot={(p) => {
+                  const { cx, cy, index } = p;
+                  if (index === weeks.length - 1) return <circle key={index} cx={cx} cy={cy} r={4} fill={theme.accent} stroke="#09090b" strokeWidth={2} />;
+                  return <circle key={index} cx={cx} cy={cy} r={0} fill="none" />;
+                }}
+                activeDot={{ r: 4, fill: theme.accent, stroke: "#09090b", strokeWidth: 2 }}
+              />
+              <Area
+                type="monotone" dataKey="avg" name="avg"
+                stroke={theme.accentMid} strokeWidth={1.5} strokeDasharray="5 3"
+                fill="none" dot={false} activeDot={false}
+              />
+              <Area
+                type="monotone" dataKey="projection" name="projection"
+                stroke="#71717a" strokeWidth={1.5} strokeDasharray="3 3"
+                fill="none" dot={(p) => {
+                  const { cx, cy, index } = p;
+                  if (index === weeks.length - 1) return <circle key={index} cx={cx} cy={cy} r={3} fill="#71717a" stroke="#09090b" strokeWidth={2} />;
+                  return <circle key={index} cx={cx} cy={cy} r={0} fill="none" />;
+                }} activeDot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="w-full h-[220px] rounded-xl bg-zinc-800/20 animate-pulse" />
+        )}
       </div>
 
       {/* Legend */}

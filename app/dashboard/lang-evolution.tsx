@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { useThemeColors } from "@/components/theme-provider";
 import { useLanguage } from "@/lib/i18n";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export type MonthLangPoint = {
   month: string;
@@ -82,6 +82,11 @@ function CustomTooltip({ active, payload, label, lang }: {
 }
 
 export default function LangEvolution({ data, languages }: Props) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const theme = useThemeColors();
   const { lang } = useLanguage();
   const [mode, setMode] = useState<"stacked" | "pct">("pct");
@@ -154,29 +159,33 @@ export default function LangEvolution({ data, languages }: Props) {
       )}
 
       {/* Chart */}
-      <div className="flex-1 min-h-[200px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={normalizedData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-            <defs>
+      <div className="w-full h-[220px] min-h-[220px] flex-1">
+        {mounted ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={normalizedData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <defs>
+                {languages.map((lang, i) => (
+                  <linearGradient key={lang} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={getLangColor(lang, i)} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={getLangColor(lang, i)} stopOpacity={0.05} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid stroke="#27272a" strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: "#52525b", fontSize: 10 }} axisLine={false} tickLine={false} interval={1} />
+              <YAxis tick={{ fill: "#52525b", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false}
+                domain={[0, mode === "pct" ? 100 : "auto"]}
+                tickFormatter={(v) => mode === "pct" ? `${v}%` : String(v)} />
+              <Tooltip content={<CustomTooltip lang={lang} />} />
               {languages.map((lang, i) => (
-                <linearGradient key={lang} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={getLangColor(lang, i)} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={getLangColor(lang, i)} stopOpacity={0.05} />
-                </linearGradient>
+                <Area key={lang} type="monotone" dataKey={lang} stackId="1"
+                  stroke={getLangColor(lang, i)} strokeWidth={1.5} fill={`url(#grad-${i})`} />
               ))}
-            </defs>
-            <CartesianGrid stroke="#27272a" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" tick={{ fill: "#52525b", fontSize: 10 }} axisLine={false} tickLine={false} interval={1} />
-            <YAxis tick={{ fill: "#52525b", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false}
-              domain={[0, mode === "pct" ? 100 : "auto"]}
-              tickFormatter={(v) => mode === "pct" ? `${v}%` : String(v)} />
-            <Tooltip content={<CustomTooltip lang={lang} />} />
-            {languages.map((lang, i) => (
-              <Area key={lang} type="monotone" dataKey={lang} stackId="1"
-                stroke={getLangColor(lang, i)} strokeWidth={1.5} fill={`url(#grad-${i})`} />
-            ))}
-          </AreaChart>
-        </ResponsiveContainer>
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="w-full h-[220px] rounded-xl bg-zinc-800/20 animate-pulse" />
+        )}
       </div>
 
       {/* Lang chips */}

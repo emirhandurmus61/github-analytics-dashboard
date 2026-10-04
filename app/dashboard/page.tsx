@@ -187,8 +187,16 @@ export default async function DashboardPage({ searchParams }: Props) {
       languageCount: langMap.size,
     };
 
-    recentActivity = (activityRes.data ?? []).reverse();
     heatmapData = heatmapRes.data ?? [];
+
+    // Son 30 günlük ardışık takvim aktivitesi (her gün için commit sayısı)
+    const heatmapMap = new Map(heatmapData.map((d) => [d.date, d.commit_count]));
+    const last30Days: { date: string; commit_count: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      last30Days.push({ date: d, commit_count: heatmapMap.get(d) ?? 0 });
+    }
+    recentActivity = last30Days;
 
     // Commit timestamp'leri (ritim analizi için)
     commitTimestamps = (allCommitsRes.data ?? []).map((c) => c.committed_at);
@@ -982,19 +990,37 @@ function StatCard({ label, value, lang = "tr" }: { label: string; value: number;
 
 function ActivityBar({ data, emptyText = "Veri yok", lang = "tr" }: { data: { date: string; commit_count: number }[]; emptyText?: string; lang?: Language }) {
   if (data.length === 0) return <p className="text-[11px] text-zinc-600">{emptyText}</p>;
-  const max = Math.max(...data.map((d) => d.commit_count));
+  const max = Math.max(...data.map((d) => d.commit_count), 1);
+  const totalCommits = data.reduce((s, d) => s + d.commit_count, 0);
+
   return (
-    <div className="flex items-end gap-0.5 flex-1 h-36 min-h-[140px] w-full">
-      {data.map((d) => {
-        const height = max > 0 ? Math.max((d.commit_count / max) * 100, 4) : 4;
-        const commitWord = lang === "en" ? (d.commit_count === 1 ? "commit" : "commits") : "commit";
-        return (
-          <div key={d.date} title={`${d.date}: ${d.commit_count} ${commitWord}`}
-            className="flex-1 rounded-sm opacity-80 transition-opacity hover:opacity-100"
-            style={{ height: `${height}%`, backgroundColor: "var(--accent, #34d399)" }}
-          />
-        );
-      })}
+    <div className="flex flex-col flex-1 justify-between gap-3 w-full h-full min-h-[160px]">
+      <div className="flex items-end gap-1 flex-1 h-36 min-h-[130px] w-full pt-2">
+        {data.map((d) => {
+          const hasCommits = d.commit_count > 0;
+          const height = hasCommits ? Math.max((d.commit_count / max) * 100, 16) : 8;
+          const commitWord = lang === "en" ? (d.commit_count === 1 ? "commit" : "commits") : "commit";
+          return (
+            <div
+              key={d.date}
+              title={`${d.date}: ${d.commit_count} ${commitWord}`}
+              className="group relative flex-1 rounded-sm transition-all duration-150 hover:brightness-125"
+              style={{
+                height: `${height}%`,
+                backgroundColor: hasCommits ? "var(--accent, #34d399)" : "rgba(63, 63, 70, 0.45)",
+              }}
+            />
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-2 border-t border-zinc-800/60 shrink-0">
+        <span>{data[0]?.date ? new Date(data[0].date).toLocaleDateString(lang === "en" ? "en-US" : "tr-TR", { month: "short", day: "numeric" }) : ""}</span>
+        <span className="font-medium text-zinc-400">
+          {totalCommits} {lang === "en" ? (totalCommits === 1 ? "commit in last 30d" : "commits in last 30d") : "commit (son 30 gün)"}
+        </span>
+        <span>{data[data.length - 1]?.date ? new Date(data[data.length - 1].date).toLocaleDateString(lang === "en" ? "en-US" : "tr-TR", { month: "short", day: "numeric" }) : ""}</span>
+      </div>
     </div>
   );
 }
