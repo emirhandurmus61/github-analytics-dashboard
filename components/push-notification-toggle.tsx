@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Bell, BellOff, BellRing, Loader2, AlertTriangle, XCircle } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { useLanguage } from "@/lib/i18n";
 
 type NotifyPref = {
   streak: boolean;
@@ -43,13 +44,6 @@ function Toggle({
   );
 }
 
-const NOTIFY_TYPES: { key: keyof Omit<NotifyPref, "hour">; label: string; desc: string }[] = [
-  { key: "streak", label: "Streak Uyarısı", desc: "Bugün commit atmadıysan akşam hatırlatır" },
-  { key: "goal", label: "Hedef İlerlemesi", desc: "Hedefe yaklaştığında bildirim alırsın" },
-  { key: "badge", label: "Yeni Rozet", desc: "Rozet kazandığında anlık bildirim" },
-  { key: "summary", label: "Haftalık Özet", desc: "Pazartesi sabahı haftanın özetini gönderir" },
-];
-
 const HOURS = [8, 10, 12, 14, 16, 18, 20, 22];
 
 export default function PushNotificationToggle({
@@ -61,12 +55,48 @@ export default function PushNotificationToggle({
   prefs: NotifyPref;
   onPrefsChange: (prefs: NotifyPref) => void;
 }) {
+  const { lang } = useLanguage();
   const { state, subscribe, unsubscribe, error } = usePushNotifications();
 
   const isEnabled = state === "granted";
   const isLoading = state === "loading";
   const isDenied = state === "denied";
   const isUnsupported = state === "unsupported";
+
+  const notifyTypes: { key: keyof Omit<NotifyPref, "hour">; label: string; desc: string }[] = [
+    {
+      key: "streak",
+      label: lang === "en" ? "Streak Alert" : "Streak Uyarısı",
+      desc:
+        lang === "en"
+          ? "Reminds you in the evening if you haven't committed today"
+          : "Bugün commit atmadıysan akşam hatırlatır",
+    },
+    {
+      key: "goal",
+      label: lang === "en" ? "Goal Progress" : "Hedef İlerlemesi",
+      desc:
+        lang === "en"
+          ? "Get notified when approaching your weekly target"
+          : "Hedefe yaklaştığında bildirim alırsın",
+    },
+    {
+      key: "badge",
+      label: lang === "en" ? "New Badge" : "Yeni Rozet",
+      desc:
+        lang === "en"
+          ? "Instant notification when you unlock a new badge"
+          : "Rozet kazandığında anlık bildirim",
+    },
+    {
+      key: "summary",
+      label: lang === "en" ? "Weekly Summary" : "Haftalık Özet",
+      desc:
+        lang === "en"
+          ? "Sends a weekly summary report every Monday morning"
+          : "Pazartesi sabahı haftanın özetini gönderir",
+    },
+  ];
 
   // Push API sadece HTTPS veya localhost'ta çalışır — state "unsupported" değilse ve
   // state artık "loading" değilse kontrol et (hydration mismatch'i önlemek için)
@@ -86,7 +116,9 @@ export default function PushNotificationToggle({
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2.5">
           <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-300 leading-relaxed">
-            Push bildirimleri yalnızca HTTPS bağlantısında çalışır. Lütfen uygulamayı deploy edilmiş Vercel URL'inden aç.
+            {lang === "en"
+              ? "Push notifications only work over an HTTPS connection. Please access the app from your deployed production URL."
+              : "Push bildirimleri yalnızca HTTPS bağlantısında çalışır. Lütfen uygulamayı deploy edilmiş Vercel URL'inden aç."}
           </p>
         </div>
       )}
@@ -103,15 +135,29 @@ export default function PushNotificationToggle({
           )}
           <div className="min-w-0">
             <p className="text-sm font-semibold text-zinc-100">
-              {isEnabled ? "Bildirimler Açık" : "Bildirimleri Aç"}
+              {isEnabled
+                ? lang === "en"
+                  ? "Notifications Enabled"
+                  : "Bildirimler Açık"
+                : lang === "en"
+                ? "Enable Notifications"
+                : "Bildirimleri Aç"}
             </p>
             <p className="text-xs text-zinc-500">
               {isUnsupported
-                ? "Bu tarayıcı push bildirimleri desteklemiyor"
+                ? lang === "en"
+                  ? "This browser does not support push notifications"
+                  : "Bu tarayıcı push bildirimleri desteklemiyor"
                 : isDenied
-                ? "Tarayıcı izni engellendi"
+                ? lang === "en"
+                  ? "Browser permission was denied"
+                  : "Tarayıcı izni engellendi"
                 : isEnabled
-                ? "Bildirimler etkin"
+                ? lang === "en"
+                  ? "Notifications are active"
+                  : "Bildirimler etkin"
+                : lang === "en"
+                ? "Click the toggle to grant permission"
                 : "Toggle'a tıklayarak izin ver"}
             </p>
           </div>
@@ -137,12 +183,23 @@ export default function PushNotificationToggle({
         <div className="flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2.5">
           <XCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
           <div className="min-w-0">
-            <p className="text-xs text-red-400 font-medium">Bildirim açılamadı</p>
+            <p className="text-xs text-red-400 font-medium">
+              {lang === "en" ? "Failed to enable notifications" : "Bildirim açılamadı"}
+            </p>
             <p className="text-[11px] text-red-500 mt-0.5 break-all">{error}</p>
             {error.includes("push_subscriptions") || error.includes("500") ? (
               <p className="text-[11px] text-red-400 mt-1">
-                Veritabanı tablosu eksik — Supabase Dashboard'dan{" "}
-                <code className="bg-red-500/20 px-1 rounded">schema_v11.sql</code>'i çalıştır.
+                {lang === "en" ? (
+                  <>
+                    Database table missing — run{" "}
+                    <code className="bg-red-500/20 px-1 rounded">schema_v11.sql</code> from Supabase Dashboard.
+                  </>
+                ) : (
+                  <>
+                    Veritabanı tablosu eksik — Supabase Dashboard&apos;dan{" "}
+                    <code className="bg-red-500/20 px-1 rounded">schema_v11.sql</code>&apos;i çalıştır.
+                  </>
+                )}
               </p>
             ) : null}
           </div>
@@ -154,8 +211,17 @@ export default function PushNotificationToggle({
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2.5">
           <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-300 leading-relaxed">
-            Bildirim izni engellendi. Tarayıcının adres çubuğundaki{" "}
-            <strong>kilit ikonu → Bildirimler → İzin Ver</strong> seçeneğini aktif et, sonra sayfayı yenile.
+            {lang === "en" ? (
+              <>
+                Notification permission was denied. In your browser address bar, click the{" "}
+                <strong>lock icon → Notifications → Allow</strong>, then reload this page.
+              </>
+            ) : (
+              <>
+                Bildirim izni engellendi. Tarayıcının adres çubuğundaki{" "}
+                <strong>kilit ikonu → Bildirimler → İzin Ver</strong> seçeneğini aktif et, sonra sayfayı yenile.
+              </>
+            )}
           </p>
         </div>
       )}
@@ -164,9 +230,9 @@ export default function PushNotificationToggle({
       {isEnabled && (
         <div className="space-y-3">
           <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">
-            Bildirim Tipleri
+            {lang === "en" ? "Notification Types" : "Bildirim Tipleri"}
           </p>
-          {NOTIFY_TYPES.map(({ key, label, desc }) => (
+          {notifyTypes.map(({ key, label, desc }) => (
             <div key={key} className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-zinc-200 font-medium">{label}</p>
@@ -184,8 +250,14 @@ export default function PushNotificationToggle({
           {prefs.streak && (
             <div className="flex items-center justify-between gap-3 pt-1 border-t border-zinc-800">
               <div>
-                <p className="text-sm text-zinc-200 font-medium">Uyarı Saati</p>
-                <p className="text-[11px] text-zinc-600">Streak uyarısı bu saatte gönderilir</p>
+                <p className="text-sm text-zinc-200 font-medium">
+                  {lang === "en" ? "Alert Time" : "Uyarı Saati"}
+                </p>
+                <p className="text-[11px] text-zinc-600">
+                  {lang === "en"
+                    ? "Streak alert will be delivered at this hour"
+                    : "Streak uyarısı bu saatte gönderilir"}
+                </p>
               </div>
               <select
                 value={prefs.hour}
@@ -205,18 +277,22 @@ export default function PushNotificationToggle({
               try {
                 const reg = await navigator.serviceWorker.ready;
                 await reg.showNotification("Devboard", {
-                  body: "Bildirimler düzgün çalışıyor!",
+                  body: lang === "en" ? "Notifications are working properly!" : "Bildirimler düzgün çalışıyor!",
                   icon: "/favicon.ico",
                   tag: "test",
                 });
               } catch {
-                alert("Bildirim gönderilemedi — tarayıcı izinlerini kontrol et.");
+                alert(
+                  lang === "en"
+                    ? "Failed to send notification — check browser permissions."
+                    : "Bildirim gönderilemedi — tarayıcı izinlerini kontrol et."
+                );
               }
             }}
-            className="flex items-center gap-2 rounded-xl border border-zinc-700 px-4 py-2 text-xs font-medium text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 transition-all"
+            className="flex items-center gap-2 rounded-xl border border-zinc-700 px-4 py-2 text-xs font-medium text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 transition-all cursor-pointer"
           >
             <Bell size={13} />
-            Test Bildirimi Gönder
+            {lang === "en" ? "Send Test Notification" : "Test Bildirimi Gönder"}
           </button>
         </div>
       )}

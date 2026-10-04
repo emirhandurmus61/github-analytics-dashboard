@@ -35,6 +35,8 @@ import {
   WIDGET_KEYS,
   WIDGET_LABELS,
   PRESETS,
+  PRESETS_LOCALIZED,
+  getWidgetLabelByKey,
   type WidgetKey,
   type WidgetPreset,
 } from "@/lib/widgets";
@@ -567,7 +569,9 @@ export default function SettingsForm({
                     >
                       <div>
                         <span className="block text-xs font-semibold text-white">Türkçe</span>
-                        <span className="text-[10px] text-zinc-500">TR · Varsayılan</span>
+                        <span className="text-[10px] text-zinc-500">
+                          {lang === "en" ? "TR · Default" : "TR · Varsayılan"}
+                        </span>
                       </div>
                       {lang === "tr" && <Check className="h-4 w-4" style={{ color: accent }} />}
                     </button>
@@ -583,7 +587,9 @@ export default function SettingsForm({
                     >
                       <div>
                         <span className="block text-xs font-semibold text-white">English</span>
-                        <span className="text-[10px] text-zinc-500">EN · International</span>
+                        <span className="text-[10px] text-zinc-500">
+                          {lang === "en" ? "EN · International" : "EN · İngilizce"}
+                        </span>
                       </div>
                       {lang === "en" && <Check className="h-4 w-4" style={{ color: accent }} />}
                     </button>
@@ -657,7 +663,7 @@ export default function SettingsForm({
                     <div className="flex items-center gap-2">
                       <Sparkle className="h-3.5 w-3.5" style={{ color: accent }} />
                       <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>
-                        Canlı Tema Önizlemesi
+                        {t.settings.liveThemePreview}
                       </p>
                     </div>
                     <span className="text-[11px] text-zinc-500">
@@ -673,12 +679,14 @@ export default function SettingsForm({
                     >
                       <div className="flex items-center gap-1.5 text-xs text-zinc-400">
                         <Flame className="h-4 w-4" style={{ color: accent }} />
-                        <span className="font-medium">Günlük Streak</span>
+                        <span className="font-medium">{t.settings.dailyStreak}</span>
                       </div>
                       <span className="text-3xl font-extrabold tabular-nums mt-1" style={{ color: accent }}>
                         14
                       </span>
-                      <span className="text-[10px] text-zinc-500 font-medium">kesintisiz gün</span>
+                      <span className="text-[10px] text-zinc-500 font-medium">
+                        {lang === "en" ? "consecutive days" : "kesintisiz gün"}
+                      </span>
                     </div>
 
                     {/* Progress Bar & Hedef Önizleme */}
@@ -688,7 +696,9 @@ export default function SettingsForm({
                     >
                       <div>
                         <div className="mb-1.5 flex justify-between text-xs">
-                          <span className="text-zinc-400 font-medium">Haftalık Katkı Hedefi</span>
+                          <span className="text-zinc-400 font-medium">
+                            {lang === "en" ? "Weekly Contribution Goal" : "Haftalık Katkı Hedefi"}
+                          </span>
                           <span className="font-semibold" style={{ color: accent }}>18 / 25 commit</span>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800/80">
@@ -701,17 +711,22 @@ export default function SettingsForm({
 
                       {/* Heatmap Tonları Önizleme */}
                       <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between">
-                        <span className="text-[11px] text-zinc-500 font-medium">Katkı Yoğunluk Tonları</span>
+                        <span className="text-[11px] text-zinc-500 font-medium">
+                          {lang === "en" ? "Contribution Intensity Shades" : "Katkı Yoğunluk Tonları"}
+                        </span>
                         <div className="flex gap-1.5">
                           {previewColors.shades.map((shade, i) => (
                             <div
                               key={i}
                               className="h-4 w-4 rounded-md transition-transform hover:scale-110"
                               style={{ backgroundColor: shade }}
-                              title={`Katkı düzeyi ${i + 1}`}
+                              title={lang === "en" ? `Contribution level ${i + 1}` : `Katkı düzeyi ${i + 1}`}
                             />
                           ))}
-                          <div className="h-4 w-4 rounded-md bg-zinc-800" title="Katkı yok" />
+                          <div
+                            className="h-4 w-4 rounded-md bg-zinc-800"
+                            title={lang === "en" ? "No contributions" : "Katkı yok"}
+                          />
                         </div>
                       </div>
                     </div>
@@ -727,9 +742,13 @@ export default function SettingsForm({
           <div className={activeSection === "profil" ? "block" : "hidden"}>
             <Section
               icon={User}
-              title="Profil Bilgileri"
-              desc="Geliştirici portföyünde ve herkese açık sayfanızda ziyaretçilere gösterilecek kişisel detaylar."
-              badge="Public Profil"
+              title={t.settings.navProfile}
+              desc={
+                lang === "en"
+                  ? "Personal details displayed to visitors on your developer portfolio and public profile."
+                  : "Geliştirici portföyünde ve herkese açık sayfanızda ziyaretçilere gösterilecek kişisel detaylar."
+              }
+              badge={lang === "en" ? "Public Profile" : "Public Profil"}
               accent={accent}
               accentBorder={accentBorder}
               accentBg={accentBg}
@@ -737,9 +756,17 @@ export default function SettingsForm({
               <div className="space-y-5">
                 {/* Biyografi */}
                 <Field
-                  label="Biyografi"
-                  hint={`maks. 200 karakter (${bioInput.length}/200)`}
-                  desc="Profilinizin üst kısmında özet açıklama olarak görüntülenir."
+                  label={lang === "en" ? "Bio" : "Biyografi"}
+                  hint={
+                    lang === "en"
+                      ? `max 200 chars (${bioInput.length}/200)`
+                      : `maks. 200 karakter (${bioInput.length}/200)`
+                  }
+                  desc={
+                    lang === "en"
+                      ? "Displayed as a summary description at the top of your profile."
+                      : "Profilinizin üst kısmında özet açıklama olarak görüntülenir."
+                  }
                 >
                   <textarea
                     name="bio"
@@ -747,7 +774,11 @@ export default function SettingsForm({
                     onChange={(e) => setBioInput(e.target.value)}
                     maxLength={200}
                     rows={3}
-                    placeholder="Kendinizi, odaklandığınız alanları veya çalışma tarzınızı kısaca tanıtın..."
+                    placeholder={
+                      lang === "en"
+                        ? "Briefly introduce yourself, your focus areas, or your work style..."
+                        : "Kendinizi, odaklandığınız alanları veya çalışma tarzınızı kısaca tanıtın..."
+                    }
                     className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
                   />
                 </Field>
@@ -755,8 +786,12 @@ export default function SettingsForm({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Şu an üzerinde çalıştığım */}
                   <Field
-                    label="Şu an üzerinde çalışıyorum"
-                    hint={`maks. 150 (${workingOnInput.length}/150)`}
+                    label={lang === "en" ? "Currently working on" : "Şu an üzerinde çalışıyorum"}
+                    hint={
+                      lang === "en"
+                        ? `max 150 (${workingOnInput.length}/150)`
+                        : `maks. 150 (${workingOnInput.length}/150)`
+                    }
                   >
                     <input
                       name="currently_working_on"
@@ -764,15 +799,23 @@ export default function SettingsForm({
                       value={workingOnInput}
                       onChange={(e) => setWorkingOnInput(e.target.value)}
                       maxLength={150}
-                      placeholder="Örn: Açık kaynak CLI araçları ve Rust..."
+                      placeholder={
+                        lang === "en"
+                          ? "e.g. Open-source CLI tools and Rust..."
+                          : "Örn: Açık kaynak CLI araçları ve Rust..."
+                      }
                       className="w-full rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none"
                     />
                   </Field>
 
                   {/* Bu yıl hedefim */}
                   <Field
-                    label="Bu yıl hedefim"
-                    hint={`maks. 150 (${yearlyGoalInput.length}/150)`}
+                    label={lang === "en" ? "Yearly goal" : "Bu yıl hedefim"}
+                    hint={
+                      lang === "en"
+                        ? `max 150 (${yearlyGoalInput.length}/150)`
+                        : `maks. 150 (${yearlyGoalInput.length}/150)`
+                    }
                   >
                     <input
                       name="yearly_goal"
@@ -780,7 +823,11 @@ export default function SettingsForm({
                       value={yearlyGoalInput}
                       onChange={(e) => setYearlyGoalInput(e.target.value)}
                       maxLength={150}
-                      placeholder="Örn: 1000 commit ve 5 açık kaynak katkısı..."
+                      placeholder={
+                        lang === "en"
+                          ? "e.g. 1000 commits and 5 open-source contributions..."
+                          : "Örn: 1000 commit ve 5 açık kaynak katkısı..."
+                      }
                       className="w-full rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none"
                     />
                   </Field>
@@ -788,9 +835,13 @@ export default function SettingsForm({
 
                 {/* Favori Teknolojiler */}
                 <Field
-                  label="Favori Teknolojiler & Araçlar"
-                  hint="virgülle ayırın, maks. 12"
-                  desc="Yeteneklerinizin ve kullandığınız dillerin rozetleri profilinizde listelenir."
+                  label={lang === "en" ? "Favorite Technologies & Tools" : "Favori Teknolojiler & Araçlar"}
+                  hint={lang === "en" ? "comma-separated, max 12" : "virgülle ayırın, maks. 12"}
+                  desc={
+                    lang === "en"
+                      ? "Badges for your skills and technologies will be listed on your profile."
+                      : "Yeteneklerinizin ve kullandığınız dillerin rozetleri profilinizde listelenir."
+                  }
                 >
                   <input
                     name="tech_tags"
@@ -804,7 +855,9 @@ export default function SettingsForm({
                   {/* Aktif Etiketler */}
                   {tagInput.trim() && (
                     <div className="mt-3 flex flex-wrap gap-1.5 items-center">
-                      <span className="text-[11px] text-zinc-500 font-medium mr-1">Seçilenler:</span>
+                      <span className="text-[11px] text-zinc-500 font-medium mr-1">
+                        {lang === "en" ? "Selected:" : "Seçilenler:"}
+                      </span>
                       {tagInput
                         .split(",")
                         .map((t) => t.trim())
@@ -825,7 +878,7 @@ export default function SettingsForm({
                               type="button"
                               onClick={() => removeTag(tag)}
                               className="text-zinc-500 hover:text-zinc-200 transition-colors"
-                              title={`${tag} etiketini kaldır`}
+                              title={lang === "en" ? `Remove ${tag} tag` : `${tag} etiketini kaldır`}
                             >
                               ×
                             </button>
@@ -836,7 +889,9 @@ export default function SettingsForm({
 
                   {/* Öneri Etiketler */}
                   <div className="mt-2.5 flex flex-wrap gap-1.5 items-center">
-                    <span className="text-[11px] text-zinc-600 font-medium mr-1">Hızlı ekle:</span>
+                    <span className="text-[11px] text-zinc-600 font-medium mr-1">
+                      {lang === "en" ? "Quick add:" : "Hızlı ekle:"}
+                    </span>
                     {SUGGESTED_TAGS.map((tag) => {
                       const isAdded = tagInput
                         .split(",")
@@ -859,9 +914,13 @@ export default function SettingsForm({
 
                 {/* Öne Çıkan Repolar */}
                 <Field
-                  label="Öne Çıkan Repolar"
-                  hint="maks. 3 repo seçin"
-                  desc="Profil kartınızda ve sayfanızda vitrin projeler olarak öne çıkarılır."
+                  label={lang === "en" ? "Featured Repositories" : "Öne Çıkan Repolar"}
+                  hint={lang === "en" ? "select up to 3 repos" : "maks. 3 repo seçin"}
+                  desc={
+                    lang === "en"
+                      ? "Featured as showcase projects on your profile card and public page."
+                      : "Profil kartınızda ve sayfanızda vitrin projeler olarak öne çıkarılır."
+                  }
                 >
                   <div className="space-y-2.5 max-w-2xl">
                     {[0, 1, 2].map((i) => (
@@ -891,7 +950,19 @@ export default function SettingsForm({
                           }}
                           className="w-full appearance-none rounded-xl border border-zinc-800 bg-zinc-900/90 py-2.5 pl-11 pr-4 text-xs text-zinc-100 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
                         >
-                          <option value="">{i === 0 ? "— Birinci repo seç —" : i === 1 ? "— İkinci repo seç (opsiyonel) —" : "— Üçüncü repo seç (opsiyonel) —"}</option>
+                          <option value="">
+                            {lang === "en"
+                              ? i === 0
+                                ? "— Select first repo —"
+                                : i === 1
+                                ? "— Select second repo (optional) —"
+                                : "— Select third repo (optional) —"
+                              : i === 0
+                              ? "— Birinci repo seç —"
+                              : i === 1
+                              ? "— İkinci repo seç (opsiyonel) —"
+                              : "— Üçüncü repo seç (opsiyonel) —"}
+                          </option>
                           {repos
                             .filter(
                               (r) => !selectedPinned.includes(r.name) || selectedPinned[i] === r.name
@@ -916,9 +987,13 @@ export default function SettingsForm({
           <div className={activeSection === "sosyal" ? "block" : "hidden"}>
             <Section
               icon={Share2}
-              title="Sosyal Bağlantılar"
-              desc="Public profilinizde ve geliştirici kartınızda tıklanabilir ikonlar olarak görüntülenir."
-              badge="Sosyal Ağlar"
+              title={t.settings.navSocial}
+              desc={
+                lang === "en"
+                  ? "Displayed as clickable icons on your public profile and developer card."
+                  : "Public profilinizde ve geliştirici kartınızda tıklanabilir ikonlar olarak görüntülenir."
+              }
+              badge={lang === "en" ? "Social Networks" : "Sosyal Ağlar"}
               accent={accent}
               accentBorder={accentBorder}
               accentBg={accentBg}
@@ -934,7 +1009,7 @@ export default function SettingsForm({
                     prefix="x.com/"
                     name="social_twitter"
                     defaultValue={socialTwitter ?? ""}
-                    placeholder="kullanici_adi"
+                    placeholder={lang === "en" ? "username" : "kullanici_adi"}
                     maxLength={50}
                   />
                 </Field>
@@ -949,12 +1024,12 @@ export default function SettingsForm({
                     prefix="linkedin.com/in/"
                     name="social_linkedin"
                     defaultValue={socialLinkedin ?? ""}
-                    placeholder="kullanici-adi"
+                    placeholder={lang === "en" ? "username" : "kullanici-adi"}
                     maxLength={80}
                   />
                 </Field>
 
-                <Field label="Kişisel Web Sitesi">
+                <Field label={lang === "en" ? "Personal Website" : "Kişisel Web Sitesi"}>
                   <PrefixInput
                     icon={<Globe className="w-3.5 h-3.5 text-zinc-400" />}
                     prefix="https://"
@@ -975,7 +1050,7 @@ export default function SettingsForm({
                     prefix="@"
                     name="social_discord"
                     defaultValue={socialDiscord ?? ""}
-                    placeholder="kullanici_adi"
+                    placeholder={lang === "en" ? "username" : "kullanici_adi"}
                     maxLength={50}
                   />
                 </Field>
@@ -987,9 +1062,13 @@ export default function SettingsForm({
           <div className={activeSection === "profil-sayfasi" ? "block" : "hidden"}>
             <Section
               icon={LayoutTemplate}
-              title="Profil Sayfası & README Düzeni"
-              desc="Public profil sayfanızdaki README metni, widget'ların sırası ve görünürlük tercihleri."
-              badge="Sayfa Yapısı"
+              title={lang === "en" ? "Profile Page & README Layout" : "Profil Sayfası & README Düzeni"}
+              desc={
+                lang === "en"
+                  ? "README content, widget order, and visibility preferences on your public profile page."
+                  : "Public profil sayfanızdaki README metni, widget'ların sırası ve görünürlük tercihleri."
+              }
+              badge={lang === "en" ? "Page Structure" : "Sayfa Yapısı"}
               accent={accent}
               accentBorder={accentBorder}
               accentBg={accentBg}
@@ -997,7 +1076,9 @@ export default function SettingsForm({
               <div className="space-y-6">
                 {/* README Kaynağı Seçimi */}
                 <div>
-                  <p className="mb-2 text-xs font-semibold text-zinc-300">README Kaynak Tercihi</p>
+                  <p className="mb-2 text-xs font-semibold text-zinc-300">
+                    {lang === "en" ? "README Source Preference" : "README Kaynak Tercihi"}
+                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {(["github", "custom"] as const).map((src) => {
                       const isSelected = selectedReadmeSource === src;
@@ -1025,13 +1106,23 @@ export default function SettingsForm({
                               className="text-xs font-bold"
                               style={{ color: isSelected ? accent : "#e4e4e7" }}
                             >
-                              {src === "github" ? "GitHub Otomatik README" : "Özel Markdown Editörü"}
+                              {src === "github"
+                                ? lang === "en"
+                                  ? "GitHub Auto README"
+                                  : "GitHub Otomatik README"
+                                : lang === "en"
+                                ? "Custom Markdown Editor"
+                                : "Özel Markdown Editörü"}
                             </span>
                             {isSelected && <Check className="h-4 w-4" style={{ color: accent }} />}
                           </div>
                           <span className="mt-1 block text-xs text-zinc-500 leading-relaxed">
                             {src === "github"
-                              ? "GitHub kullanıcı repoundan (username/username) otomatik olarak çekilir."
+                              ? lang === "en"
+                                ? "Automatically fetched from your GitHub special repository (username/username)."
+                                : "GitHub kullanıcı repoundan (username/username) otomatik olarak çekilir."
+                              : lang === "en"
+                              ? "Create and customize your own rich Markdown content."
                               : "Kendinize özel zengin Markdown içeriği oluşturun ve düzenleyin."}
                           </span>
                         </button>
@@ -1044,20 +1135,38 @@ export default function SettingsForm({
                 {/* README İçerik Alanı */}
                 {selectedReadmeSource === "github" ? (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-zinc-400">Çekilen GitHub README Önizlemesi</p>
+                    <p className="text-xs font-medium text-zinc-400">
+                      {lang === "en" ? "Fetched GitHub README Preview" : "Çekilen GitHub README Önizlemesi"}
+                    </p>
                     {githubReadme ? (
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 px-4 py-3.5 text-xs text-zinc-400 font-mono leading-relaxed max-h-56 overflow-y-auto whitespace-pre-wrap custom-scroll">
                         {githubReadme.slice(0, 1000)}
-                        {githubReadme.length > 1000 ? "\n\n... (kalan içerik profilde gösterilir)" : ""}
+                        {githubReadme.length > 1000
+                          ? lang === "en"
+                            ? "\n\n... (remaining content shown on profile)"
+                            : "\n\n... (kalan içerik profilde gösterilir)"
+                          : ""}
                       </div>
                     ) : (
                       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4">
                         <p className="text-xs text-zinc-400 leading-relaxed">
-                          GitHub profilinizde henüz README bulunamadı veya senkronize edilmedi.{" "}
-                          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">
-                            {username}/{username}
-                          </code>{" "}
-                          reposu oluşturulduğunda sync ile otomatik buraya aktarılır.
+                          {lang === "en" ? (
+                            <>
+                              No README found on your GitHub profile yet or not yet synchronized. Once the{" "}
+                              <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">
+                                {username}/{username}
+                              </code>{" "}
+                              repository is created, it will automatically appear here on sync.
+                            </>
+                          ) : (
+                            <>
+                              GitHub profilinizde henüz README bulunamadı veya senkronize edilmedi.{" "}
+                              <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">
+                                {username}/{username}
+                              </code>{" "}
+                              reposu oluşturulduğunda sync ile otomatik buraya aktarılır.
+                            </>
+                          )}
                         </p>
                       </div>
                     )}
@@ -1065,7 +1174,9 @@ export default function SettingsForm({
                   </div>
                 ) : (
                   <div>
-                    <p className="mb-2 text-xs font-medium text-zinc-400">Özel Markdown Editörü</p>
+                    <p className="mb-2 text-xs font-medium text-zinc-400">
+                      {lang === "en" ? "Custom Markdown Editor" : "Özel Markdown Editörü"}
+                    </p>
                     <ReadmeEditor
                       value={readme}
                       onChange={setReadme}
@@ -1081,29 +1192,42 @@ export default function SettingsForm({
                 {/* Hazır Düzen Seçenekleri */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-zinc-300">Hazır Widget Düzenleri</p>
-                    <span className="text-[11px] text-zinc-500">Hızlı şablon uygula</span>
+                    <p className="text-xs font-semibold text-zinc-300">
+                      {lang === "en" ? "Preset Widget Layouts" : "Hazır Widget Düzenleri"}
+                    </p>
+                    <span className="text-[11px] text-zinc-500">
+                      {lang === "en" ? "Apply quick template" : "Hızlı şablon uygula"}
+                    </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {(Object.entries(PRESETS) as [WidgetPreset, (typeof PRESETS)[WidgetPreset]][]).map(
-                      ([key, preset]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => applyPreset(key)}
-                          className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5 text-left transition-all duration-150 hover:border-zinc-700 hover:bg-zinc-900"
-                        >
-                          <p className="text-xs font-semibold text-zinc-200">{preset.label}</p>
-                          <p className="mt-1 text-[11px] text-zinc-500 leading-snug">{preset.desc}</p>
-                        </button>
-                      )
+                      ([key, preset]) => {
+                        const loc = PRESETS_LOCALIZED[key];
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => applyPreset(key)}
+                            className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5 text-left transition-all duration-150 hover:border-zinc-700 hover:bg-zinc-900"
+                          >
+                            <p className="text-xs font-semibold text-zinc-200">
+                              {loc ? (lang === "en" ? loc.labelEn : loc.labelTr) : preset.label}
+                            </p>
+                            <p className="mt-1 text-[11px] text-zinc-500 leading-snug">
+                              {loc ? (lang === "en" ? loc.descEn : loc.descTr) : preset.desc}
+                            </p>
+                          </button>
+                        );
+                      }
                     )}
                   </div>
                 </div>
 
                 {/* Widget Sıralama ve Görünürlük */}
                 <div>
-                  <p className="mb-3 text-xs font-semibold text-zinc-300">Widget Sırası & Görünürlük</p>
+                  <p className="mb-3 text-xs font-semibold text-zinc-300">
+                    {lang === "en" ? "Widget Order & Visibility" : "Widget Sırası & Görünürlük"}
+                  </p>
                   <div className="space-y-2">
                     {order.map((key, i) => {
                       const visible = visibleWidgets.has(key);
@@ -1131,7 +1255,7 @@ export default function SettingsForm({
                             className="flex-1 text-sm font-medium"
                             style={{ color: visible ? "#f4f4f5" : "#71717a" }}
                           >
-                            {WIDGET_LABELS[key]}
+                            {getWidgetLabelByKey(key, lang)}
                           </span>
 
                           <button
@@ -1152,7 +1276,13 @@ export default function SettingsForm({
                                   }
                             }
                           >
-                            {visible ? "Görünür" : "Gizli"}
+                            {visible
+                              ? lang === "en"
+                                ? "Visible"
+                                : "Görünür"
+                              : lang === "en"
+                              ? "Hidden"
+                              : "Gizli"}
                           </button>
 
                           {/* Yeniden Sıralama Butonları */}
@@ -1162,7 +1292,7 @@ export default function SettingsForm({
                               onClick={() => moveUp(i)}
                               disabled={i === 0}
                               className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 disabled:opacity-20 transition-colors"
-                              title="Yukarı taşı"
+                              title={lang === "en" ? "Move up" : "Yukarı taşı"}
                             >
                               <ChevronUp className="h-4 w-4" />
                             </button>
@@ -1171,7 +1301,7 @@ export default function SettingsForm({
                               onClick={() => moveDown(i)}
                               disabled={i === order.length - 1}
                               className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 disabled:opacity-20 transition-colors"
-                              title="Aşağı taşı"
+                              title={lang === "en" ? "Move down" : "Aşağı taşı"}
                             >
                               <ChevronDown className="h-4 w-4" />
                             </button>
@@ -1196,9 +1326,13 @@ export default function SettingsForm({
           <div className={activeSection === "badge" ? "block" : "hidden"}>
             <Section
               icon={Award}
-              title="README Rozeti"
-              desc="GitHub profil README dosyanıza veya dokümanlarınıza gömebileceğiniz dinamik SVG rozeti."
-              badge="SVG Rozet"
+              title={t.settings.navBadge}
+              desc={
+                lang === "en"
+                  ? "Dynamic SVG badge that you can embed in your GitHub profile README or docs."
+                  : "GitHub profil README dosyanıza veya dokümanlarınıza gömebileceğiniz dinamik SVG rozeti."
+              }
+              badge={lang === "en" ? "SVG Badge" : "SVG Rozet"}
               accent={accent}
               accentBorder={accentBorder}
               accentBg={accentBg}
@@ -1206,16 +1340,20 @@ export default function SettingsForm({
               <div className="space-y-6">
                 {/* Rozet Önizleme Kartı */}
                 <div>
-                  <p className="mb-2 text-xs font-semibold text-zinc-400">Canlı Rozet Görünümü</p>
+                  <p className="mb-2 text-xs font-semibold text-zinc-400">
+                    {t.settings.badgeLiveView}
+                  </p>
                   <div className="flex items-center justify-center rounded-2xl border border-zinc-800/80 bg-zinc-950 p-6">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={badgeUrl} alt="Devboard Rozet" className="block max-w-full drop-shadow-md" />
+                    <img src={badgeUrl} alt={lang === "en" ? "Devboard Badge" : "Devboard Rozet"} className="block max-w-full drop-shadow-md" />
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <p className="mb-2 text-xs font-medium text-zinc-400">Markdown Kodu (GitHub Profiliniz İçin)</p>
+                    <p className="mb-2 text-xs font-medium text-zinc-400">
+                      {t.settings.badgeMarkdown}
+                    </p>
                     <CopyBox
                       value={`[![Devboard](${badgeUrl})](https://devboard.app/u/${username})`}
                       accentColor={accent}
@@ -1224,7 +1362,9 @@ export default function SettingsForm({
                     />
                   </div>
                   <div>
-                    <p className="mb-2 text-xs font-medium text-zinc-400">HTML Kodu</p>
+                    <p className="mb-2 text-xs font-medium text-zinc-400">
+                      {t.settings.badgeHtml}
+                    </p>
                     <CopyBox
                       value={`<a href="https://devboard.app/u/${username}"><img src="${badgeUrl}" alt="Devboard"></a>`}
                       accentColor={accent}
@@ -1241,9 +1381,13 @@ export default function SettingsForm({
           <div className={activeSection === "readme-widgets" ? "block" : "hidden"}>
             <Section
               icon={Sparkles}
-              title="README Widget'ları"
-              desc="Streak, genel istatistik, dil dağılımı ve 52 haftalık ısı haritası SVG kartlarını GitHub profilinize ekleyin."
-              badge="Canlı SVG"
+              title={t.settings.navReadmeWidgets}
+              desc={
+                lang === "en"
+                  ? "Add streak, overall stats, language breakdown, and 52-week heatmap SVG cards to your GitHub profile."
+                  : "Streak, genel istatistik, dil dağılımı ve 52 haftalık ısı haritası SVG kartlarını GitHub profilinize ekleyin."
+              }
+              badge={lang === "en" ? "Live SVG" : "Canlı SVG"}
               accent={accent}
               accentBorder={accentBorder}
               accentBg={accentBg}
@@ -1261,9 +1405,13 @@ export default function SettingsForm({
           <div className={activeSection === "bildirimler" ? "block" : "hidden"}>
             <Section
               icon={Bell}
-              title="Bildirim Tercihleri"
-              desc="Web push bildirimleriyle streak serinizi koruyun ve haftalık hedeflerinize ulaştığınızda anlık uyarı alın."
-              badge="Push Uyarıları"
+              title={lang === "en" ? "Notification Preferences" : "Bildirim Tercihleri"}
+              desc={
+                lang === "en"
+                  ? "Protect your streak serially with web push notifications and get instant alerts when you reach your weekly goals."
+                  : "Web push bildirimleriyle streak serinizi koruyun ve haftalık hedeflerinize ulaştığınızda anlık uyarı alın."
+              }
+              badge={lang === "en" ? "Push Alerts" : "Push Uyarıları"}
               accent={accent}
               accentBorder={accentBorder}
               accentBg={accentBg}
@@ -1280,9 +1428,13 @@ export default function SettingsForm({
           <div className={activeSection === "gizlilik" ? "block" : "hidden"}>
             <Section
               icon={Shield}
-              title="Gizlilik & Liderlik Tablosu"
-              desc="Geliştirici topluluğunda görünürlüğünüzü ve sıralama katılımınızı buradan yapılandırın."
-              badge="Gizlilik"
+              title={lang === "en" ? "Privacy & Leaderboard" : "Gizlilik & Liderlik Tablosu"}
+              desc={
+                lang === "en"
+                  ? "Configure your visibility and ranking participation in the developer community."
+                  : "Geliştirici topluluğunda görünürlüğünüzü ve sıralama katılımınızı buradan yapılandırın."
+              }
+              badge={lang === "en" ? "Privacy" : "Gizlilik"}
               accent={accent}
               accentBorder={accentBorder}
               accentBg={accentBg}
@@ -1296,19 +1448,39 @@ export default function SettingsForm({
                   }}
                 >
                   <div className="space-y-1.5">
-                    <p className="text-sm font-semibold text-zinc-100">Liderlik Tablosuna Katıl</p>
+                    <p className="text-sm font-semibold text-zinc-100">
+                      {lang === "en" ? "Participate in Leaderboard" : "Liderlik Tablosuna Katıl"}
+                    </p>
                     <p className="text-xs text-zinc-400 leading-relaxed max-w-xl">
-                      Haftalık commit sayınız, aktif streak gününüz ve kazandığınız rozetler{" "}
-                      <a
-                        href="/leaderboard"
-                        target="_blank"
-                        className="underline inline-flex items-center gap-1 font-medium"
-                        style={{ color: accent }}
-                      >
-                        liderlik tablosunda
-                        <ExternalLink className="h-3 w-3" />
-                      </a>{" "}
-                      herkese açık olarak listelenir. Bu ayarı kapatarak kendinizi sıralamadan tamamen gizleyebilirsiniz.
+                      {lang === "en" ? (
+                        <>
+                          Your weekly commit count, active streak days, and earned badges are publicly listed on the{" "}
+                          <a
+                            href="/leaderboard"
+                            target="_blank"
+                            className="underline inline-flex items-center gap-1 font-medium"
+                            style={{ color: accent }}
+                          >
+                            leaderboard
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          . You can turn this off to completely hide yourself from the ranking.
+                        </>
+                      ) : (
+                        <>
+                          Haftalık commit sayınız, aktif streak gününüz ve kazandığınız rozetler{" "}
+                          <a
+                            href="/leaderboard"
+                            target="_blank"
+                            className="underline inline-flex items-center gap-1 font-medium"
+                            style={{ color: accent }}
+                          >
+                            liderlik tablosunda
+                            <ExternalLink className="h-3 w-3" />
+                          </a>{" "}
+                          herkese açık olarak listelenir. Bu ayarı kapatarak kendinizi sıralamadan tamamen gizleyebilirsiniz.
+                        </>
+                      )}
                     </p>
                   </div>
 
@@ -1317,6 +1489,7 @@ export default function SettingsForm({
                     type="button"
                     role="switch"
                     aria-checked={optIn}
+                    aria-label={lang === "en" ? "Leaderboard opt-in toggle" : "Liderlik tablosu katılım anahtarı"}
                     onClick={() => setOptIn((v) => !v)}
                     className="relative shrink-0 h-7 w-12 rounded-full transition-colors duration-200 mt-1"
                     style={{ backgroundColor: optIn ? accent : "#3f3f46" }}
@@ -1522,6 +1695,7 @@ function CopyBox({
   accentBg: string;
   accentBorder: string;
 }) {
+  const { lang } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
@@ -1547,7 +1721,15 @@ function CopyBox({
         }
       >
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        <span>{copied ? "Kopyalandı" : "Kopyala"}</span>
+        <span>
+          {copied
+            ? lang === "en"
+              ? "Copied"
+              : "Kopyalandı"
+            : lang === "en"
+            ? "Copy"
+            : "Kopyala"}
+        </span>
       </button>
     </div>
   );
@@ -1564,6 +1746,7 @@ function ReadmeEditor({
   accentBorder?: string;
   accentBg?: string;
 }) {
+  const { lang } = useLanguage();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -1576,7 +1759,7 @@ function ReadmeEditor({
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error ?? "Yükleme başarısız");
+        alert(data.error ?? (lang === "en" ? "Upload failed" : "Yükleme başarısız"));
         return;
       }
       const textarea = textareaRef.current;
@@ -1594,7 +1777,7 @@ function ReadmeEditor({
         onChange(value + imageMarkdown);
       }
     } catch {
-      alert("Yükleme sırasında hata oluştu");
+      alert(lang === "en" ? "An error occurred during upload" : "Yükleme sırasında hata oluştu");
     } finally {
       setUploading(false);
     }
@@ -1635,10 +1818,10 @@ function ReadmeEditor({
   }
 
   function applyFormat(type: "bold" | "italic" | "heading" | "code" | "list") {
-    if (type === "bold") insertAround("**", "**", "kalın metin");
-    else if (type === "italic") insertAround("*", "*", "italik metin");
+    if (type === "bold") insertAround("**", "**", lang === "en" ? "bold text" : "kalın metin");
+    else if (type === "italic") insertAround("*", "*", lang === "en" ? "italic text" : "italik metin");
     else if (type === "heading") insertAt("\n### ");
-    else if (type === "code") insertAround("`", "`", "kod");
+    else if (type === "code") insertAround("`", "`", lang === "en" ? "code" : "kod");
     else if (type === "list") insertAt("\n- ");
   }
 
@@ -1651,47 +1834,47 @@ function ReadmeEditor({
         <button
           type="button"
           onClick={() => applyFormat("bold")}
-          title="Kalın"
+          title={lang === "en" ? "Bold" : "Kalın"}
           className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer"
         >
           <Bold className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-[11px]">Kalın</span>
+          <span className="hidden sm:inline text-[11px]">{lang === "en" ? "Bold" : "Kalın"}</span>
         </button>
         <button
           type="button"
           onClick={() => applyFormat("italic")}
-          title="İtalik"
+          title={lang === "en" ? "Italic" : "İtalik"}
           className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer"
         >
           <Italic className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-[11px]">İtalik</span>
+          <span className="hidden sm:inline text-[11px]">{lang === "en" ? "Italic" : "İtalik"}</span>
         </button>
         <button
           type="button"
           onClick={() => applyFormat("heading")}
-          title="Başlık"
+          title={lang === "en" ? "Heading" : "Başlık"}
           className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer"
         >
           <Heading className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-[11px]">Başlık</span>
+          <span className="hidden sm:inline text-[11px]">{lang === "en" ? "Heading" : "Başlık"}</span>
         </button>
         <button
           type="button"
           onClick={() => applyFormat("code")}
-          title="Kod Bloğu"
+          title={lang === "en" ? "Code Block" : "Kod Bloğu"}
           className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer"
         >
           <Code className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-[11px]">Kod</span>
+          <span className="hidden sm:inline text-[11px]">{lang === "en" ? "Code" : "Kod"}</span>
         </button>
         <button
           type="button"
           onClick={() => applyFormat("list")}
-          title="Madde Listesi"
+          title={lang === "en" ? "Bullet List" : "Madde Listesi"}
           className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer"
         >
           <List className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-[11px]">Liste</span>
+          <span className="hidden sm:inline text-[11px]">{lang === "en" ? "List" : "Liste"}</span>
         </button>
         <div className="mx-1 h-4 w-px bg-zinc-800" />
         <button
@@ -1700,10 +1883,12 @@ function ReadmeEditor({
           onClick={() => fileInputRef.current?.click()}
           className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50 hover:bg-zinc-800 cursor-pointer"
           style={{ color: accentColor }}
-          title="Görsel yükle"
+          title={lang === "en" ? "Upload image" : "Görsel yükle"}
         >
           {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline font-medium text-[11px]">Görsel Yükle</span>
+          <span className="hidden sm:inline font-medium text-[11px]">
+            {lang === "en" ? "Upload Image" : "Görsel Yükle"}
+          </span>
         </button>
       </div>
 
@@ -1729,12 +1914,20 @@ function ReadmeEditor({
         onPaste={handlePaste}
         rows={10}
         maxLength={10000}
-        placeholder={"### Merhaba!\n\nBen bir yazılım geliştiriciyim.\n\n- Şu an **proje** üzerinde çalışıyorum\n- **Rust & TypeScript** ile geliştirme yapıyorum"}
+        placeholder={
+          lang === "en"
+            ? "### Hello!\n\nI am a software developer.\n\n- Currently working on **project**\n- Developing with **Rust & TypeScript**"
+            : "### Merhaba!\n\nBen bir yazılım geliştiriciyim.\n\n- Şu an **proje** üzerinde çalışıyorum\n- **Rust & TypeScript** ile geliştirme yapıyorum"
+        }
         className="w-full resize-y rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-3 font-mono text-xs leading-relaxed text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
       />
 
       <div className="flex items-center justify-between text-[11px] text-zinc-500">
-        <span>Görsel: sürükle-bırak, panodan yapıştır veya butonu kullan</span>
+        <span>
+          {lang === "en"
+            ? "Image: drag and drop, paste from clipboard, or use the button"
+            : "Görsel: sürükle-bırak, panodan yapıştır veya butonu kullan"}
+        </span>
         <div className="flex items-center gap-2">
           <div className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-800">
             <div
@@ -1754,33 +1947,6 @@ function ReadmeEditor({
 
 /* ── README Widgets ─────────────────────────────────────────────────────────── */
 
-const WIDGET_ITEMS = [
-  {
-    id: "streak",
-    label: "Streak Widget",
-    desc: "Günlük commit serisi, en uzun streak ve son 14 günlük mini bar grafiği.",
-    path: (u: string) => `/api/widget/streak/${u}`,
-  },
-  {
-    id: "stats",
-    label: "Stats Widget",
-    desc: "Yıllık commit, streak, repo sayısı ve toplam yıldız — 4 sütunlu kompakt kart.",
-    path: (u: string) => `/api/widget/stats/${u}`,
-  },
-  {
-    id: "langs",
-    label: "Top Languages",
-    desc: "En çok kullandığınız 5 programlama dili ve yüzdelik dağılım çubuğu.",
-    path: (u: string) => `/api/widget/langs/${u}`,
-  },
-  {
-    id: "heatmap",
-    label: "Contribution Heatmap",
-    desc: "Son 52 haftanın katkı ısı haritası — seçilen tema renginizle uyumlu SVG kartı.",
-    path: (u: string) => `/api/widget/heatmap/${u}`,
-  },
-] as const;
-
 function ReadmeWidgets({
   username,
   accentColor,
@@ -1792,8 +1958,49 @@ function ReadmeWidgets({
   accentBg: string;
   accentBorder: string;
 }) {
+  const { lang } = useLanguage();
   const [active, setActive] = useState<string>("streak");
-  const current = WIDGET_ITEMS.find((w) => w.id === active)!;
+
+  const widgetItems = [
+    {
+      id: "streak",
+      label: "Streak Widget",
+      desc:
+        lang === "en"
+          ? "Daily commit streak, longest streak, and a 14-day mini bar chart."
+          : "Günlük commit serisi, en uzun streak ve son 14 günlük mini bar grafiği.",
+      path: (u: string) => `/api/widget/streak/${u}`,
+    },
+    {
+      id: "stats",
+      label: "Stats Widget",
+      desc:
+        lang === "en"
+          ? "Yearly commits, streak, repo count, and total stars — 4-column compact card."
+          : "Yıllık commit, streak, repo sayısı ve toplam yıldız — 4 sütunlu kompakt kart.",
+      path: (u: string) => `/api/widget/stats/${u}`,
+    },
+    {
+      id: "langs",
+      label: "Top Languages",
+      desc:
+        lang === "en"
+          ? "Top 5 most used programming languages and percentage distribution bar."
+          : "En çok kullandığınız 5 programlama dili ve yüzdelik dağılım çubuğu.",
+      path: (u: string) => `/api/widget/langs/${u}`,
+    },
+    {
+      id: "heatmap",
+      label: "Contribution Heatmap",
+      desc:
+        lang === "en"
+          ? "52-week contribution heatmap — SVG card styled with your chosen theme accent."
+          : "Son 52 haftanın katkı ısı haritası — seçilen tema renginizle uyumlu SVG kartı.",
+      path: (u: string) => `/api/widget/heatmap/${u}`,
+    },
+  ] as const;
+
+  const current = widgetItems.find((w) => w.id === active)!;
   const base = typeof window !== "undefined" ? window.location.origin : "https://devanalytics.app";
   const imgUrl = `${base}${current.path(username)}`;
   const profileUrl = `${base}/u/${username}`;
@@ -1805,7 +2012,7 @@ function ReadmeWidgets({
     <div className="space-y-5">
       {/* Widget Seçici Sekmeler */}
       <div className="flex flex-wrap gap-2">
-        {WIDGET_ITEMS.map((w) => (
+        {widgetItems.map((w) => (
           <button
             key={w.id}
             type="button"
@@ -1834,17 +2041,23 @@ function ReadmeWidgets({
       {/* Kod Kutuları */}
       <div className="space-y-4">
         <div>
-          <p className="mb-2 text-xs font-medium text-zinc-400">Markdown Kodu (GitHub Profiliniz İçin)</p>
+          <p className="mb-2 text-xs font-medium text-zinc-400">
+            {lang === "en" ? "Markdown Code (For Your GitHub Profile)" : "Markdown Kodu (GitHub Profiliniz İçin)"}
+          </p>
           <CopyBox value={mdSnippet} accentColor={accentColor} accentBg={accentBg} accentBorder={accentBorder} />
         </div>
         <div>
-          <p className="mb-2 text-xs font-medium text-zinc-400">HTML Kodu</p>
+          <p className="mb-2 text-xs font-medium text-zinc-400">
+            {lang === "en" ? "HTML Code" : "HTML Kodu"}
+          </p>
           <CopyBox value={htmlSnippet} accentColor={accentColor} accentBg={accentBg} accentBorder={accentBorder} />
         </div>
         <div>
-          <p className="mb-2 text-xs font-medium text-zinc-400">Tüm Widget&apos;ları Birlikte Ekle (Markdown)</p>
+          <p className="mb-2 text-xs font-medium text-zinc-400">
+            {lang === "en" ? "Add All Widgets Together (Markdown)" : "Tüm Widget'ları Birlikte Ekle (Markdown)"}
+          </p>
           <CopyBox
-            value={WIDGET_ITEMS.map((w) => `[![${w.label}](${base}${w.path(username)})](${profileUrl})`).join("\n\n")}
+            value={widgetItems.map((w) => `[![${w.label}](${base}${w.path(username)})](${profileUrl})`).join("\n\n")}
             accentColor={accentColor}
             accentBg={accentBg}
             accentBorder={accentBorder}
