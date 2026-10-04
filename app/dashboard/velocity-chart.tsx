@@ -4,6 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid,
 } from "recharts";
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import { TrendingUp, TrendingDown, Minus, Activity } from "lucide-react";
 
 type DayData = { date: string; commit_count: number };
@@ -11,7 +12,10 @@ type Props = { data: DayData[] };
 
 type WeekPoint = { label: string; weekStart: string; commits: number; avg: number | null; projection: number | null; isCurrent: boolean };
 
-function buildWeeklyData(data: DayData[]): WeekPoint[] {
+const MONTHS_TR = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function buildWeeklyData(data: DayData[], lang: string): WeekPoint[] {
   const map = new Map(data.map((d) => [d.date, d.commit_count]));
   const today = new Date();
   const dow = (today.getDay() + 6) % 7;
@@ -32,7 +36,7 @@ function buildWeeklyData(data: DayData[]): WeekPoint[] {
     weeks.push({ start, commits });
   }
 
-  const M = ["Oca","Sub","Mar","Nis","May","Haz","Tem","Agu","Eyl","Eki","Kas","Ara"];
+  const M = lang === "en" ? MONTHS_EN : MONTHS_TR;
 
   // Projeksiyon: son 4 tamamlanmış haftanın ortalaması
   const completedWeeks = weeks.slice(0, -1); // son hafta (bu hafta) hariç
@@ -47,7 +51,7 @@ function buildWeeklyData(data: DayData[]): WeekPoint[] {
     const isCurrent = i === weeks.length - 1;
     const d = w.start;
     return {
-      label: isCurrent ? "Bu hafta" : `${M[d.getMonth()]} ${d.getDate()}`,
+      label: isCurrent ? (lang === "en" ? "This week" : "Bu hafta") : `${M[d.getMonth()]} ${d.getDate()}`,
       weekStart: w.start.toISOString().slice(0, 10),
       commits: isCurrent ? w.commits : w.commits,
       avg: i >= 2 ? Math.round(avg * 10) / 10 : null,
@@ -57,19 +61,19 @@ function buildWeeklyData(data: DayData[]): WeekPoint[] {
   });
 }
 
-function getTrend(weeks: WeekPoint[]) {
+function getTrend(weeks: WeekPoint[], lang: string) {
   const recent = weeks.slice(-4);
   const older = weeks.slice(-8, -4);
   const rAvg = recent.reduce((s, w) => s + w.commits, 0) / recent.length;
   const oAvg = older.reduce((s, w) => s + w.commits, 0) / Math.max(older.length, 1);
-  if (oAvg === 0) return { label: "Veri yetersiz", color: "#71717a", pct: 0, icon: Minus };
+  if (oAvg === 0) return { label: lang === "en" ? "Insufficient data" : "Veri yetersiz", color: "#71717a", pct: 0, icon: Minus };
   const pct = Math.round(((rAvg - oAvg) / oAvg) * 100);
-  if (pct >= 10) return { label: "Hizlaniyor", color: "#34d399", pct, icon: TrendingUp };
-  if (pct >= -10) return { label: "Stabil", color: "#71717a", pct, icon: Minus };
-  return { label: "Yavasliyor", color: "#f87171", pct, icon: TrendingDown };
+  if (pct >= 10) return { label: lang === "en" ? "Accelerating" : "Hızlanıyor", color: "#34d399", pct, icon: TrendingUp };
+  if (pct >= -10) return { label: lang === "en" ? "Stable" : "Stabil", color: "#71717a", pct, icon: Minus };
+  return { label: lang === "en" ? "Slowing down" : "Yavaşlıyor", color: "#f87171", pct, icon: TrendingDown };
 }
 
-function CustomTooltip({ active, payload, label, color }: { active?: boolean; payload?: { value: number; name: string }[]; label?: string; color: string }) {
+function CustomTooltip({ active, payload, label, color, lang }: { active?: boolean; payload?: { value: number; name: string }[]; label?: string; color: string; lang: string }) {
   if (!active || !payload?.length) return null;
   const commits = payload.find((p) => p.name === "commits")?.value;
   const avg = payload.find((p) => p.name === "avg")?.value;
@@ -77,10 +81,12 @@ function CustomTooltip({ active, payload, label, color }: { active?: boolean; pa
   return (
     <div className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs shadow-lg">
       <p className="mb-0.5 font-medium text-zinc-300">{label}</p>
-      {commits !== undefined && <p style={{ color }}>{commits} commit</p>}
-      {avg !== undefined && avg !== null && <p className="text-zinc-500">3h ort. {avg}</p>}
+      {commits !== undefined && <p style={{ color }}>{commits} commit{lang === "en" && commits !== 1 ? "s" : ""}</p>}
+      {avg !== undefined && avg !== null && <p className="text-zinc-500">{lang === "en" ? `3w avg. ${avg}` : `3h ort. ${avg}`}</p>}
       {projection !== undefined && projection !== null && (
-        <p className="text-zinc-400">Projeksiyon: {projection} commit</p>
+        <p className="text-zinc-400">
+          {lang === "en" ? `Projection: ${projection} commit${projection !== 1 ? "s" : ""}` : `Projeksiyon: ${projection} commit`}
+        </p>
       )}
     </div>
   );
@@ -88,8 +94,9 @@ function CustomTooltip({ active, payload, label, color }: { active?: boolean; pa
 
 export default function VelocityChart({ data }: Props) {
   const theme = useThemeColors();
-  const weeks = buildWeeklyData(data);
-  const trend = getTrend(weeks);
+  const { lang } = useLanguage();
+  const weeks = buildWeeklyData(data, lang);
+  const trend = getTrend(weeks, lang);
   const currentWeek = weeks[weeks.length - 1];
   const projection = currentWeek?.projection ?? 0;
   const maxVal = Math.max(...weeks.map((w) => w.commits), projection, 1);
@@ -108,7 +115,7 @@ export default function VelocityChart({ data }: Props) {
         <div className="flex items-center gap-2 flex-wrap">
           {monthlyProjection > 0 && (
             <span className="text-xs text-zinc-600">
-              ~<span className="text-zinc-400 font-medium">{monthlyProjection}</span> commit/ay tahmini
+              ~<span className="text-zinc-400 font-medium">{monthlyProjection}</span> {lang === "en" ? "commits/mo est." : "commit/ay tahmini"}
             </span>
           )}
           <div
@@ -137,7 +144,7 @@ export default function VelocityChart({ data }: Props) {
             <CartesianGrid stroke="#1f1f23" strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="label" tick={{ fill: "#3f3f46", fontSize: 10 }} axisLine={false} tickLine={false} interval={1} />
             <YAxis tick={{ fill: "#3f3f46", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, maxVal + 2]} />
-            <Tooltip content={<CustomTooltip color={theme.accent} />} />
+            <Tooltip content={<CustomTooltip color={theme.accent} lang={lang} />} />
             <ReferenceLine x={weeks[weeks.length - 1].label} stroke={theme.accentBorder} strokeDasharray="4 4" />
             <Area
               type="monotone" dataKey="commits" name="commits"
@@ -171,16 +178,16 @@ export default function VelocityChart({ data }: Props) {
       <div className="mt-2 flex items-center gap-4 justify-end shrink-0 flex-wrap">
         <div className="flex items-center gap-1">
           <div className="h-px w-4" style={{ backgroundColor: theme.accent }} />
-          <span className="text-[10px] text-zinc-600">Haftalik</span>
+          <span className="text-[10px] text-zinc-600">{lang === "en" ? "Weekly" : "Haftalık"}</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="h-px w-4 border-t border-dashed" style={{ borderColor: theme.accentMid }} />
-          <span className="text-[10px] text-zinc-600">3h ort.</span>
+          <span className="text-[10px] text-zinc-600">{lang === "en" ? "3w avg." : "3h ort."}</span>
         </div>
         {projection > 0 && (
           <div className="flex items-center gap-1">
             <div className="h-px w-4 border-t border-dashed border-zinc-600" />
-            <span className="text-[10px] text-zinc-600">Projeksiyon</span>
+            <span className="text-[10px] text-zinc-600">{lang === "en" ? "Projection" : "Projeksiyon"}</span>
           </div>
         )}
       </div>

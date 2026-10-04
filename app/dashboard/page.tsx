@@ -840,7 +840,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">
                   {lang === "tr" ? `Son ${dateRange === "365" ? "30" : dateRange} Gün Aktivite` : `Last ${dateRange === "365" ? "30" : dateRange} Days Activity`}
                 </h2>
-                <ActivityBar data={recentActivity} emptyText={lang === "tr" ? "Veri yok" : "No data"} />
+                <ActivityBar data={recentActivity} emptyText={lang === "tr" ? "Veri yok" : "No data"} lang={lang} />
               </div>
             </SortableWidget>
 
@@ -933,15 +933,16 @@ function StatCard({ label, value, lang = "tr" }: { label: string; value: number;
   );
 }
 
-function ActivityBar({ data, emptyText = "Veri yok" }: { data: { date: string; commit_count: number }[]; emptyText?: string }) {
+function ActivityBar({ data, emptyText = "Veri yok", lang = "tr" }: { data: { date: string; commit_count: number }[]; emptyText?: string; lang?: Language }) {
   if (data.length === 0) return <p className="text-[11px] text-zinc-600">{emptyText}</p>;
   const max = Math.max(...data.map((d) => d.commit_count));
   return (
     <div className="flex items-end gap-0.5 flex-1">
       {data.map((d) => {
         const height = max > 0 ? Math.max((d.commit_count / max) * 100, 4) : 4;
+        const commitWord = lang === "en" ? (d.commit_count === 1 ? "commit" : "commits") : "commit";
         return (
-          <div key={d.date} title={`${d.date}: ${d.commit_count} commit`}
+          <div key={d.date} title={`${d.date}: ${d.commit_count} ${commitWord}`}
             className="flex-1 rounded-sm opacity-80 transition-opacity hover:opacity-100"
             style={{ height: `${height}%`, backgroundColor: "var(--accent, #34d399)" }}
           />

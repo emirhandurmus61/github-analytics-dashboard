@@ -1,22 +1,34 @@
 "use client";
 
 import { useThemeColors } from "@/components/theme-provider";
-import { Sunrise, Sun, Sunset, Moon, Timer, Calendar } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import { Sunrise, Sun, Sunset, Moon, Calendar } from "lucide-react";
 
 type HourEntry = { hour: number; day: number; count: number };
 type Props = { hourData: HourEntry[]; commitTimestamps: string[] };
 
 type PeriodKey = "morning" | "afternoon" | "evening" | "night";
-type Period = { key: PeriodKey; label: string; icon: React.ComponentType<{ className?: string }>; hours: number[] };
+type Period = {
+  key: PeriodKey;
+  labelTr: string;
+  labelEn: string;
+  coderTr: string;
+  coderEn: string;
+  icon: React.ComponentType<{ className?: string }>;
+  hours: number[];
+};
 
 const PERIODS: Period[] = [
-  { key: "morning",   label: "Sabah",   icon: Sunrise, hours: [6,7,8,9,10,11] },
-  { key: "afternoon", label: "Ogle",    icon: Sun,     hours: [12,13,14,15,16,17] },
-  { key: "evening",   label: "Aksam",   icon: Sunset,  hours: [18,19,20,21] },
-  { key: "night",     label: "Gece",    icon: Moon,    hours: [22,23,0,1,2,3,4,5] },
+  { key: "morning",   labelTr: "Sabah", labelEn: "Morning",   coderTr: "Sabah Kodcusu", coderEn: "Morning Coder",   icon: Sunrise, hours: [6,7,8,9,10,11] },
+  { key: "afternoon", labelTr: "Öğle",  labelEn: "Afternoon", coderTr: "Öğle Kodcusu",  coderEn: "Afternoon Coder", icon: Sun,     hours: [12,13,14,15,16,17] },
+  { key: "evening",   labelTr: "Akşam", labelEn: "Evening",   coderTr: "Akşam Kodcusu", coderEn: "Evening Coder",   icon: Sunset,  hours: [18,19,20,21] },
+  { key: "night",     labelTr: "Gece",  labelEn: "Night",     coderTr: "Gece Kodcusu",  coderEn: "Night Owl",       icon: Moon,    hours: [22,23,0,1,2,3,4,5] },
 ];
 
-function buildStats(hourData: HourEntry[], commitTimestamps: string[]) {
+const DAY_NAMES_TR = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
+const DAY_NAMES_EN = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+function buildStats(hourData: HourEntry[], commitTimestamps: string[], lang: string) {
   const grid: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
   for (const { hour, day, count } of hourData) {
     if (day >= 0 && day < 7 && hour >= 0 && hour < 24) grid[day][hour] = count;
@@ -30,7 +42,7 @@ function buildStats(hourData: HourEntry[], commitTimestamps: string[]) {
   const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
   const dayTotals = grid.map((row) => row.reduce((s, c) => s + c, 0));
   const dayMax = Math.max(...dayTotals, 1);
-  const DAY_NAMES = ["Pzt","Sal","Car","Per","Cum","Cmt","Paz"];
+  const DAY_NAMES = lang === "en" ? DAY_NAMES_EN : DAY_NAMES_TR;
   const peakDayIndex = dayTotals.indexOf(Math.max(...dayTotals));
   const peakDay = DAY_NAMES[peakDayIndex];
 
@@ -60,9 +72,10 @@ function buildStats(hourData: HourEntry[], commitTimestamps: string[]) {
 
 export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   if (hourData.length === 0) return null;
 
-  const s = buildStats(hourData, commitTimestamps);
+  const s = buildStats(hourData, commitTimestamps, lang);
   const hourMax = Math.max(...s.hourTotals, 1);
   const IdentityIcon = s.identityPeriod.icon;
 
@@ -71,12 +84,18 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
       {/* Header */}
       <div className="flex items-start justify-between mb-3 shrink-0">
         <div>
-          <h2 className="text-sm font-medium text-zinc-400">Calisma Ritmi</h2>
-          <p className="text-xs text-zinc-600 mt-0.5">Commit aliskanliklarinin analizi</p>
+          <h2 className="text-sm font-medium text-zinc-400">
+            {lang === "en" ? "Work Rhythm" : "Çalışma Ritmi"}
+          </h2>
+          <p className="text-xs text-zinc-600 mt-0.5">
+            {lang === "en" ? "Analysis of commit habits" : "Commit alışkanlıklarının analizi"}
+          </p>
         </div>
         <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1" style={{ borderColor: theme.accentBorder, backgroundColor: theme.accentBg }}>
           <IdentityIcon className="w-3.5 h-3.5 text-[var(--accent)]" />
-          <span className="text-xs font-medium" style={{ color: theme.accent }}>{s.identityPeriod.label} Kodcusu</span>
+          <span className="text-xs font-medium" style={{ color: theme.accent }}>
+            {lang === "en" ? s.identityPeriod.coderEn : s.identityPeriod.coderTr}
+          </span>
         </div>
       </div>
 
@@ -89,12 +108,13 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
             const pct = s.total > 0 ? Math.round((count / s.total) * 100) : 0;
             const isTop = count === Math.max(...Object.values(s.periodCounts));
             const Icon = period.icon;
+            const label = lang === "en" ? period.labelEn : period.labelTr;
             return (
               <div key={period.key}>
                 <div className="mb-1 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Icon className={`w-3.5 h-3.5 ${isTop ? "text-[var(--accent)]" : "text-zinc-600"}`} />
-                    <span className={`text-xs ${isTop ? "text-zinc-200 font-medium" : "text-zinc-500"}`}>{period.label}</span>
+                    <span className={`text-xs ${isTop ? "text-zinc-200 font-medium" : "text-zinc-500"}`}>{label}</span>
                   </div>
                   <span className="text-[10px] text-zinc-600 tabular-nums">{pct}%</span>
                 </div>
@@ -110,7 +130,9 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
         <div className="space-y-2">
           {/* Günlük dağılım bar grafiği */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-            <p className="text-[10px] text-zinc-600 mb-2">Gün Bazlı Dağılım</p>
+            <p className="text-[10px] text-zinc-600 mb-2">
+              {lang === "en" ? "Daily Distribution" : "Gün Bazlı Dağılım"}
+            </p>
             <div className="flex items-end gap-1 h-12">
               {s.dayTotals.map((count, i) => {
                 const pct = s.dayMax > 0 ? (count / s.dayMax) * 100 : 0;
@@ -120,7 +142,7 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
                   <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
                     <div
                       className="w-full rounded-sm transition-all hover:opacity-80"
-                      title={`${s.DAY_NAMES[i]}: ${count} commit`}
+                      title={`${s.DAY_NAMES[i]}: ${count} commit${lang === "en" && count !== 1 ? "s" : ""}`}
                       style={{
                         height: `${Math.max(pct, count > 0 ? 8 : 4)}%`,
                         backgroundColor: isPeak
@@ -138,14 +160,18 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
               })}
             </div>
             <div className="flex justify-between text-[10px] mt-1.5">
-              <span style={{ color: theme.accent }}>%{s.weekdayPct} hafta içi</span>
-              <span className="text-zinc-500">%{s.weekendPct} hafta sonu</span>
+              <span style={{ color: theme.accent }}>
+                {lang === "en" ? `${s.weekdayPct}% weekdays` : `%${s.weekdayPct} hafta içi`}
+              </span>
+              <span className="text-zinc-500">
+                {lang === "en" ? `${s.weekendPct}% weekends` : `%${s.weekendPct} hafta sonu`}
+              </span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-              <p className="text-[10px] text-zinc-600 mb-1">Pik Saat</p>
+              <p className="text-[10px] text-zinc-600 mb-1">{lang === "en" ? "Peak Hour" : "Pik Saat"}</p>
               <p className="text-lg font-bold tabular-nums" style={{ color: theme.accent }}>
                 {String(s.peakHour).padStart(2, "0")}:00
               </p>
@@ -153,7 +179,7 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
             <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
               <div className="flex items-center gap-1 mb-1">
                 <Calendar className="w-2.5 h-2.5 text-zinc-600" />
-                <p className="text-[10px] text-zinc-600">En Aktif Gün</p>
+                <p className="text-[10px] text-zinc-600">{lang === "en" ? "Most Active Day" : "En Aktif Gün"}</p>
               </div>
               <p className="text-sm font-semibold text-zinc-200">{s.peakDay}</p>
             </div>
@@ -169,7 +195,7 @@ export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
             return (
               <div
                 key={h} className="flex-1 rounded-t-sm hover:opacity-80 transition-opacity"
-                title={`${String(h).padStart(2, "0")}:00 -- ${count} commit`}
+                title={`${String(h).padStart(2, "0")}:00 -- ${count} commit${lang === "en" && count !== 1 ? "s" : ""}`}
                 style={{ height: `${Math.max(hPct, count > 0 ? 8 : 2)}%`, backgroundColor: h === s.peakHour ? theme.accent : count > 0 ? theme.shades[1] : "#1a1a1e" }}
               />
             );

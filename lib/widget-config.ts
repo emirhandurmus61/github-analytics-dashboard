@@ -120,3 +120,40 @@ export const DEFAULT_WIDGET_CONFIGS: WidgetConfig[] = [
   // Follow Feed 2x3
   { id: "follow-feed",     label: "Takip Akışı",         colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
 ];
+
+export const WIDGET_LABELS_EN: Record<WidgetId, string> = {
+  "stat-repos": "Total Repos",
+  "stat-commits": "Commit Count",
+  "stat-langs": "Languages Used",
+  "week-compare": "Weekly Comparison",
+  "streak": "Streak",
+  "goal": "Weekly Goal",
+  "insights": "Insights",
+  "badges": "Badges",
+  "code-stats": "Code Stats",
+  "month-compare": "Monthly Comparison",
+  "velocity": "Velocity",
+  "lang-evolution": "Language Evolution",
+  "heatmap": "Contribution Heatmap",
+  "activity-bar": "Activity",
+  "lang-dist": "Language Distribution",
+  "rhythm": "Work Rhythm",
+  "commit-quality": "Commit Quality",
+  "hour-heatmap": "Hourly Heatmap",
+  "repo-list": "Active Repos",
+  "repo-health": "Repo Health",
+  "profile-views": "Profile Views",
+  "developer-card": "Developer Card",
+  "developer-dna": "Developer DNA",
+  "percentile-rank": "Your Ranking",
+  "advanced-goals": "Advanced Goals",
+  "follow-feed": "Follow Feed",
+};
+
+export function getWidgetLabel(id: WidgetId, lang: "tr" | "en" = "tr"): string {
+  if (lang === "en") {
+    return WIDGET_LABELS_EN[id] ?? id;
+  }
+  const cfg = DEFAULT_WIDGET_CONFIGS.find((c) => c.id === id);
+  return cfg?.label ?? id;
+}

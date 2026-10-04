@@ -1,6 +1,6 @@
 "use client";
 
-import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import { AlertTriangle, HeartCrack, ExternalLink } from "lucide-react";
 
 export type StreakStatus = "safe" | "at_risk" | "broken_today" | "no_streak";
@@ -11,6 +11,7 @@ type Props = {
 };
 
 export default function StreakGuard({ status, currentStreak }: Props) {
+  const { lang } = useLanguage();
   if (status === "safe" || status === "no_streak") return null;
 
   const isAtRisk = status === "at_risk";
@@ -41,13 +42,13 @@ export default function StreakGuard({ status, currentStreak }: Props) {
           style={{ color: isAtRisk ? "#fbbf24" : "#f87171" }}
         >
           {isAtRisk
-            ? `${currentStreak} gunluk streak tehlikede!`
-            : `${currentStreak} gunluk streak kirildi`}
+            ? (lang === "en" ? `${currentStreak}-day streak is at risk!` : `${currentStreak} günlük streak tehlikede!`)
+            : (lang === "en" ? `${currentStreak}-day streak was broken` : `${currentStreak} günlük streak kırıldı`)}
         </p>
         <p className="text-xs text-zinc-500">
           {isAtRisk
-            ? "Bugun henuz commit atmadin. Streakini korumak icin bugun en az 1 commit at."
-            : "Yeni bir seri baslat."}
+            ? (lang === "en" ? "You haven't committed yet today. Push at least 1 commit to protect your streak." : "Bugün henüz commit atmadın. Streakini korumak için bugün en az 1 commit at.")
+            : (lang === "en" ? "Start a new streak today." : "Yeni bir seri başlat.")}
         </p>
       </div>
 

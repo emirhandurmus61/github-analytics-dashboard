@@ -1,6 +1,7 @@
 "use client";
 
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import { Flame, Zap, CalendarDays } from "lucide-react";
 
 type Props = {
@@ -11,11 +12,12 @@ type Props = {
 
 export default function StreakCard({ currentStreak, longestStreak, totalActiveDays }: Props) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
 
   const items = [
     { icon: <Flame className="w-5 h-5" />, value: currentStreak, label: "Streak", color: theme.accent },
-    { icon: <Zap className="w-5 h-5" />, value: longestStreak, label: "Rekor", color: "#facc15" },
-    { icon: <CalendarDays className="w-5 h-5" />, value: totalActiveDays, label: "Aktif Gun", color: theme.accentMid },
+    { icon: <Zap className="w-5 h-5" />, value: longestStreak, label: lang === "en" ? "Record" : "Rekor", color: "#facc15" },
+    { icon: <CalendarDays className="w-5 h-5" />, value: totalActiveDays, label: lang === "en" ? "Active Days" : "Aktif Gün", color: theme.accentMid },
   ];
 
   return (

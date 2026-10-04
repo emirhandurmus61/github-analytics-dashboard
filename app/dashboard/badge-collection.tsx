@@ -8,7 +8,10 @@ import {
   type BadgeSeries,
   RARITY_COLORS,
   SERIES_INFO,
+  getLocalizedBadge,
+  getLocalizedSeriesInfo,
 } from "@/lib/badges";
+import { useLanguage } from "@/lib/i18n";
 import {
   Rocket, Flame, Zap, Moon, Sunrise, Swords, Eraser, Globe, Globe2, Lock, Trophy,
   Gem, Languages, Hash, Award, Footprints, Package, Building2, GitMerge, Bug, Star, Crown,
@@ -23,10 +26,17 @@ type Props = { badges: Badge[] };
 type StatusFilter = "all" | "closest" | "earned" | "locked";
 type CategoryFilter = "all" | BadgeSeries | "habits";
 
-const RARITY_LABEL: Record<Badge["rarity"], string> = {
-  common: "Yaygın",
-  rare: "Nadir",
-  epic: "Epik",
+const RARITY_LABEL: Record<"en" | "tr", Record<Badge["rarity"], string>> = {
+  tr: {
+    common: "Yaygın",
+    rare: "Nadir",
+    epic: "Epik",
+  },
+  en: {
+    common: "Common",
+    rare: "Rare",
+    epic: "Epic",
+  },
 };
 
 const BADGE_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -97,18 +107,18 @@ const BADGE_ICON: Record<string, React.ComponentType<{ className?: string }>> = 
   big_cleanup: Trash2,
 };
 
-const CATEGORIES: { id: CategoryFilter; label: string }[] = [
-  { id: "all", label: "Tüm Kategoriler" },
-  { id: "commits", label: "Commitler" },
-  { id: "streak", label: "Streak" },
-  { id: "active_days", label: "Aktiflik" },
-  { id: "repos", label: "Repolar" },
-  { id: "languages", label: "Diller" },
-  { id: "code_volume", label: "Kod Hacmi" },
-  { id: "pull_requests", label: "PR & İş Birliği" },
-  { id: "issues", label: "Issue Çözümü" },
-  { id: "stars", label: "Yıldızlar" },
-  { id: "habits", label: "Alışkanlıklar" },
+const CATEGORIES: { id: CategoryFilter; tr: string; en: string }[] = [
+  { id: "all", tr: "Tüm Kategoriler", en: "All Categories" },
+  { id: "commits", tr: "Commitler", en: "Commits" },
+  { id: "streak", tr: "Streak", en: "Streak" },
+  { id: "active_days", tr: "Aktiflik", en: "Activity" },
+  { id: "repos", tr: "Repolar", en: "Repositories" },
+  { id: "languages", tr: "Diller", en: "Languages" },
+  { id: "code_volume", tr: "Kod Hacmi", en: "Code Volume" },
+  { id: "pull_requests", tr: "PR & İş Birliği", en: "PR & Collaboration" },
+  { id: "issues", tr: "Issue Çözümü", en: "Issue Resolution" },
+  { id: "stars", tr: "Yıldızlar", en: "Stars" },
+  { id: "habits", tr: "Alışkanlıklar", en: "Habits" },
 ];
 
 const HABIT_SERIES: BadgeSeries[] = ["night_owl", "early_bird", "weekend", "open_source", "cleanup"];
@@ -151,10 +161,12 @@ function BadgeDetailModal({
   onClose: () => void;
   onSelectBadge: (id: BadgeId) => void;
 }) {
+  const { lang } = useLanguage();
+  const numLocale = lang === "en" ? "en-US" : "tr-TR";
   const theme = useThemeColors();
   const rarity = RARITY_COLORS[badge.rarity];
   const Icon = BADGE_ICON[badge.id] ?? Trophy;
-  const seriesInfo = badge.series ? SERIES_INFO[badge.series] : null;
+  const seriesInfo = badge.series ? getLocalizedSeriesInfo(badge.series, lang) : null;
 
   const current = badge.current ?? 0;
   const target = badge.target ?? 1;
@@ -232,11 +244,11 @@ function BadgeDetailModal({
         <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800/80 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-              {seriesInfo?.title ?? "Özel Başarı"}
+              {seriesInfo?.title ?? (lang === "en" ? "Special Achievement" : "Özel Başarı")}
             </span>
             {badge.tier && badge.maxTier && (
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
-                Seviye {badge.tier}/{badge.maxTier}
+                {lang === "en" ? `Tier ${badge.tier}/${badge.maxTier}` : `Seviye ${badge.tier}/${badge.maxTier}`}
               </span>
             )}
           </div>
@@ -244,7 +256,7 @@ function BadgeDetailModal({
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-xl flex items-center justify-center bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:border-zinc-700 transition-colors cursor-pointer"
-            title="Kapat (Esc)"
+            title={lang === "en" ? "Close (Esc)" : "Kapat (Esc)"}
           >
             <X className="w-4 h-4" />
           </button>
@@ -287,7 +299,7 @@ function BadgeDetailModal({
               {badge.earned ? (
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wide">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>BU SEVİYE KAZANILDI</span>
+                  <span>{lang === "en" ? "TIER EARNED" : "BU SEVİYE KAZANILDI"}</span>
                 </div>
               ) : remaining > 0 ? (
                 <div
@@ -299,12 +311,16 @@ function BadgeDetailModal({
                   }}
                 >
                   <Flame className="w-3.5 h-3.5" />
-                  <span>Son {remaining.toLocaleString("tr-TR")} {badge.unit ?? ""} kaldı!</span>
+                  <span>
+                    {lang === "en"
+                      ? `${remaining.toLocaleString(numLocale)} ${badge.unit ?? ""} left!`
+                      : `Son ${remaining.toLocaleString(numLocale)} ${badge.unit ?? ""} kaldı!`}
+                  </span>
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-zinc-800 text-zinc-300 text-xs font-bold">
                   <Target className="w-3.5 h-3.5" />
-                  <span>Kilidi Açılmaya Hazır!</span>
+                  <span>{lang === "en" ? "Ready to Unlock!" : "Kilidi Açılmaya Hazır!"}</span>
                 </div>
               )}
             </div>
@@ -314,7 +330,7 @@ function BadgeDetailModal({
           <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4 space-y-2.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-300 font-mono font-medium">
-                {current.toLocaleString("tr-TR")} / {target.toLocaleString("tr-TR")} {badge.unit ?? ""}
+                {current.toLocaleString(numLocale)} / {target.toLocaleString(numLocale)} {badge.unit ?? ""}
               </span>
               <span className="font-extrabold text-sm tabular-nums" style={{ color: theme.accent }}>
                 %{progressPct}
@@ -337,10 +353,10 @@ function BadgeDetailModal({
             <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 space-y-3">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-zinc-200">
-                  {seriesInfo?.title ?? "Seri"} Seviye Ağacı
+                  {seriesInfo?.title ?? (lang === "en" ? "Series" : "Seri")} {lang === "en" ? "Level Tree" : "Seviye Ağacı"}
                 </span>
                 <span className="text-zinc-400 text-xs font-mono">
-                  {completedCount} / {seriesBadges.length} Tamamlandı
+                  {completedCount} / {seriesBadges.length} {lang === "en" ? "Completed" : "Tamamlandı"}
                 </span>
               </div>
 
@@ -364,7 +380,7 @@ function BadgeDetailModal({
                       key={sb.id}
                       onClick={() => onSelectBadge(sb.id)}
                       className="relative z-10 flex flex-col items-center group/node focus:outline-none cursor-pointer"
-                      title={`${sb.name} — Seviye ${sb.tier}`}
+                      title={`${sb.name} — ${lang === "en" ? "Tier" : "Seviye"} ${sb.tier}`}
                     >
                       <div
                         className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-md ${
@@ -399,8 +415,10 @@ function BadgeDetailModal({
           <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 text-xs text-zinc-400 flex items-start gap-2.5">
             <Target className="w-4 h-4 text-[var(--accent)] shrink-0 mt-0.5" />
             <div className="leading-relaxed">
-              <span className="font-semibold text-zinc-200">Gereksinim: </span>
-              {badge.description}. Hedefe ulaşmak için {target.toLocaleString("tr-TR")} {badge.unit ?? "işlem"} gerekiyor.
+              <span className="font-semibold text-zinc-200">{lang === "en" ? "Requirement: " : "Gereksinim: "}</span>
+              {badge.description}. {lang === "en"
+                ? `${target.toLocaleString(numLocale)} ${badge.unit ?? "actions"} required to reach the goal.`
+                : `Hedefe ulaşmak için ${target.toLocaleString(numLocale)} ${badge.unit ?? "işlem"} gerekiyor.`}
             </div>
           </div>
         </div>
@@ -413,14 +431,14 @@ function BadgeDetailModal({
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
-            <span>Önceki Seviye</span>
+            <span>{lang === "en" ? "Previous Tier" : "Önceki Seviye"}</span>
           </button>
 
           <button
             onClick={onClose}
             className="px-5 py-2 rounded-xl font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-100 hover:text-white transition-colors cursor-pointer"
           >
-            Kapat
+            {lang === "en" ? "Close" : "Kapat"}
           </button>
 
           <button
@@ -428,7 +446,7 @@ function BadgeDetailModal({
             disabled={seriesBadges.length <= 1}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
-            <span>Sonraki Seviye</span>
+            <span>{lang === "en" ? "Next Tier" : "Sonraki Seviye"}</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -447,14 +465,16 @@ function BadgeCard({
   onClick: () => void;
 }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const rarity = RARITY_COLORS[badge.rarity];
   const Icon = BADGE_ICON[badge.id] ?? Trophy;
-  const seriesInfo = badge.series ? SERIES_INFO[badge.series] : null;
+  const seriesInfo = badge.series ? getLocalizedSeriesInfo(badge.series, lang) : null;
 
   const current = badge.current ?? 0;
   const target = badge.target ?? 1;
   const progressPct = Math.min(100, Math.max(0, Math.round((current / target) * 100)));
   const remaining = Math.max(0, target - current);
+  const locale = lang === "en" ? "en-US" : "tr-TR";
 
   return (
     <div
@@ -493,10 +513,12 @@ function BadgeCard({
       <div className="flex items-center justify-between w-full mb-1 relative z-10">
         {badge.tier && badge.maxTier ? (
           <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-zinc-800/90 text-zinc-300 border border-zinc-700/60 shadow-sm">
-            Seviye {badge.tier}/{badge.maxTier}
+            {lang === "en" ? `Tier ${badge.tier}/${badge.maxTier}` : `Seviye ${badge.tier}/${badge.maxTier}`}
           </span>
         ) : (
-          <span className="text-[11px] font-semibold text-zinc-400">Özel Başarı</span>
+          <span className="text-[11px] font-semibold text-zinc-400">
+            {lang === "en" ? "Special Achievement" : "Özel Başarı"}
+          </span>
         )}
 
         {badge.earned ? (
@@ -508,12 +530,12 @@ function BadgeCard({
               border: `1px solid ${rarity.badgeBorder}`,
             }}
           >
-            {RARITY_LABEL[badge.rarity]}
+            {RARITY_LABEL[lang === "en" ? "en" : "tr"][badge.rarity]}
           </span>
         ) : (
           <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded-full border border-zinc-700/50">
             <Lock className="w-3 h-3 text-zinc-500" />
-            <span>Kilitli</span>
+            <span>{lang === "en" ? "Locked" : "Kilitli"}</span>
           </span>
         )}
       </div>
@@ -521,7 +543,7 @@ function BadgeCard({
       {/* Gövde: Seri Başlığı, Vektör Madalyon, İkon, Başlık ve Açıklama */}
       <div className="flex flex-col items-center my-1 min-w-0 relative z-10">
         <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] mb-1 opacity-90 truncate max-w-full">
-          {seriesInfo?.title ?? "Başarı"}
+          {seriesInfo?.title ?? (lang === "en" ? "Achievement" : "Başarı")}
         </span>
 
         <div
@@ -566,13 +588,17 @@ function BadgeCard({
         {badge.earned ? (
           <div className="w-full py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
             <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span>{badge.tier === badge.maxTier ? "SERİ TAMAMLANDI" : "SEVİYE KAZANILDI"}</span>
+            <span>
+              {badge.tier === badge.maxTier
+                ? lang === "en" ? "SERIES COMPLETED" : "SERİ TAMAMLANDI"
+                : lang === "en" ? "TIER EARNED" : "SEVİYE KAZANILDI"}
+            </span>
           </div>
         ) : (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-mono text-zinc-300">
               <span className="truncate font-medium">
-                {current.toLocaleString("tr-TR")} / {target.toLocaleString("tr-TR")} {badge.unit ?? ""}
+                {current.toLocaleString(locale)} / {target.toLocaleString(locale)} {badge.unit ?? ""}
               </span>
               <span className="font-extrabold tabular-nums" style={{ color: theme.accent }}>
                 %{progressPct}
@@ -592,17 +618,25 @@ function BadgeCard({
               {progressPct >= 75 ? (
                 <span className="text-amber-400 font-bold flex items-center gap-1">
                   <Flame className="w-3.5 h-3.5" />
-                  <span>Son {remaining.toLocaleString("tr-TR")} kaldı!</span>
+                  <span>
+                    {lang === "en"
+                      ? `Only ${remaining.toLocaleString(locale)} left!`
+                      : `Son ${remaining.toLocaleString(locale)} kaldı!`}
+                  </span>
                 </span>
               ) : remaining > 0 ? (
                 <span className="text-zinc-400 font-medium">
-                  Kalan: {remaining.toLocaleString("tr-TR")} {badge.unit ?? ""}
+                  {lang === "en"
+                    ? `Remaining: ${remaining.toLocaleString(locale)} ${badge.unit ?? ""}`
+                    : `Kalan: ${remaining.toLocaleString(locale)} ${badge.unit ?? ""}`}
                 </span>
               ) : (
-                <span className="text-[var(--accent)] font-bold">Açılmaya hazır!</span>
+                <span className="text-[var(--accent)] font-bold">
+                  {lang === "en" ? "Ready to unlock!" : "Açılmaya hazır!"}
+                </span>
               )}
               <span className="text-zinc-300 group-hover:text-white font-semibold text-xs transition-colors flex items-center gap-0.5">
-                Seviyeler →
+                {lang === "en" ? "Tiers →" : "Seviyeler →"}
               </span>
             </div>
           </div>
@@ -616,9 +650,15 @@ function BadgeCard({
 
 export default function BadgeCollection({ badges }: Props) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [selectedBadgeId, setSelectedBadgeId] = useState<BadgeId | null>(null);
+
+  const localizedBadges = useMemo(
+    () => badges.map((b) => getLocalizedBadge(b, lang)),
+    [badges, lang]
+  );
 
   // Yatay Slider, Ok Butonları & Tutup-Çekme Mekaniği
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -629,8 +669,8 @@ export default function BadgeCollection({ badges }: Props) {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
-  const earned = useMemo(() => badges.filter((b) => b.earned), [badges]);
-  const total = badges.length;
+  const earned = useMemo(() => localizedBadges.filter((b) => b.earned), [localizedBadges]);
+  const total = localizedBadges.length;
   const pct = total > 0 ? Math.round((earned.length / total) * 100) : 0;
 
   // ─── Her Serinin Tek Bir Temsilci Kartı (Her Seviye Ayrı Gözükmez!) ───
@@ -648,7 +688,7 @@ export default function BadgeCollection({ badges }: Props) {
     const cards: Badge[] = [];
 
     for (const s of targetSeriesKeys) {
-      const sBadges = badges
+      const sBadges = localizedBadges
         .filter((b) => b.series === s)
         .sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0));
 
@@ -694,13 +734,13 @@ export default function BadgeCollection({ badges }: Props) {
     }
 
     return cards;
-  }, [badges, filter, category]);
+  }, [localizedBadges, filter, category]);
 
   // Modalda açılacak rozet
   const selectedBadge = useMemo(() => {
     if (!selectedBadgeId) return null;
-    return badges.find((b) => b.id === selectedBadgeId) ?? null;
-  }, [badges, selectedBadgeId]);
+    return localizedBadges.find((b) => b.id === selectedBadgeId) ?? null;
+  }, [localizedBadges, selectedBadgeId]);
 
   // Ok butonlarının görünürlük ve aktiflik durumunu güncelle
   const updateScrollButtons = useCallback(() => {
@@ -766,9 +806,13 @@ export default function BadgeCollection({ badges }: Props) {
             <Trophy className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm sm:text-base font-semibold text-zinc-100">Rozet Koleksiyonu</h2>
+            <h2 className="text-sm sm:text-base font-semibold text-zinc-100">
+              {lang === "en" ? "Badge Collection" : "Rozet Koleksiyonu"}
+            </h2>
             <p className="text-xs text-zinc-400">
-              {earned.length} / {total} seviye tamamlandı • 15 Başarı Serisi
+              {lang === "en"
+                ? `${earned.length} / ${total} tiers completed • 15 Achievement Series`
+                : `${earned.length} / ${total} seviye tamamlandı • 15 Başarı Serisi`}
             </p>
           </div>
         </div>
@@ -805,7 +849,7 @@ export default function BadgeCollection({ badges }: Props) {
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Tümü ({displayedSeriesCards.length})
+            {lang === "en" ? `All (${displayedSeriesCards.length})` : `Tümü (${displayedSeriesCards.length})`}
           </button>
           <button
             onClick={() => setFilter("closest")}
@@ -816,7 +860,7 @@ export default function BadgeCollection({ badges }: Props) {
             }`}
           >
             <Target className="w-3 h-3 text-[var(--accent)]" />
-            <span>Sıradaki Hedefler</span>
+            <span>{lang === "en" ? "Next Goals" : "Sıradaki Hedefler"}</span>
           </button>
           <button
             onClick={() => setFilter("earned")}
@@ -826,7 +870,7 @@ export default function BadgeCollection({ badges }: Props) {
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Kazanılanlar
+            {lang === "en" ? "Earned" : "Kazanılanlar"}
           </button>
           <button
             onClick={() => setFilter("locked")}
@@ -836,7 +880,7 @@ export default function BadgeCollection({ badges }: Props) {
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Kilitli
+            {lang === "en" ? "Locked" : "Kilitli"}
           </button>
         </div>
 
@@ -846,12 +890,12 @@ export default function BadgeCollection({ badges }: Props) {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as CategoryFilter)}
-              aria-label="Kategori Seçin"
+              aria-label={lang === "en" ? "Select Category" : "Kategori Seçin"}
               className="bg-zinc-950/80 border border-zinc-800 text-xs text-zinc-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-zinc-700 cursor-pointer"
             >
               {CATEGORIES.map((cat) => (
                 <option key={cat.id} value={cat.id} className="bg-zinc-900 text-zinc-200">
-                  {cat.label}
+                  {cat[lang === "en" ? "en" : "tr"]}
                 </option>
               ))}
             </select>
@@ -873,7 +917,7 @@ export default function BadgeCollection({ badges }: Props) {
           className={`absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-zinc-950/90 border border-zinc-700/80 text-zinc-200 hover:text-white hover:scale-110 hover:border-zinc-500 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all cursor-pointer ${
             canScrollLeft ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
-          title="Sola Kaydır"
+          title={lang === "en" ? "Scroll Left" : "Sola Kaydır"}
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -890,7 +934,7 @@ export default function BadgeCollection({ badges }: Props) {
           className={`absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-zinc-950/90 border border-zinc-700/80 text-zinc-200 hover:text-white hover:scale-110 hover:border-zinc-500 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all cursor-pointer ${
             canScrollRight ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
-          title="Sağa Kaydır"
+          title={lang === "en" ? "Scroll Right" : "Sağa Kaydır"}
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -898,7 +942,11 @@ export default function BadgeCollection({ badges }: Props) {
         {displayedSeriesCards.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-zinc-400 w-full">
             <Trophy className="w-8 h-8 mb-2 opacity-30 text-zinc-500" />
-            <p className="text-xs text-zinc-400">Bu filtreye uygun başarı serisi bulunamadı.</p>
+            <p className="text-xs text-zinc-400">
+              {lang === "en"
+                ? "No achievement series found matching this filter."
+                : "Bu filtreye uygun başarı serisi bulunamadı."}
+            </p>
           </div>
         ) : (
           <div
@@ -930,7 +978,7 @@ export default function BadgeCollection({ badges }: Props) {
       {selectedBadge && (
         <BadgeDetailModal
           badge={selectedBadge}
-          badges={badges}
+          badges={localizedBadges}
           onClose={() => setSelectedBadgeId(null)}
           onSelectBadge={(id) => setSelectedBadgeId(id)}
         />

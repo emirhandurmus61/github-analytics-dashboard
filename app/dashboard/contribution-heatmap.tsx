@@ -1,14 +1,17 @@
 "use client";
 
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import { Grid3X3 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 
 type DayData = { date: string; commit_count: number };
 type Props = { data: DayData[]; accentShades?: [string, string, string, string] };
 
-const MONTHS = ["Oca","Sub","Mar","Nis","May","Haz","Tem","Agu","Eyl","Eki","Kas","Ara"];
-const DAYS = ["Pzt","","Car","","Cum","","Paz"];
+const MONTHS_TR = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS_TR = ["Pzt","","Çar","","Cum","","Paz"];
+const DAYS_EN = ["Mon","","Wed","","Fri","","Sun"];
 
 function buildGrid(data: DayData[]) {
   const map = new Map(data.map((d) => [d.date, d.commit_count]));
@@ -34,13 +37,14 @@ function buildGrid(data: DayData[]) {
   return weeks;
 }
 
-function getMonthLabels(weeks: { date: string; count: number }[][], cellSize: number, gap: number) {
+function getMonthLabels(weeks: { date: string; count: number }[][], cellSize: number, gap: number, lang: string) {
   const labels: { label: string; left: number }[] = [];
   let last = -1;
+  const months = lang === "en" ? MONTHS_EN : MONTHS_TR;
   weeks.forEach((w, col) => {
     const m = new Date(w[0].date).getMonth();
     if (m !== last) {
-      labels.push({ label: MONTHS[m], left: col * (cellSize + gap) });
+      labels.push({ label: months[m], left: col * (cellSize + gap) });
       last = m;
     }
   });
@@ -48,6 +52,8 @@ function getMonthLabels(weeks: { date: string; count: number }[][], cellSize: nu
 }
 
 function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, string, string, string] }) {
+  const { lang } = useLanguage();
+  const days = lang === "en" ? DAYS_EN : DAYS_TR;
   const weeks = buildGrid(data);
   const max = Math.max(...data.map((d) => d.commit_count), 1);
   const total = data.reduce((s, d) => s + d.commit_count, 0);
@@ -72,7 +78,7 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
     return () => observer.disconnect();
   }, [weeks.length]);
 
-  const monthLabels = getMonthLabels(weeks, cellSize, gap);
+  const monthLabels = getMonthLabels(weeks, cellSize, gap, lang);
 
   function getColor(count: number) {
     if (count === 0) return "#1a1a1e";
@@ -90,7 +96,9 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
           <Grid3X3 className="w-4 h-4 text-zinc-500" />
           <h2 className="text-sm font-medium text-zinc-400">Contributions</h2>
         </div>
-        <span className="text-xs text-zinc-600 tabular-nums">{total.toLocaleString("tr-TR")} commit</span>
+        <span className="text-xs text-zinc-600 tabular-nums">
+          {total.toLocaleString(lang === "en" ? "en-US" : "tr-TR")} commit{lang === "en" && total !== 1 ? "s" : ""}
+        </span>
       </div>
 
       {/* Container: genişliği ölç, scroll YOK */}
@@ -112,7 +120,7 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
         <div className="flex shrink-0" style={{ gap: 4 }}>
           {/* Day labels */}
           <div className="flex flex-col" style={{ gap, width: 28, paddingTop: 0 }}>
-            {DAYS.map((day, i) => (
+            {days.map((day, i) => (
               <div
                 key={i}
                 className="flex items-center justify-end text-[10px] text-zinc-600"
@@ -130,7 +138,7 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
                 {week.map((day) => (
                   <div
                     key={day.date}
-                    title={`${day.date}: ${day.count} commit`}
+                    title={`${day.date}: ${day.count} commit${lang === "en" && day.count !== 1 ? "s" : ""}`}
                     className="rounded-[2px] hover:opacity-80 transition-opacity w-full"
                     style={{ height: cellSize, backgroundColor: getColor(day.count) }}
                   />
@@ -142,7 +150,7 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
 
         {/* Legend */}
         <div className="mt-2 flex items-center justify-end gap-1 shrink-0">
-          <span className="text-[10px] text-zinc-600">Az</span>
+          <span className="text-[10px] text-zinc-600">{lang === "en" ? "Less" : "Az"}</span>
           {["#1a1a1e", ...shades].map((c) => (
             <div
               key={c}
@@ -150,7 +158,7 @@ function HeatmapInner({ data, shades }: { data: DayData[]; shades: [string, stri
               style={{ width: cellSize, height: cellSize, backgroundColor: c }}
             />
           ))}
-          <span className="text-[10px] text-zinc-600">Çok</span>
+          <span className="text-[10px] text-zinc-600">{lang === "en" ? "More" : "Çok"}</span>
         </div>
       </div>
     </div>

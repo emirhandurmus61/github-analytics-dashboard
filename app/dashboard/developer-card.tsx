@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, Share2, Check, ExternalLink } from "lucide-react";
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 
 type Format = "og" | "square" | "twitter";
 
@@ -14,13 +15,16 @@ const FORMATS: { id: Format; label: string; size: string }[] = [
 
 export default function DeveloperCard({ username }: { username: string }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const [format, setFormat] = useState<Format>("og");
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   const cardUrl = `/api/card/${username}?format=${format}`;
   const tweetText = encodeURIComponent(
-    `GitHub aktivitelerime bakın! 🚀\nDevboard üzerinde istatistiklerinizi görün`
+    lang === "en"
+      ? `Check out my GitHub analytics! 🚀\nTrack your stats on Devboard`
+      : `GitHub aktivitelerime bakın! 🚀\nDevboard üzerinde istatistiklerinizi görün`
   );
   const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(`https://devboard.app/u/${username}`)}`;
 
@@ -61,7 +65,7 @@ export default function DeveloperCard({ username }: { username: string }) {
           style={{ borderColor: theme.accentBorder, color: theme.accent, backgroundColor: theme.accentBg }}
         >
           <ExternalLink className="w-3 h-3" />
-          Profil
+          {lang === "en" ? "Profile" : "Profil"}
         </a>
       </div>
 
@@ -105,7 +109,9 @@ export default function DeveloperCard({ username }: { username: string }) {
             style={{ backgroundColor: theme.accent, color: "#09090b" }}
           >
             <Download className="w-3.5 h-3.5" />
-            {downloading ? "İndiriliyor..." : "PNG İndir"}
+            {downloading
+              ? (lang === "en" ? "Downloading..." : "İndiriliyor...")
+              : (lang === "en" ? "Download PNG" : "PNG İndir")}
           </button>
 
           <button
@@ -115,12 +121,12 @@ export default function DeveloperCard({ username }: { username: string }) {
             {copied ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Kopyalandı</span>
+                <span className="text-emerald-400">{lang === "en" ? "Copied" : "Kopyalandı"}</span>
               </>
             ) : (
               <>
                 <Share2 className="w-3.5 h-3.5" />
-                Kopyala
+                {lang === "en" ? "Copy Link" : "Kopyala"}
               </>
             )}
           </button>
@@ -136,7 +142,7 @@ export default function DeveloperCard({ username }: { username: string }) {
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.726-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
           </svg>
-          Twitter&apos;da Paylaş
+          {lang === "en" ? "Share on X" : "Twitter'da Paylaş"}
         </a>
       </div>
     </div>

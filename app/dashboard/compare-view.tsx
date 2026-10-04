@@ -1,6 +1,7 @@
 "use client";
 
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 type MonthData = {
@@ -10,6 +11,17 @@ type MonthData = {
   linesAdded: number;
 };
 
+const MONTH_MAP_TR_TO_EN: Record<string, string> = {
+  Ocak: "January", Şubat: "February", Mart: "March", Nisan: "April",
+  Mayıs: "May", Haziran: "June", Temmuz: "July", Ağustos: "August",
+  Eylül: "September", Ekim: "October", Kasım: "November", Aralık: "December",
+};
+
+function localizeMonth(label: string, lang: string): string {
+  if (lang !== "en") return label;
+  return MONTH_MAP_TR_TO_EN[label] ?? label;
+}
+
 export default function CompareView({
   thisMonth,
   lastMonth,
@@ -18,17 +30,21 @@ export default function CompareView({
   lastMonth: MonthData;
 }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
+
+  const thisMonthLabel = localizeMonth(thisMonth.label, lang);
+  const lastMonthLabel = localizeMonth(lastMonth.label, lang);
 
   const metrics: { key: keyof MonthData; label: string; format: (v: number) => string }[] = [
-    { key: "commits", label: "Commit", format: (v) => v.toLocaleString("tr-TR") },
-    { key: "activeDays", label: "Aktif Gun", format: (v) => `${v} gun` },
-    { key: "linesAdded", label: "Eklenen Satir", format: (v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v) },
+    { key: "commits", label: "Commit", format: (v) => v.toLocaleString(lang === "en" ? "en-US" : "tr-TR") },
+    { key: "activeDays", label: lang === "en" ? "Active Days" : "Aktif Gün", format: (v) => lang === "en" ? `${v} days` : `${v} gün` },
+    { key: "linesAdded", label: lang === "en" ? "Lines Added" : "Eklenen Satır", format: (v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v) },
   ];
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
       <h2 className="mb-4 text-sm font-medium text-zinc-400 shrink-0">
-        {thisMonth.label} vs {lastMonth.label}
+        {thisMonthLabel} vs {lastMonthLabel}
       </h2>
       <div className="flex-1 min-h-0 flex flex-col justify-between gap-4">
         {metrics.map(({ key, label, format }) => {
@@ -46,19 +62,19 @@ export default function CompareView({
                   {pctDiff === 0
                     ? <Minus className="w-3.5 h-3.5" />
                     : isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                  %{Math.abs(pctDiff)}
+                  {lang === "en" ? `${Math.abs(pctDiff)}%` : `%${Math.abs(pctDiff)}`}
                 </span>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 text-right text-xs text-zinc-400">{thisMonth.label}</span>
+                  <span className="w-16 shrink-0 text-right text-xs text-zinc-400">{thisMonthLabel}</span>
                   <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${(a / max) * 100}%`, backgroundColor: theme.accent }} />
                   </div>
                   <span className="w-12 shrink-0 text-xs text-zinc-300 tabular-nums font-medium">{format(a)}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 text-right text-xs text-zinc-600">{lastMonth.label}</span>
+                  <span className="w-16 shrink-0 text-right text-xs text-zinc-600">{lastMonthLabel}</span>
                   <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
                     <div className="h-full rounded-full bg-zinc-600" style={{ width: `${(b / max) * 100}%` }} />
                   </div>

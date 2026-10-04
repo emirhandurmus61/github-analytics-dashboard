@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useThemeColors } from "@/components/theme-provider";
 import { saveWeeklyGoal } from "@/app/dashboard/settings/actions";
+import { useLanguage } from "@/lib/i18n";
 import { Target, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
 
 const GOALS = [5, 10, 20, 30, 50];
@@ -10,15 +11,20 @@ const GOALS = [5, 10, 20, 30, 50];
 type WeekHistory = { week_start: string; goal: number; actual: number };
 type Props = { thisWeek: number; initialGoal: number; history: WeekHistory[] };
 
-const MS = ["Oca","Sub","Mar","Nis","May","Haz","Tem","Agu","Eyl","Eki","Kas","Ara"];
+const MS_TR = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+const MS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-function formatWeek(s: string) {
+function formatWeek(s: string, lang: string) {
   const d = new Date(s);
-  return `${d.getDate()} ${MS[d.getMonth()]}`;
+  if (lang === "en") {
+    return `${MS_EN[d.getMonth()]} ${d.getDate()}`;
+  }
+  return `${d.getDate()} ${MS_TR[d.getMonth()]}`;
 }
 
 export default function GoalTracker({ thisWeek, initialGoal, history }: Props) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const [goal, setGoal] = useState(initialGoal);
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
@@ -57,24 +63,28 @@ export default function GoalTracker({ thisWeek, initialGoal, history }: Props) {
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-zinc-500" />
           <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
-            Haftalik Hedef
+            {lang === "en" ? "Weekly Goal" : "Haftalık Hedef"}
           </h2>
         </div>
         <div className="flex items-center gap-2">
           {history.length > 0 && (
             <button
               onClick={() => setShowHistory((v) => !v)}
-              className="flex items-center gap-0.5 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
+              className="flex items-center gap-0.5 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
             >
               {showHistory ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {showHistory ? "Gizle" : "Gecmis"}
+              {showHistory
+                ? (lang === "en" ? "Hide" : "Gizle")
+                : (lang === "en" ? "History" : "Geçmiş")}
             </button>
           )}
           <button
             onClick={() => { setEditing(!editing); setInput(String(goal)); }}
-            className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
+            className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
           >
-            {editing ? "Iptal" : "Duzenle"}
+            {editing
+              ? (lang === "en" ? "Cancel" : "İptal")
+              : (lang === "en" ? "Edit" : "Düzenle")}
           </button>
         </div>
       </div>
@@ -86,7 +96,7 @@ export default function GoalTracker({ thisWeek, initialGoal, history }: Props) {
               <button
                 key={g}
                 onClick={() => handleSave(g)}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+                className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer"
                 style={g === goal ? { backgroundColor: theme.accent, color: "#09090b" } : { color: "#71717a" }}
               >
                 {g}
@@ -98,15 +108,15 @@ export default function GoalTracker({ thisWeek, initialGoal, history }: Props) {
               type="number"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ozel..."
+              placeholder={lang === "en" ? "Custom..." : "Özel..."}
               className="w-24 rounded-lg bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500"
             />
             <button
               onClick={() => { const v = parseInt(input); if (v > 0) handleSave(v); }}
               disabled={isPending}
-              className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-600 disabled:opacity-50"
+              className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-600 disabled:opacity-50 cursor-pointer"
             >
-              {isPending ? "..." : "Kaydet"}
+              {isPending ? "..." : (lang === "en" ? "Save" : "Kaydet")}
             </button>
           </div>
         </div>
@@ -122,7 +132,7 @@ export default function GoalTracker({ thisWeek, initialGoal, history }: Props) {
             {done && (
               <span className="flex items-center gap-1 text-xs font-medium" style={{ color: theme.accent }}>
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Tamamlandi
+                {lang === "en" ? "Completed" : "Tamamlandı"}
               </span>
             )}
           </div>
@@ -135,21 +145,27 @@ export default function GoalTracker({ thisWeek, initialGoal, history }: Props) {
           </div>
 
           <p className="text-xs text-zinc-600">
-            {done ? `${thisWeek - goal} fazla` : `${goal - thisWeek} commit kaldi`}
+            {done
+              ? (lang === "en" ? `${thisWeek - goal} extra` : `${thisWeek - goal} fazla`)
+              : (lang === "en" ? `${goal - thisWeek} commits remaining` : `${goal - thisWeek} commit kaldı`)}
           </p>
         </div>
       )}
 
       {showHistory && historyWithCurrent.length > 1 && (
         <div className="border-t border-zinc-800 pt-3 mt-3 space-y-2 shrink-0">
-          <p className="text-[10px] text-zinc-600">Son {historyWithCurrent.length} Hafta</p>
+          <p className="text-[10px] text-zinc-600">
+            {lang === "en"
+              ? `Last ${historyWithCurrent.length} Weeks`
+              : `Son ${historyWithCurrent.length} Hafta`}
+          </p>
           <div className="flex items-end gap-0.5 h-14">
             {historyWithCurrent.map((h, i) => {
               const isLast = i === historyWithCurrent.length - 1;
               const pctH = (h.actual / histMax) * 100;
               const achieved = h.actual >= h.goal;
               return (
-                <div key={h.week_start} className="flex-1" title={`${formatWeek(h.week_start)}: ${h.actual}/${h.goal}`}>
+                <div key={h.week_start} className="flex-1" title={`${formatWeek(h.week_start, lang)}: ${h.actual}/${h.goal}`}>
                   <div className="w-full flex flex-col justify-end h-14">
                     <div
                       className="w-full rounded-t-sm transition-all"

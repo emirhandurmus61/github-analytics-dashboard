@@ -4,6 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import { useState } from "react";
 
 export type MonthLangPoint = {
@@ -16,6 +17,21 @@ type Props = {
   data: MonthLangPoint[];
   languages: string[];
 };
+
+const MONTH_MAP_TR_TO_EN: Record<string, string> = {
+  Oca: "Jan", Şub: "Feb", Sub: "Feb", Mar: "Mar", Nis: "Apr",
+  May: "May", Haz: "Jun", Tem: "Jul", Ağu: "Aug", Agu: "Aug",
+  Eyl: "Sep", Eki: "Oct", Kas: "Nov", Ara: "Dec",
+};
+
+function localizeMonthLabel(label: string, lang: string): string {
+  if (lang !== "en") return label;
+  const parts = label.split(" ");
+  if (parts.length === 2 && MONTH_MAP_TR_TO_EN[parts[0]]) {
+    return `${MONTH_MAP_TR_TO_EN[parts[0]]} ${parts[1]}`;
+  }
+  return MONTH_MAP_TR_TO_EN[label] ?? label;
+}
 
 const LANG_COLORS: Record<string, string> = {
   TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572A5",
@@ -34,10 +50,11 @@ function getLangColor(lang: string, index: number): string {
   return LANG_COLORS[lang] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
 }
 
-function CustomTooltip({ active, payload, label }: {
+function CustomTooltip({ active, payload, label, lang }: {
   active?: boolean;
   payload?: { name: string; value: number; fill: string }[];
   label?: string;
+  lang?: string;
 }) {
   if (!active || !payload?.length) return null;
   const total = payload.reduce((s, p) => s + (p.value ?? 0), 0);
@@ -57,27 +74,31 @@ function CustomTooltip({ active, payload, label }: {
           </div>
         ) : null
       )}
-      <p className="mt-1 pt-1 border-t border-zinc-800 text-zinc-600">{total} commit</p>
+      <p className="mt-1 pt-1 border-t border-zinc-800 text-zinc-600">
+        {total} commit{lang === "en" && total !== 1 ? "s" : ""}
+      </p>
     </div>
   );
 }
 
 export default function LangEvolution({ data, languages }: Props) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const [mode, setMode] = useState<"stacked" | "pct">("pct");
 
   if (data.length === 0 || languages.length === 0) return null;
 
   const normalizedData = data.map((point) => {
     const total = languages.reduce((s, l) => s + ((point[l] as number) ?? 0), 0);
+    const localizedLabel = localizeMonthLabel(point.label, lang);
     if (mode === "pct" && total > 0) {
-      const norm: MonthLangPoint = { month: point.month, label: point.label };
+      const norm: MonthLangPoint = { month: point.month, label: localizedLabel };
       for (const l of languages) {
         norm[l] = Math.round((((point[l] as number) ?? 0) / total) * 100);
       }
       return norm;
     }
-    return point;
+    return { ...point, label: localizedLabel };
   });
 
   const langTotals = languages.map((l) => ({
@@ -92,8 +113,12 @@ export default function LangEvolution({ data, languages }: Props) {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between shrink-0 mb-3">
         <div>
-          <h2 className="text-sm font-medium text-zinc-400">Dil Evrimi</h2>
-          <p className="text-xs text-zinc-600 mt-0.5">Son 12 ay commit dagilimi</p>
+          <h2 className="text-sm font-medium text-zinc-400">
+            {lang === "en" ? "Language Evolution" : "Dil Evrimi"}
+          </h2>
+          <p className="text-xs text-zinc-600 mt-0.5">
+            {lang === "en" ? "Commit distribution over the last 12 months" : "Son 12 ay commit dağılımı"}
+          </p>
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-zinc-800 p-1 self-start">
           {(["pct", "stacked"] as const).map((m) => (
@@ -107,7 +132,7 @@ export default function LangEvolution({ data, languages }: Props) {
                   : { color: "#71717a" }
               }
             >
-              {m === "pct" ? "% Oran" : "Sayi"}
+              {m === "pct" ? (lang === "en" ? "% Ratio" : "% Oran") : (lang === "en" ? "Count" : "Sayı")}
             </button>
           ))}
         </div>
@@ -122,7 +147,7 @@ export default function LangEvolution({ data, languages }: Props) {
           >
             <div className="h-2 w-2 rounded-full" style={{ backgroundColor: getLangColor(topLang, 0) }} />
             <span className="text-xs" style={{ color: theme.accent }}>
-              Ana dil: <span className="font-semibold">{topLang}</span>
+              {lang === "en" ? "Primary language:" : "Ana dil:"} <span className="font-semibold">{topLang}</span>
             </span>
           </div>
         </div>
@@ -145,7 +170,7 @@ export default function LangEvolution({ data, languages }: Props) {
             <YAxis tick={{ fill: "#52525b", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false}
               domain={[0, mode === "pct" ? 100 : "auto"]}
               tickFormatter={(v) => mode === "pct" ? `${v}%` : String(v)} />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip lang={lang} />} />
             {languages.map((lang, i) => (
               <Area key={lang} type="monotone" dataKey={lang} stackId="1"
                 stroke={getLangColor(lang, i)} strokeWidth={1.5} fill={`url(#grad-${i})`} />

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { calcRepoHealth, HEALTH_COLORS, type RepoHealth } from "@/lib/repo-health";
+import { calcRepoHealth, HEALTH_COLORS, type RepoHealth, type HealthStatus } from "@/lib/repo-health";
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 
 type RepoInput = {
   name: string;
@@ -16,6 +17,13 @@ type RepoInput = {
   openIssues: number;
   totalIssues: number;
   isArchived: boolean;
+};
+
+const STATUS_LABELS: Record<HealthStatus, { tr: string; en: string }> = {
+  active: { tr: "Aktif", en: "Active" },
+  slowing: { tr: "Yavaşlıyor", en: "Slowing" },
+  idle: { tr: "Hareketsiz", en: "Idle" },
+  archived: { tr: "Arşiv", en: "Archived" },
 };
 
 const LANG_COLORS: Record<string, string> = {
@@ -58,10 +66,11 @@ function FactorBar({ label, value, max, color }: { label: string; value: number;
   );
 }
 
-function RepoRow({ repo, health }: { repo: RepoInput; health: RepoHealth }) {
+function RepoRow({ repo, health, lang }: { repo: RepoInput; health: RepoHealth; lang: string }) {
   const [expanded, setExpanded] = useState(false);
   const color = HEALTH_COLORS[health.status];
   const langColor = repo.language ? (LANG_COLORS[repo.language] ?? "#6b7280") : null;
+  const statusLabel = STATUS_LABELS[health.status]?.[lang === "en" ? "en" : "tr"] ?? health.label;
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 overflow-hidden">
@@ -76,9 +85,11 @@ function RepoRow({ repo, health }: { repo: RepoInput; health: RepoHealth }) {
             <span className="text-sm font-medium text-zinc-200 truncate">{repo.name}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-zinc-600">
-            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${color}18`, color }}>{health.label}</span>
+            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${color}18`, color }}>
+              {statusLabel}
+            </span>
             {repo.language && <span>{repo.language}</span>}
-            <span>{repo.stars} stars</span>
+            <span>{repo.stars} star{lang === "en" && repo.stars !== 1 ? "s" : ""}</span>
           </div>
         </div>
         <svg className={`h-4 w-4 text-zinc-600 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,13 +99,17 @@ function RepoRow({ repo, health }: { repo: RepoInput; health: RepoHealth }) {
 
       {expanded && (
         <div className="border-t border-zinc-800 px-3 py-2.5 space-y-2">
-          <FactorBar label="Guncellik" value={health.factors.recency} max={40} color={color} />
-          <FactorBar label="Aktivite" value={health.factors.activity} max={30} color={color} />
-          <FactorBar label="Topluluk" value={health.factors.community} max={20} color={color} />
+          <FactorBar label={lang === "en" ? "Recency" : "Güncellik"} value={health.factors.recency} max={40} color={color} />
+          <FactorBar label={lang === "en" ? "Activity" : "Aktivite"} value={health.factors.activity} max={30} color={color} />
+          <FactorBar label={lang === "en" ? "Community" : "Topluluk"} value={health.factors.community} max={20} color={color} />
           <FactorBar label="Issue" value={health.factors.issues} max={10} color={color} />
           <div className="flex gap-3 mt-2 pt-2 border-t border-zinc-800">
-            <Link href={`/dashboard/repos/${repo.name}`} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors" onClick={(e) => e.stopPropagation()}>Detay</Link>
-            <a href={`https://github.com/${repo.full_name}`} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors" onClick={(e) => e.stopPropagation()}>GitHub</a>
+            <Link href={`/dashboard/repos/${repo.name}`} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors" onClick={(e) => e.stopPropagation()}>
+              {lang === "en" ? "Details" : "Detay"}
+            </Link>
+            <a href={`https://github.com/${repo.full_name}`} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors" onClick={(e) => e.stopPropagation()}>
+              GitHub
+            </a>
           </div>
         </div>
       )}
@@ -104,6 +119,7 @@ function RepoRow({ repo, health }: { repo: RepoInput; health: RepoHealth }) {
 
 export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
   const [sortBy, setSortBy] = useState<"score" | "name" | "activity">("score");
 
   if (repos.length === 0) return null;
@@ -138,8 +154,12 @@ export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div>
-          <h2 className="text-sm font-medium text-zinc-400">Repo Saglik Skoru</h2>
-          <p className="text-xs text-zinc-600">{repos.length} repo</p>
+          <h2 className="text-sm font-medium text-zinc-400">
+            {lang === "en" ? "Repo Health Score" : "Repo Sağlık Skoru"}
+          </h2>
+          <p className="text-xs text-zinc-600">
+            {repos.length} repo{lang === "en" && repos.length !== 1 ? "s" : ""}
+          </p>
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-zinc-800 p-1 self-start">
           {(["score", "activity", "name"] as const).map((key) => (
@@ -149,7 +169,11 @@ export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
               className="rounded-md px-2.5 py-1 text-xs transition-colors"
               style={sortBy === key ? { backgroundColor: theme.accentBg, color: theme.accent } : { color: "#71717a" }}
             >
-              {key === "score" ? "Skor" : key === "activity" ? "Aktivite" : "Isim"}
+              {key === "score"
+                ? (lang === "en" ? "Score" : "Skor")
+                : key === "activity"
+                ? (lang === "en" ? "Activity" : "Aktivite")
+                : (lang === "en" ? "Name" : "İsim")}
             </button>
           ))}
         </div>
@@ -164,17 +188,17 @@ export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
           {archived > 0 && <div className="h-full" style={{ width: `${(archived / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.archived }} />}
         </div>
         <span className="text-sm text-zinc-500 shrink-0">
-          Ort. <span className="font-bold text-base" style={{ color: theme.accent }}>{avgScore}</span>/100
+          {lang === "en" ? "Avg." : "Ort."} <span className="font-bold text-base" style={{ color: theme.accent }}>{avgScore}</span>/100
         </span>
       </div>
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs shrink-0 mb-3">
         {[
-          { status: "active" as const, label: "Aktif", count: active },
-          { status: "slowing" as const, label: "Yavasliyor", count: slowing },
-          { status: "idle" as const, label: "Hareketsiz", count: idle },
-          { status: "archived" as const, label: "Arsiv", count: archived },
+          { status: "active" as const, label: lang === "en" ? "Active" : "Aktif", count: active },
+          { status: "slowing" as const, label: lang === "en" ? "Slowing" : "Yavaşlıyor", count: slowing },
+          { status: "idle" as const, label: lang === "en" ? "Idle" : "Hareketsiz", count: idle },
+          { status: "archived" as const, label: lang === "en" ? "Archived" : "Arşiv", count: archived },
         ].map(({ status, label, count }) => count > 0 && (
           <div key={status} className="flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full" style={{ backgroundColor: HEALTH_COLORS[status] }} />
@@ -187,7 +211,7 @@ export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
       {/* Repo list */}
       <div className="space-y-2 flex-1 min-h-0 overflow-auto custom-scroll">
         {sorted.map(({ repo, health }) => (
-          <RepoRow key={repo.name} repo={repo} health={health} />
+          <RepoRow key={repo.name} repo={repo} health={health} lang={lang} />
         ))}
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 export type DateRange = "30" | "90" | "365";
 
@@ -15,6 +16,7 @@ export default function Filters({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { lang } = useLanguage();
 
   const setParam = useCallback(
     (key: string, value: string) => {
@@ -39,7 +41,7 @@ export default function Filters({
                 : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            {d === "365" ? "1Y" : `${d}G`}
+            {d === "365" ? (lang === "en" ? "1Y" : "1Y") : (lang === "en" ? `${d}D` : `${d}G`)}
           </button>
         ))}
       </div>
@@ -57,7 +59,9 @@ export default function Filters({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
         </svg>
-        <span className="hidden xs:inline">Fork&apos;ları Gizle</span>
+        <span className="hidden xs:inline">
+          {lang === "en" ? "Hide Forks" : "Fork'ları Gizle"}
+        </span>
         <span className="xs:hidden">Forks</span>
       </button>
     </div>

@@ -1,15 +1,19 @@
 "use client";
 
 import { useThemeColors } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/i18n";
 import { Clock } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 
 type Props = { data: { hour: number; day: number; count: number }[] };
 
-const DAYS = ["Pzt","Sal","Car","Per","Cum","Cmt","Paz"];
+const DAYS_TR = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
+const DAYS_EN = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
 export default function HourHeatmap({ data }: Props) {
   const theme = useThemeColors();
+  const { lang } = useLanguage();
+  const days = lang === "en" ? DAYS_EN : DAYS_TR;
   const max = Math.max(...data.map((d) => d.count), 1);
   const containerRef = useRef<HTMLDivElement>(null);
   const [rowH, setRowH] = useState(20);
@@ -51,10 +55,12 @@ export default function HourHeatmap({ data }: Props) {
       <div className="flex items-center justify-between shrink-0 mb-3">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-sm font-medium text-zinc-400">Saat Dağılımı</h2>
+          <h2 className="text-sm font-medium text-zinc-400">
+            {lang === "en" ? "Hourly Distribution" : "Saat Dağılımı"}
+          </h2>
         </div>
         <span className="text-xs text-zinc-600">
-          Pik: <span className="font-semibold" style={{ color: theme.accent }}>{String(peakHour).padStart(2, "0")}:00</span>
+          {lang === "en" ? "Peak" : "Pik"}: <span className="font-semibold" style={{ color: theme.accent }}>{String(peakHour).padStart(2, "0")}:00</span>
         </span>
       </div>
 
@@ -71,14 +77,14 @@ export default function HourHeatmap({ data }: Props) {
 
         {/* Grid satırları */}
         <div className="flex flex-col shrink-0" style={{ gap }}>
-          {DAYS.map((day, di) => (
+          {days.map((day, di) => (
             <div key={day} className="flex items-center" style={{ gap: 4 }}>
               <span className="shrink-0 text-right text-[10px] text-zinc-600" style={{ width: 28 }}>{day}</span>
               <div className="flex flex-1" style={{ gap: 1 }}>
                 {grid[di].map((count, hi) => (
                   <div
                     key={hi}
-                    title={`${day} ${String(hi).padStart(2, "0")}:00 — ${count} commit`}
+                    title={`${day} ${String(hi).padStart(2, "0")}:00 — ${count} commit${lang === "en" && count !== 1 ? "s" : ""}`}
                     className="flex-1 rounded-[2px] hover:opacity-80 transition-opacity"
                     style={{ height: rowH, backgroundColor: getColor(count) }}
                   />
@@ -90,7 +96,7 @@ export default function HourHeatmap({ data }: Props) {
 
         {/* Legend */}
         <div className="mt-2 flex items-center justify-end gap-1 shrink-0">
-          <span className="text-[10px] text-zinc-600">Az</span>
+          <span className="text-[10px] text-zinc-600">{lang === "en" ? "Less" : "Az"}</span>
           {["#1a1a1e", ...theme.shades].map((c) => (
             <div
               key={c}
@@ -98,7 +104,7 @@ export default function HourHeatmap({ data }: Props) {
               style={{ width: Math.min(rowH, 14), height: Math.min(rowH, 14), backgroundColor: c }}
             />
           ))}
-          <span className="text-[10px] text-zinc-600">Çok</span>
+          <span className="text-[10px] text-zinc-600">{lang === "en" ? "More" : "Çok"}</span>
         </div>
       </div>
     </div>

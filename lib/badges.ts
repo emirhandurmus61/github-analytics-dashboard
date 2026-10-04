@@ -123,6 +123,108 @@ export const SERIES_INFO: Record<
   cleanup: { title: "Kod Temizliği", icon: "🧹", description: "Refactor ve silinen kod satırı serisi" },
 };
 
+export const SERIES_INFO_EN: Record<
+  BadgeSeries,
+  {
+    title: string;
+    icon: string;
+    description: string;
+  }
+> = {
+  special: { title: "Special Milestones", icon: "🚀", description: "Platform milestones and special achievements" },
+  commits: { title: "Commit Volume", icon: "💻", description: "Code writing and commit volume milestones" },
+  streak: { title: "Commit Streak", icon: "🔥", description: "Daily unbroken coding streaks" },
+  active_days: { title: "Active Days", icon: "🏃", description: "Total active coding day targets" },
+  repos: { title: "Project Factory", icon: "📦", description: "Repository creation and project management" },
+  languages: { title: "Language Diversity", icon: "🌐", description: "Exploring diverse programming languages" },
+  code_volume: { title: "Code Volume", icon: "🏗️", description: "Total lines of code added targets" },
+  pull_requests: { title: "PR & Collaboration", icon: "🔀", description: "Merged pull requests and contributions" },
+  issues: { title: "Issue Resolution", icon: "🐛", description: "Closed issues and bug fixing streak" },
+  stars: { title: "Stars & Community", icon: "⭐", description: "Stars and appreciation received" },
+  night_owl: { title: "Night Owl", icon: "🦉", description: "Late night coding habits" },
+  early_bird: { title: "Early Bird", icon: "🐦", description: "Early morning coding habits" },
+  weekend: { title: "Weekend Warrior", icon: "⚔️", description: "Saturday and Sunday activity" },
+  open_source: { title: "Open Source", icon: "🌍", description: "Contributions to open source forks" },
+  cleanup: { title: "Code Cleanup", icon: "🧹", description: "Refactoring and deleted code lines" },
+};
+
+export const BADGE_EN: Record<BadgeId, { name: string; description: string; unit?: string }> = {
+  first_sync: { name: "First Step", description: "Completed your first synchronization", unit: "sync" },
+  commit_1: { name: "First Spark", description: "Push your first commit", unit: "commit" },
+  commit_25: { name: "Apprentice Dev", description: "Reach 25 commits", unit: "commits" },
+  century: { name: "Centurion", description: "Complete 100+ commits", unit: "commits" },
+  commit_500: { name: "Code Machine", description: "Push 500+ commits", unit: "commits" },
+  millennium: { name: "Millennium", description: "Complete 1,000+ commits", unit: "commits" },
+  commit_2500: { name: "Code Architect", description: "Surpass 2,500 commits", unit: "commits" },
+  commit_5000: { name: "Legendary Committer", description: "Ascend to legend with 5,000+ commits", unit: "commits" },
+  streak_3: { name: "First Spark", description: "Achieve a 3-day commit streak", unit: "days" },
+  streak_7: { name: "Week Complete", description: "Maintain a 7-day streak", unit: "days" },
+  streak_14: { name: "Two-Week Sprint", description: "Complete a 14-day commit streak", unit: "days" },
+  streak_30: { name: "Unbroken Chain", description: "Keep the fire alive for 30 consecutive days", unit: "days" },
+  streak_60: { name: "Habit Master", description: "Reach a 60-day streak", unit: "days" },
+  streak_100: { name: "Century Streak", description: "Hit a legendary 100-day streak", unit: "days" },
+  dedicated: { name: "Devoted", description: "Achieve a 365-day full year streak", unit: "days" },
+  active_7: { name: "First Week", description: "Code on 7 different days", unit: "days" },
+  active_30: { name: "Monthly Rhythm", description: "Active across 30 days", unit: "days" },
+  marathoner: { name: "Marathon Runner", description: "Reach 100 active coding days", unit: "days" },
+  active_200: { name: "Iron Will", description: "Reach 200 active days", unit: "days" },
+  active_300: { name: "300 Days of Code", description: "Active for 300+ days in a year", unit: "days" },
+  repo_3: { name: "Triple Threat", description: "Create 3 repositories", unit: "repos" },
+  collector: { name: "Repo Collector", description: "Reach 10+ repositories", unit: "repos" },
+  repo_25: { name: "Project Workshop", description: "Build 25 repositories", unit: "repos" },
+  repo_50: { name: "Ecosystem Creator", description: "Manage 50+ repositories", unit: "repos" },
+  lang_2: { name: "Bilingual", description: "Use at least 2 programming languages", unit: "languages" },
+  polyglot: { name: "Polyglot", description: "Code in 5+ different languages", unit: "languages" },
+  hexaglot: { name: "Multi-Stack Master", description: "Surpass 8 programming languages", unit: "languages" },
+  lang_12: { name: "Language Encyclopedist", description: "Code in 12+ programming languages", unit: "languages" },
+  lines_1k: { name: "First Thousand", description: "Add 1,000 lines of code", unit: "lines" },
+  lines_10k: { name: "Ten Thousand Club", description: "Add 10,000 lines of code", unit: "lines" },
+  lines_50k: { name: "Code Base", description: "Surpass 50,000 lines of code", unit: "lines" },
+  architect: { name: "System Architect", description: "Surpass 100,000 lines of code", unit: "lines" },
+  lines_500k: { name: "Half Million", description: "Surpass 500,000 lines of code", unit: "lines" },
+  pr_3: { name: "Collaborator", description: "Merge 3 pull requests", unit: "PRs" },
+  pr_10: { name: "Team Player", description: "Merge 10 pull requests", unit: "PRs" },
+  merge_master: { name: "Merge Master", description: "Merge 25 pull requests", unit: "PRs" },
+  pr_50: { name: "Contribution Legend", description: "Surpass 50 merged pull requests", unit: "PRs" },
+  issue_5: { name: "Problem Solver", description: "Close 5 issues", unit: "issues" },
+  issue_15: { name: "Bug Squasher", description: "Close 15 issues", unit: "issues" },
+  bug_hunter: { name: "Bug Hunter", description: "Close 30 issues", unit: "issues" },
+  issue_75: { name: "Guardian of Quality", description: "Resolve 75+ issues", unit: "issues" },
+  stars_5: { name: "First Starlight", description: "Earn 5 total stars", unit: "stars" },
+  stars_20: { name: "Rising Star", description: "Earn 20 total stars", unit: "stars" },
+  stargazer: { name: "Stargazer", description: "Surpass 50 stars across repos", unit: "stars" },
+  stars_100: { name: "Constellation", description: "Surpass 100 stars on repositories", unit: "stars" },
+  night_owl: { name: "Night Owl", description: "10+ commits between 00:00 - 05:00", unit: "commits" },
+  night_owl_2: { name: "Creature of the Night", description: "50+ late night commits", unit: "commits" },
+  early_bird: { name: "Early Bird", description: "10+ commits between 05:00 - 09:00", unit: "commits" },
+  early_bird_2: { name: "Dawn Warrior", description: "50+ early morning commits", unit: "commits" },
+  weekend_warrior: { name: "Weekend Warrior", description: "10+ commits on Saturday or Sunday", unit: "commits" },
+  weekend_warrior_2: { name: "Sunday Coder", description: "50+ weekend commits", unit: "commits" },
+  open_source_1: { name: "Open Source Contributor", description: "5+ commits to forked repositories", unit: "commits" },
+  open_source: { name: "Open Source Champion", description: "25+ commits to forked repositories", unit: "commits" },
+  cleanup_1: { name: "Spring Cleaning", description: "Delete 100+ lines in a single commit", unit: "lines" },
+  big_cleanup: { name: "Grand Refactor", description: "Delete 1,000+ lines in a single commit", unit: "lines" },
+};
+
+export function getLocalizedBadge(badge: Badge, lang: string = "tr"): Badge {
+  if (lang !== "en") return badge;
+  const en = BADGE_EN[badge.id];
+  if (!en) return badge;
+  return {
+    ...badge,
+    name: en.name,
+    description: en.description,
+    unit: en.unit ?? badge.unit,
+  };
+}
+
+export function getLocalizedSeriesInfo(series: BadgeSeries, lang: string = "tr") {
+  if (lang === "en" && SERIES_INFO_EN[series]) {
+    return SERIES_INFO_EN[series];
+  }
+  return SERIES_INFO[series];
+}
+
 export type BadgeInput = {
   hasSynced: boolean;
   longestStreak: number;

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Star } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 type Repo = { name: string; full_name: string; language: string | null; stars: number; forks: number; commit_count: number };
 
@@ -12,12 +13,15 @@ const LANG_COLORS: Record<string, string> = {
 };
 
 export default function RepoList({ repos }: { repos: Repo[] }) {
-  if (repos.length === 0) return <p className="text-xs text-zinc-600">Veri yok</p>;
+  const { lang } = useLanguage();
+  if (repos.length === 0) return <p className="text-xs text-zinc-600">{lang === "en" ? "No data" : "Veri yok"}</p>;
   const maxC = Math.max(...repos.map((r) => r.commit_count), 1);
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      <h2 className="mb-3 text-sm font-medium text-zinc-400 shrink-0">En Aktif Repolar</h2>
+      <h2 className="mb-3 text-sm font-medium text-zinc-400 shrink-0">
+        {lang === "en" ? "Most Active Repositories" : "En Aktif Repolar"}
+      </h2>
       <div className="space-y-3 flex-1 min-h-0 overflow-auto custom-scroll">
         {repos.map((repo) => {
           const pct = (repo.commit_count / maxC) * 100;

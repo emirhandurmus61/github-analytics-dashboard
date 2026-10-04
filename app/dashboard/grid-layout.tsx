@@ -33,7 +33,9 @@ import {
   GRID_GAP,
   WidgetConfig,
   WidgetId,
+  getWidgetLabel,
 } from "@/lib/widget-config";
+import { useLanguage } from "@/lib/i18n";
 import {
   GripVertical,
   Pencil,
@@ -169,6 +171,7 @@ interface SortableWidgetProps {
 }
 
 export function SortableWidget({ id, children }: SortableWidgetProps) {
+  const { lang } = useLanguage();
   const { editing, isMobile, configs } = useContext(GridContext);
   const cfg = configs.find((c) => c.id === id);
 
@@ -212,7 +215,7 @@ export function SortableWidget({ id, children }: SortableWidgetProps) {
           >
             <div className="flex items-center gap-2 rounded-xl bg-zinc-900/95 backdrop-blur-sm px-4 py-2 shadow-xl border border-zinc-700/60 select-none pointer-events-none">
               <GripVertical className="w-4 h-4 text-zinc-400" />
-              <span className="text-sm font-medium text-zinc-200">{cfg.label}</span>
+              <span className="text-sm font-medium text-zinc-200">{getWidgetLabel(cfg.id, lang)}</span>
               <span className="text-xs font-mono text-zinc-500 bg-zinc-800 rounded-md px-2 py-0.5 ml-1">
                 {cfg.colSpan}x{cfg.rowSpan}
               </span>
@@ -286,6 +289,7 @@ function EditToolbar({
   onReset: () => void;
   onDone: () => void;
 }) {
+  const { lang } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const visible = configs.filter((c) => c.visible).length;
 
@@ -299,7 +303,7 @@ function EditToolbar({
           <div className="px-4 pt-4 pb-2 border-b border-zinc-800/60">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest">
-                Widgetlar ({visible}/{configs.length})
+                {lang === "en" ? `Widgets (${visible}/${configs.length})` : `Widgetlar (${visible}/${configs.length})`}
               </p>
               <button
                 onClick={() => setExpanded(false)}
@@ -323,7 +327,7 @@ function EditToolbar({
                   `}
                 >
                   {cfg.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {cfg.label}
+                  {getWidgetLabel(cfg.id, lang)}
                 </button>
               ))}
             </div>
@@ -338,11 +342,11 @@ function EditToolbar({
               hover:brightness-110 transition-all select-none shrink-0"
           >
             <Check className="w-4 h-4" />
-            Bitti
+            {lang === "en" ? "Done" : "Bitti"}
           </button>
 
           <span className="text-xs text-zinc-500 hidden sm:block flex-1 min-w-0">
-            Kartları sürükle, kenar ve köşelerden boyutlandır
+            {lang === "en" ? "Drag cards to reorder, resize from edges and corners" : "Kartları sürükle, kenar ve köşelerden boyutlandır"}
           </span>
 
           <button
@@ -351,7 +355,7 @@ function EditToolbar({
               text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors border border-zinc-800"
           >
             {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-            Widgetlar
+            {lang === "en" ? "Widgets" : "Widgetlar"}
           </button>
 
           <button
@@ -360,7 +364,7 @@ function EditToolbar({
               transition-colors rounded-lg px-3 py-1.5 hover:bg-zinc-800/50 shrink-0"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Sıfırla
+            {lang === "en" ? "Reset" : "Sıfırla"}
           </button>
         </div>
       </div>
@@ -376,6 +380,7 @@ interface GridLayoutProps {
 }
 
 export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
+  const { lang } = useLanguage();
   const [configs, setConfigs] = useState(DEFAULT_WIDGET_CONFIGS);
   const [editing, setEditing] = useState(false);
   const [activeId, setActiveId] = useState<WidgetId | null>(null);
@@ -519,7 +524,7 @@ export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
               transition-all duration-200 select-none"
           >
             <Pencil className="w-4 h-4" />
-            Düzenle
+            {lang === "en" ? "Customize" : "Düzenle"}
           </button>
         </div>
       )}

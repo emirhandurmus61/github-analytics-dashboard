@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Users, Flame, Award, TrendingUp, RefreshCw, GitCommit, Clock } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 type ActivityUser = {
   id: string;
@@ -20,24 +21,45 @@ type Activity = {
   user: ActivityUser | null;
 };
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, lang: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 60) return `${minutes}dk önce`;
+  if (minutes < 60) return lang === "en" ? `${minutes}m ago` : `${minutes}dk önce`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}sa önce`;
-  return `${Math.floor(hours / 24)}g önce`;
+  if (hours < 24) return lang === "en" ? `${hours}h ago` : `${hours}sa önce`;
+  return lang === "en" ? `${Math.floor(hours / 24)}d ago` : `${Math.floor(hours / 24)}g önce`;
 }
 
-const TYPE_META = {
-  streak_milestone: { icon: Flame,      color: "#f97316", label: (p: Record<string, unknown>) => `${p.days} günlük streak` },
-  badge_earned:     { icon: Award,      color: "#c084fc", label: (p: Record<string, unknown>) => `"${p.badge}" rozetini kazandı` },
-  new_record:       { icon: TrendingUp, color: "#34d399", label: (p: Record<string, unknown>) => `Yeni rekor: ${p.value} commit` },
-  active_today:     { icon: GitCommit,  color: "#22d3ee", label: (_p: Record<string, unknown>) => "bugün commit attı" },
-  recent_sync:      { icon: Clock,      color: "#a1a1aa", label: (p: Record<string, unknown>) => `bu ay ${p.commitCount} aktif gün` },
+function getActivityLabel(type: Activity["type"], payload: Record<string, unknown>, lang: string): string {
+  if (lang === "en") {
+    switch (type) {
+      case "streak_milestone": return `${payload.days}-day streak`;
+      case "badge_earned":     return `earned "${payload.badge}" badge`;
+      case "new_record":       return `New record: ${payload.value} commits`;
+      case "active_today":     return "committed today";
+      case "recent_sync":      return `${payload.commitCount} active days this month`;
+    }
+  } else {
+    switch (type) {
+      case "streak_milestone": return `${payload.days} günlük streak`;
+      case "badge_earned":     return `"${payload.badge}" rozetini kazandı`;
+      case "new_record":       return `Yeni rekor: ${payload.value} commit`;
+      case "active_today":     return "bugün commit attı";
+      case "recent_sync":      return `bu ay ${payload.commitCount} aktif gün`;
+    }
+  }
+}
+
+const TYPE_ICONS = {
+  streak_milestone: { icon: Flame, color: "#f97316" },
+  badge_earned:     { icon: Award, color: "#c084fc" },
+  new_record:       { icon: TrendingUp, color: "#34d399" },
+  active_today:     { icon: GitCommit, color: "#22d3ee" },
+  recent_sync:      { icon: Clock, color: "#a1a1aa" },
 };
 
 export default function FollowFeed() {
+  const { lang } = useLanguage();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
@@ -64,12 +86,14 @@ export default function FollowFeed() {
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div className="flex items-center gap-2">
           <Users className="w-3.5 h-3.5 text-zinc-500" />
-          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Takip Akışı</h2>
+          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+            {lang === "en" ? "Follow Feed" : "Takip Akışı"}
+          </h2>
         </div>
         <button
           onClick={load}
-          className="text-zinc-600 hover:text-zinc-400 transition-colors"
-          title="Yenile"
+          className="text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
+          title={lang === "en" ? "Refresh" : "Yenile"}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
         </button>
@@ -82,16 +106,18 @@ export default function FollowFeed() {
       ) : empty ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-4">
           <Users className="w-8 h-8 text-zinc-700" />
-          <p className="text-xs text-zinc-600">Henüz kimseyi takip etmiyorsun.</p>
+          <p className="text-xs text-zinc-600">
+            {lang === "en" ? "You're not following anyone yet." : "Henüz kimseyi takip etmiyorsun."}
+          </p>
           <p className="text-[11px] text-zinc-700">
-            Profil sayfalarından geliştiricileri takip et.
+            {lang === "en" ? "Follow developers from their profile pages." : "Profil sayfalarından geliştiricileri takip et."}
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-2 overflow-y-auto flex-1 custom-scroll">
           {activities.map((a) => {
             if (!a.user) return null;
-            const meta = TYPE_META[a.type];
+            const meta = TYPE_ICONS[a.type];
             const Icon = meta.icon;
             return (
               <div key={a.id} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors">
@@ -120,10 +146,10 @@ export default function FollowFeed() {
                     </Link>
                     <Icon className="w-3 h-3 shrink-0" style={{ color: meta.color }} />
                     <span className="text-[11px] text-zinc-500 truncate">
-                      {meta.label(a.payload)}
+                      {getActivityLabel(a.type, a.payload, lang)}
                     </span>
                   </div>
-                  <p className="text-[10px] text-zinc-700 mt-0.5">{timeAgo(a.created_at)}</p>
+                  <p className="text-[10px] text-zinc-700 mt-0.5">{timeAgo(a.created_at, lang)}</p>
                 </div>
               </div>
             );
