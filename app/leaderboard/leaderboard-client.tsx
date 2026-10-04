@@ -12,6 +12,7 @@ import {
   Eye,
   Crown,
   Sparkles,
+  User,
 } from "lucide-react";
 import { toggleLeaderboardOptIn } from "./actions";
 import type { LeaderboardEntry, LeaderboardCategory } from "./page";
@@ -336,8 +337,9 @@ function RankCard({
   const isThird = rank === 3;
 
   let containerStyle: React.CSSProperties = {
-    borderColor: isSelf ? "rgba(52, 211, 153, 0.4)" : "#27272a",
-    backgroundColor: isSelf ? "rgba(52, 211, 153, 0.04)" : "rgba(24, 24, 27, 0.45)",
+    borderColor: isSelf ? "rgba(52, 211, 153, 0.45)" : "#27272a",
+    backgroundColor: isSelf ? "rgba(52, 211, 153, 0.05)" : "rgba(24, 24, 27, 0.45)",
+    ...(isSelf ? { borderLeftWidth: "4px", borderLeftColor: "#10b981" } : {}),
   };
 
   let badgeElement = null;
@@ -349,6 +351,7 @@ function RankCard({
       background:
         "linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(24, 24, 27, 0.85) 45%, rgba(24, 24, 27, 0.6) 100%)",
       boxShadow: "0 0 24px rgba(245, 158, 11, 0.12)",
+      ...(isSelf ? { borderLeftWidth: "4px", borderLeftColor: "#10b981" } : {}),
     };
     valueColor = "#fbbf24";
     badgeElement = (
@@ -362,6 +365,7 @@ function RankCard({
       background:
         "linear-gradient(90deg, rgba(203, 213, 225, 0.08) 0%, rgba(24, 24, 27, 0.85) 45%, rgba(24, 24, 27, 0.6) 100%)",
       boxShadow: "0 0 20px rgba(203, 213, 225, 0.08)",
+      ...(isSelf ? { borderLeftWidth: "4px", borderLeftColor: "#10b981" } : {}),
     };
     valueColor = "#e2e8f0";
     badgeElement = (
@@ -375,6 +379,7 @@ function RankCard({
       background:
         "linear-gradient(90deg, rgba(180, 83, 9, 0.08) 0%, rgba(24, 24, 27, 0.85) 45%, rgba(24, 24, 27, 0.6) 100%)",
       boxShadow: "0 0 20px rgba(180, 83, 9, 0.08)",
+      ...(isSelf ? { borderLeftWidth: "4px", borderLeftColor: "#10b981" } : {}),
     };
     valueColor = "#f59e0b";
     badgeElement = (
@@ -409,7 +414,9 @@ function RankCard({
             height={isFirst ? 48 : 42}
             className="rounded-full object-cover transition-transform group-hover:scale-105"
             style={{
-              outline: isFirst
+              outline: isSelf
+                ? "2px solid #34d399"
+                : isFirst
                 ? "2px solid #fbbf24"
                 : isSecond
                 ? "2px solid #cbd5e1"
@@ -427,7 +434,9 @@ function RankCard({
               height: isFirst ? 48 : 42,
               backgroundColor: `${entry.accentColor}25`,
               color: entry.accentColor,
-              outline: isFirst
+              outline: isSelf
+                ? "2px solid #34d399"
+                : isFirst
                 ? "2px solid #fbbf24"
                 : isSecond
                 ? "2px solid #cbd5e1"
@@ -440,51 +449,65 @@ function RankCard({
             {entry.displayName[0] ?? entry.username[0] ?? "?"}
           </div>
         )}
+
+        {/* Kendin olduğunu belirten zarif köşe avatar rozeti */}
+        {isSelf && (
+          <div
+            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-zinc-950 ring-2 ring-zinc-900 shadow-sm"
+            title={lang === "tr" ? "Hesabınız (Siz)" : "Your account (You)"}
+          >
+            <User className="h-2.5 w-2.5 stroke-[3]" />
+          </div>
+        )}
       </div>
 
       {/* ── İsim, Kullanıcı Adı ve Dil Etiketi ── */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <p className="font-bold text-sm sm:text-base text-zinc-100 truncate group-hover:text-white transition-colors">
             {entry.displayName}
           </p>
 
           {isFirst && (
-            <span className="rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+            <span className="shrink-0 rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-300">
               {lang === "tr" ? "Lider" : "Leader"}
             </span>
           )}
 
           {isSecond && (
-            <span className="rounded-full bg-slate-300/15 border border-slate-300/30 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
+            <span className="shrink-0 rounded-full bg-slate-300/15 border border-slate-300/30 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
               {lang === "tr" ? "2. Sıra" : "2nd"}
             </span>
           )}
 
           {isThird && (
-            <span className="rounded-full bg-amber-700/20 border border-amber-700/40 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
+            <span className="shrink-0 rounded-full bg-amber-700/20 border border-amber-700/40 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
               {lang === "tr" ? "3. Sıra" : "3rd"}
             </span>
           )}
 
           {isSelf && (
-            <span className="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
-              {youLabel}
+            <span
+              className="shrink-0 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 flex items-center gap-1"
+              title={lang === "tr" ? "Hesabınız (Siz)" : "Your account (You)"}
+            >
+              <User className="h-2.5 w-2.5" />
+              <span className="hidden sm:inline">{youLabel}</span>
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
+        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 min-w-0">
           <span className="font-mono text-zinc-400 truncate">@{entry.username}</span>
           {entry.topLang && (
             <>
-              <span className="text-zinc-700">·</span>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-zinc-700 shrink-0">·</span>
+              <div className="flex items-center gap-1.5 shrink-0 min-w-0">
                 <span
-                  className="h-2 w-2 rounded-full"
+                  className="h-2 w-2 rounded-full shrink-0"
                   style={{ backgroundColor: LANG_COLORS[entry.topLang] ?? "#71717a" }}
                 />
-                <span className="text-zinc-400 text-[11px] font-medium">{entry.topLang}</span>
+                <span className="text-zinc-400 text-[11px] font-medium truncate">{entry.topLang}</span>
               </div>
             </>
           )}

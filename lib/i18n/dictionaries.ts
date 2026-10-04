@@ -157,7 +157,7 @@ export const tr: Dictionary = {
     topLang: "Ana Dil",
     level: "Seviye",
     viewProfile: "Profili İncele",
-    you: "Sen",
+    you: "Siz",
     noDevFound: "Arama kriterine uygun geliştirici bulunamadı.",
     tierDiamond: "Elmas Lig",
     tierGold: "Altın Lig",
