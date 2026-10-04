@@ -230,7 +230,7 @@ export function SortableWidget({ id, children }: SortableWidgetProps) {
       {/* Content:
           - Desktop: h-full → grid hücresini doldur
           - Mobil: h-auto → kart kendi içeriği kadar büyür, boşluk yok */}
-      <div className={isMobile ? "w-full" : "w-full h-full overflow-hidden"}>
+      <div className={isMobile ? "w-full flex flex-col" : "w-full h-full overflow-hidden"}>
         {children}
       </div>
     </div>

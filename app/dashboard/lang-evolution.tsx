@@ -109,7 +109,7 @@ export default function LangEvolution({ data, languages }: Props) {
   const topLang = langTotals[0]?.lang ?? null;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full min-h-[280px] flex flex-col">
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between shrink-0 mb-3">
         <div>
@@ -154,7 +154,7 @@ export default function LangEvolution({ data, languages }: Props) {
       )}
 
       {/* Chart */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-[200px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={normalizedData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
             <defs>

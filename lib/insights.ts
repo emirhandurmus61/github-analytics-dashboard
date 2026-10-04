@@ -39,6 +39,7 @@ export function generateInsights(
   linesDeleted: number,
   topLanguage: string | null,
   lang: Language = "tr",
+  brokenStreak?: number,
 ): Insight[] {
   const insights: Insight[] = [];
   const isEn = lang === "en";
@@ -132,12 +133,21 @@ export function generateInsights(
         : `${currentStreak} günlük streak devam ediyor — muhteşem! 🔥`,
     });
   } else if (currentStreak === 0 && longestStreak > 0) {
-    insights.push({
-      type: "warning",
-      message: isEn
-        ? `Streak broken. Your longest streak was ${longestStreak} days, time to start a new one!`
-        : `Streak kırıldı. En uzun strekin ${longestStreak} gündü, tekrar başlayabilirsin!`,
-    });
+    if (brokenStreak && brokenStreak > 0) {
+      insights.push({
+        type: "warning",
+        message: isEn
+          ? `${brokenStreak}-day streak broken. Your record was ${longestStreak} days, time to start a new one!`
+          : `${brokenStreak} günlük streak kırıldı. En uzun strekin ${longestStreak} gündü, tekrar başlayabilirsin!`,
+      });
+    } else {
+      insights.push({
+        type: "positive",
+        message: isEn
+          ? `No active streak right now. Your all-time record is ${longestStreak} days — commit today to build a new chain!`
+          : `Şu an aktif bir streak yok. Tüm zamanlar rekorun ${longestStreak} gün — bugün commit atarak yeni bir seri başlat!`,
+      });
+    }
   }
 
   // Net satır değişimi

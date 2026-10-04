@@ -80,7 +80,15 @@ export default async function DashboardPage({ searchParams }: Props) {
   }[] = [];
   let thisWeek = 0;
   let lastWeek = 0;
-  let streakData = { currentStreak: 0, longestStreak: 0, totalActiveDays: 0 };
+  let streakData: ReturnType<typeof calculateStreaks> = {
+    currentStreak: 0,
+    longestStreak: 0,
+    totalActiveDays: 0,
+    brokenStreak: 0,
+    isRecordBrokenToday: false,
+    previousRecord: 0,
+    daysSinceLastCommit: 999,
+  };
   let codeStats = { linesAdded: 0, linesDeleted: 0, totalCommits: 0, mergedPRs: 0, openIssues: 0, closedIssues: 0 };
   let insights: import("@/lib/insights").Insight[] = [];
   let topRepo: string | null = null;
@@ -99,6 +107,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     totalAnalyzed: number;
   } | null = null;
   let badges: Badge[] = [];
+  let todayBadges: Badge[] = [];
   let streakStatus: StreakStatus = "no_streak";
   let weeklyGoal = dbUser?.weekly_commit_goal ?? 20;
   let goalHistory: { week_start: string; goal: number; actual: number }[] = [];
@@ -402,13 +411,13 @@ export default async function DashboardPage({ searchParams }: Props) {
     const hasToday = activeDateSet.has(todayStr);
     const hasYesterday = activeDateSet.has(yesterdayStr);
 
-    if (streakData.currentStreak === 0 && streakData.longestStreak === 0) {
-      streakStatus = "no_streak";
+    if (streakData.isRecordBrokenToday) {
+      streakStatus = "record_broken";
     } else if (hasToday) {
       streakStatus = "safe";
     } else if (hasYesterday) {
       streakStatus = "at_risk";
-    } else if (streakData.longestStreak > 0) {
+    } else if (streakData.daysSinceLastCommit === 2 && streakData.brokenStreak > 0) {
       streakStatus = "broken_today";
     } else {
       streakStatus = "no_streak";
@@ -501,6 +510,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       linesDeleted,
       topLang,
       lang,
+      streakData.brokenStreak,
     );
 
     // Rozetler
@@ -523,6 +533,37 @@ export default async function DashboardPage({ searchParams }: Props) {
       totalActiveDays: streakData.totalActiveDays,
       totalStars: (repoRows ?? []).reduce((s, r) => s + (r.stars ?? 0), 0),
     });
+
+    // Bugün kazanılan yeni başarılar / rozetler
+    if (activeDateSet.has(todayStr)) {
+      const pastCommits = (allCommitsRes.data ?? []).filter(
+        (c) => c.committed_at.slice(0, 10) < todayStr
+      );
+      const pastDates = heatmapData
+        .filter((d) => d.date < todayStr && d.commit_count > 0)
+        .map((d) => d.date);
+      const pastStreakData = calculateStreaks(pastDates);
+
+      const pastBadges = calcBadges({
+        hasSynced: true,
+        longestStreak: pastStreakData.longestStreak,
+        commitTimestamps: pastCommits.map((c) => c.committed_at),
+        repoForkMap,
+        commitRepoIds: pastCommits.map((c) => c.repo_id),
+        commitDeletions: pastCommits.map((c) => c.deletions ?? 0),
+        languageCount: langMap.size,
+        totalCommits: pastCommits.length,
+        repoCount: stats.repoCount,
+        mergedPRs: codeStats.mergedPRs,
+        closedIssues: codeStats.closedIssues,
+        linesAdded: codeStats.linesAdded,
+        totalActiveDays: pastStreakData.totalActiveDays,
+        totalStars: (repoRows ?? []).reduce((s, r) => s + (r.stars ?? 0), 0),
+      });
+
+      const pastEarnedIds = new Set(pastBadges.filter((b) => b.earned).map((b) => b.id));
+      todayBadges = badges.filter((b) => b.earned && !pastEarnedIds.has(b.id));
+    }
 
     // Developer DNA
     {
@@ -753,7 +794,13 @@ export default async function DashboardPage({ searchParams }: Props) {
       ) : (
         <div className="space-y-5">
           {/* Streak uyarı banner — grid dışında, her zaman üstte */}
-          <StreakGuard status={streakStatus} currentStreak={streakData.currentStreak || streakData.longestStreak} />
+          <StreakGuard
+            status={streakStatus}
+            currentStreak={streakData.currentStreak}
+            brokenStreak={streakData.brokenStreak}
+            previousRecord={streakData.previousRecord}
+            todayBadges={todayBadges}
+          />
 
           {/* Özelleştirilebilir Grid */}
           <DashboardGrid widgetIds={DEFAULT_WIDGET_CONFIGS.map((c) => c.id)}>
@@ -836,7 +883,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
             {/* Commit aktivitesi */}
             <SortableWidget key="activity-bar" id="activity-bar" data-widget-id="activity-bar">
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full min-h-[220px] flex flex-col">
                 <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">
                   {lang === "tr" ? `Son ${dateRange === "365" ? "30" : dateRange} Gün Aktivite` : `Last ${dateRange === "365" ? "30" : dateRange} Days Activity`}
                 </h2>
@@ -937,7 +984,7 @@ function ActivityBar({ data, emptyText = "Veri yok", lang = "tr" }: { data: { da
   if (data.length === 0) return <p className="text-[11px] text-zinc-600">{emptyText}</p>;
   const max = Math.max(...data.map((d) => d.commit_count));
   return (
-    <div className="flex items-end gap-0.5 flex-1">
+    <div className="flex items-end gap-0.5 flex-1 h-36 min-h-[140px] w-full">
       {data.map((d) => {
         const height = max > 0 ? Math.max((d.commit_count / max) * 100, 4) : 4;
         const commitWord = lang === "en" ? (d.commit_count === 1 ? "commit" : "commits") : "commit";

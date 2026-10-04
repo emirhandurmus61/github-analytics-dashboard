@@ -105,7 +105,7 @@ export default function VelocityChart({ data }: Props) {
   const monthlyProjection = Math.round(projection * 4.33);
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full min-h-[280px] flex flex-col">
       {/* Header */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between shrink-0 mb-3">
         <div className="flex items-center gap-2">
@@ -132,7 +132,7 @@ export default function VelocityChart({ data }: Props) {
       </div>
 
       {/* Chart — fills remaining space */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-[200px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={weeks} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
             <defs>

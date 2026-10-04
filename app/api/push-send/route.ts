@@ -65,13 +65,20 @@ export async function POST(req: Request) {
 
   for (const sub of subs) {
     const dates = userDates.get(sub.user_id) ?? [];
-    const { currentStreak } = calculateStreaks(dates);
+    const { currentStreak, isRecordBrokenToday, previousRecord } = calculateStreaks(dates);
     const hasToday = dates.includes(todayStr);
 
     let notification: { title: string; body: string; tag: string; url: string } | null = null;
 
     if (type === "streak") {
-      if (currentStreak > 0 && !hasToday) {
+      if (isRecordBrokenToday) {
+        notification = {
+          title: "🎉 Yeni Streak Rekoru!",
+          body: `${currentStreak} günlük kesintisiz seri ile kişisel rekorunu (${previousRecord} gün) kırdın! 🔥`,
+          tag: "streak-record",
+          url: "/dashboard",
+        };
+      } else if (currentStreak > 0 && !hasToday) {
         notification = {
           title: "🔥 Streak tehlikede!",
           body: `${currentStreak} günlük serinizi korumak için bugün commit atın.`,
@@ -79,6 +86,13 @@ export async function POST(req: Request) {
           url: "/dashboard",
         };
       }
+    } else if (type === "badge") {
+      notification = {
+        title: "🏆 Yeni Başarı Kazandın!",
+        body: "Tebrikler, yeni bir rozet kazandın! Detayları görmek için dashboard'a göz at.",
+        tag: "badge-achievement",
+        url: "/dashboard",
+      };
     } else if (type === "summary") {
       const weekStart = (() => {
         const d = new Date();
