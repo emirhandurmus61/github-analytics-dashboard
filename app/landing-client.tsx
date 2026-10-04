@@ -297,7 +297,7 @@ export default function LandingClient({
 }: {
   signInAction: () => Promise<void>;
 }) {
-  const { lang, t } = useLanguage();
+  const { t } = useLanguage();
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setReady(true), 80);
@@ -692,10 +692,10 @@ export default function LandingClient({
       <section className="relative z-10 mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
         <R>
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400">
-            KAPSAMLI ÖZELLİKLER
+            {t.landing.bentoPill}
           </p>
           <h2 className="mb-14 text-3xl font-black tracking-tight sm:text-4xl text-white">
-            Geliştirici kimliğinin tüm yönleri, tek çatı altında.
+            {t.landing.bentoTitle}
           </h2>
         </R>
 
@@ -718,21 +718,21 @@ export default function LandingClient({
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-white">
-                      Sinematik Wrapped &middot; Festival Posteri
+                      {t.landing.wrappedCardTitle}
                     </h3>
                     <p className="text-xs text-zinc-400">
-                      10 bölümlük interaktif hikaye ve koleksiyonluk editoryal poster
+                      {t.landing.wrappedCardDesc}
                     </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-5 gap-2 my-4">
                   {[
-                    { n: "01", t: "Commitler" },
-                    { n: "02", t: "Satırlar" },
-                    { n: "03", t: "Zirve Ay" },
-                    { n: "04", t: "Arketip" },
-                    { n: "05", t: "Diller" },
+                    { n: "01", t: t.landing.bentoStoryCommits },
+                    { n: "02", t: t.landing.bentoStoryLines },
+                    { n: "03", t: t.landing.bentoStoryPeakMonth },
+                    { n: "04", t: t.landing.bentoStoryArchetype },
+                    { n: "05", t: t.landing.bentoStoryLanguages },
                   ].map((s, i) => (
                     <div
                       key={s.n}
@@ -786,25 +786,25 @@ export default function LandingClient({
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-white">
-                      21 Analiz Widget&apos;ı &middot; Dashboard
+                      {t.landing.dashboardCardTitle}
                     </h3>
                     <p className="text-xs text-zinc-400">
-                      Kodlama hızından geliştirici DNA&apos;sına derin analiz
+                      {t.landing.dashboardCardDesc}
                     </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 my-4">
                   {[
-                    "Isı Haritası",
-                    "Saatlik Yoğunluk",
-                    "Velocity",
-                    "Dil Evrimi",
-                    "Ritim Analizi",
-                    "Repo Sağlığı",
-                    "Geliştirici DNA",
-                    "Percentile Ligi",
-                    "Hedef Takibi",
+                    t.landing.bentoWidgetHeatmap,
+                    t.landing.bentoWidgetHourly,
+                    t.landing.bentoWidgetVelocity,
+                    t.landing.bentoWidgetLangEvolution,
+                    t.landing.bentoWidgetRhythm,
+                    t.landing.bentoWidgetRepoHealth,
+                    t.landing.bentoWidgetDna,
+                    t.landing.bentoWidgetPercentile,
+                    t.landing.bentoWidgetGoals,
                   ].map((w, i) => (
                     <div
                       key={w}
@@ -817,7 +817,7 @@ export default function LandingClient({
                 </div>
 
                 <p className="mt-4 text-[11px] text-zinc-500">
-                  30 / 90 / 365 gün filtreleme &middot; Sürükle-bırak düzenleme &middot; Otomatik senkronizasyon
+                  {t.landing.dashboardCardFoot}
                 </p>
               </div>
             </div>
@@ -897,11 +897,10 @@ export default function LandingClient({
                 <Trophy className="h-5 w-5 text-amber-400" />
               </div>
               <h3 className="mb-1.5 text-base font-bold text-white">
-                Global Sıralama &middot; Geliştirici Ligi
+                {t.landing.leaderboardCardTitle}
               </h3>
               <p className="text-xs leading-relaxed text-zinc-400">
-                Haftalık commit hacmi, aktiflik serileri ve rozet sayısına göre
-                global developer liginde yerini al. Altın, Gümüş ve Bronz taç için yarış.
+                {t.landing.leaderboardCardDesc}
               </p>
             </div>
           </R>
@@ -913,11 +912,10 @@ export default function LandingClient({
                 <Award className="h-5 w-5 text-rose-400" />
               </div>
               <h3 className="mb-1.5 text-base font-bold text-white">
-                40+ Kazanılabilir Rozet &middot; Başarılar
+                {t.landing.badgesCardTitle}
               </h3>
               <p className="text-xs leading-relaxed text-zinc-400">
-                Gece Kuşu, Poliglot, Ateş Serisi, Hafta Sonu Savaşçısı, Büyük Temizlik.
-                Common, Rare, Epic ve Efsanevi seviyelerle başarılarını sergile.
+                {t.landing.badgesCardDesc}
               </p>
             </div>
           </R>
@@ -929,11 +927,10 @@ export default function LandingClient({
                 <Share2 className="h-5 w-5 text-cyan-400" />
               </div>
               <h3 className="mb-1.5 text-base font-bold text-white">
-                Geliştirici Kartı &middot; Dinamik SVG API
+                {t.landing.devCardTitle}
               </h3>
               <p className="text-xs leading-relaxed text-zinc-400">
-                Otomatik güncellenen canlı SVG rozetleri ve 1200x630 PNG geliştirici kartı.
-                GitHub README profiline ekle, sosyal medyada gururla paylaş.
+                {t.landing.devCardDesc}
               </p>
             </div>
           </R>
@@ -1040,10 +1037,10 @@ export default function LandingClient({
                 {/* Mini Stats */}
                 <div className="grid grid-cols-4 divide-x divide-zinc-800/40 border-b border-zinc-800/40">
                   {[
-                    { v: "94", l: "Repo" },
-                    { v: "2.8K", l: "Commit" },
-                    { v: "27", l: "Rozet" },
-                    { v: "12", l: "Dil" },
+                    { v: "94", l: t.landing.previewStatRepo },
+                    { v: "2.8K", l: t.landing.previewStatCommit },
+                    { v: "27", l: t.landing.previewStatBadge },
+                    { v: "12", l: t.landing.previewStatLang },
                   ].map((s) => (
                     <div key={s.l} className="py-3 text-center">
                       <p className="font-mono text-xs font-black text-zinc-100">{s.v}</p>
