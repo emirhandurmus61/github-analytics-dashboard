@@ -17,6 +17,7 @@ import CompareView from "./compare-view";
 import VelocityChart from "./velocity-chart";
 import RhythmAnalysis from "./rhythm-analysis";
 import RepoHealthList from "./repo-health-list";
+import ActivityChart from "./activity-chart";
 import LangEvolution, { type MonthLangPoint } from "./lang-evolution";
 import CommitQuality from "./commit-quality";
 import BadgeCollection from "./badge-collection";
@@ -895,7 +896,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 <h2 className="mb-3 text-xs font-medium text-zinc-500 uppercase tracking-wider shrink-0">
                   {lang === "tr" ? `Son ${dateRange === "365" ? "30" : dateRange} Gün Aktivite` : `Last ${dateRange === "365" ? "30" : dateRange} Days Activity`}
                 </h2>
-                <ActivityBar data={recentActivity} emptyText={lang === "tr" ? "Veri yok" : "No data"} lang={lang} />
+                <ActivityChart data={recentActivity} emptyText={lang === "tr" ? "Veri yok" : "No data"} lang={lang} />
               </div>
             </SortableWidget>
 
@@ -984,43 +985,6 @@ function StatCard({ label, value, lang = "tr" }: { label: string; value: number;
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 h-full flex flex-col items-center justify-center p-5 gap-2">
       <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">{label}</p>
       <p className="text-4xl font-bold text-zinc-100 tabular-nums">{value.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}</p>
-    </div>
-  );
-}
-
-function ActivityBar({ data, emptyText = "Veri yok", lang = "tr" }: { data: { date: string; commit_count: number }[]; emptyText?: string; lang?: Language }) {
-  if (data.length === 0) return <p className="text-[11px] text-zinc-600">{emptyText}</p>;
-  const max = Math.max(...data.map((d) => d.commit_count), 1);
-  const totalCommits = data.reduce((s, d) => s + d.commit_count, 0);
-
-  return (
-    <div className="flex flex-col flex-1 justify-between gap-3 w-full h-full min-h-[160px]">
-      <div className="flex items-end gap-1 flex-1 h-36 min-h-[130px] w-full pt-2">
-        {data.map((d) => {
-          const hasCommits = d.commit_count > 0;
-          const height = hasCommits ? Math.max((d.commit_count / max) * 100, 16) : 8;
-          const commitWord = lang === "en" ? (d.commit_count === 1 ? "commit" : "commits") : "commit";
-          return (
-            <div
-              key={d.date}
-              title={`${d.date}: ${d.commit_count} ${commitWord}`}
-              className="group relative flex-1 rounded-sm transition-all duration-150 hover:brightness-125"
-              style={{
-                height: `${height}%`,
-                backgroundColor: hasCommits ? "var(--accent, #34d399)" : "rgba(63, 63, 70, 0.45)",
-              }}
-            />
-          );
-        })}
-      </div>
-
-      <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-2 border-t border-zinc-800/60 shrink-0">
-        <span>{data[0]?.date ? new Date(data[0].date).toLocaleDateString(lang === "en" ? "en-US" : "tr-TR", { month: "short", day: "numeric" }) : ""}</span>
-        <span className="font-medium text-zinc-400">
-          {totalCommits} {lang === "en" ? (totalCommits === 1 ? "commit in last 30d" : "commits in last 30d") : "commit (son 30 gün)"}
-        </span>
-        <span>{data[data.length - 1]?.date ? new Date(data[data.length - 1].date).toLocaleDateString(lang === "en" ? "en-US" : "tr-TR", { month: "short", day: "numeric" }) : ""}</span>
-      </div>
     </div>
   );
 }
