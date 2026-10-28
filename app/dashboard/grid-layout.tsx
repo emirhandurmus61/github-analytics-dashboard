@@ -78,7 +78,8 @@ const useGrid = () => useContext(GridContext)!;
 
 /* ── Persistence ─────────────────────────────────────────────────────── */
 
-const KEY = "dashboard_grid_v15";
+// Bumped when the default layout changes, so everyone starts from the new one.
+const KEY = "dashboard_grid_v16";
 type Saved = {
   configs: Pick<WidgetConfig, "id" | "colSpan" | "rowSpan" | "visible" | "mobile">[];
   order: WidgetId[];
