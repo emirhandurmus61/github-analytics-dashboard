@@ -12,7 +12,6 @@ import {
   Sparkles,
   Bell,
   Shield,
-  Flame,
   ChevronUp,
   ChevronDown,
   Check,
@@ -26,14 +25,18 @@ import {
   List,
   Globe,
   ExternalLink,
-  Info,
-  Sparkle,
+  Search,
 } from "lucide-react";
 import PushNotificationToggle from "@/components/push-notification-toggle";
+import { PageHeader } from "@/components/ui/page-header";
+import { useUIPrefs } from "@/components/ui-prefs";
+import { cn } from "@/lib/ui/format";
+import AppearanceSettings from "./appearance";
+import { DARK_SCHEMES, LIGHT_SCHEMES } from "@/lib/ui/schemes";
+import { useOrigin } from "@/lib/ui/hooks";
 import { useLanguage } from "@/lib/i18n";
 import {
   WIDGET_KEYS,
-  WIDGET_LABELS,
   PRESETS,
   PRESETS_LOCALIZED,
   getWidgetLabelByKey,
@@ -140,7 +143,9 @@ export default function SettingsForm({
 }: Props) {
   const [state, formAction, pending] = useActionState(saveProfileSettings, initialState);
 
-  const [selectedTheme, setSelectedTheme] = useState<ThemeAccent>(currentTheme);
+  const [selectedTheme] = useState<ThemeAccent>(currentTheme);
+  const [query, setQuery] = useState("");
+  const { prefs } = useUIPrefs();
   const previewColors = THEMES[selectedTheme];
 
   const [selectedPinned, setSelectedPinned] = useState<string[]>(
@@ -177,7 +182,7 @@ export default function SettingsForm({
     hour: 20,
   });
 
-  const { lang, setLang, t } = useLanguage();
+  const { lang, t } = useLanguage();
 
   const navGroups = [
     { id: "ozellestirme", label: t.settings.groupCustomization },
@@ -340,401 +345,115 @@ export default function SettingsForm({
     setTagInput(next);
   }
 
-  const accent = previewColors.accent;
-  const accentBg = previewColors.accentBg;
-  const accentBorder = previewColors.accentBorder;
+  const accent = "var(--accent)";
+  const accentBg = "var(--accent-soft)";
+  const accentBorder = "var(--accent-line)";
+  void previewColors;
 
+  const ql = query.trim().toLocaleLowerCase(lang);
+  const matches = (item: NavItem) =>
+    !ql || `${item.label} ${item.shortDesc} ${item.badgeText ?? ""} ${SEARCH_HINTS[item.id]}`.toLocaleLowerCase(lang).includes(ql);
+  const firstMatch = navItems.find(matches);
   const currentNav = navItems.find((n) => n.id === activeSection) || navItems[0];
   const CurrentIcon = currentNav.icon;
 
   return (
     <div className="relative">
-      {/* ── Sayfa Başlığı ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-800/60 mb-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">{t.settings.title}</h1>
-          <p className="mt-1 text-xs sm:text-sm text-zinc-400">
-            {t.settings.subtitle}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={t.settings.title}
+        command={`settings${activeSection !== "gorunum" ? ` --section=${activeSection}` : ""}`}
+        subtitle={lang === "en" ? "Appearance applies instantly. Profile changes publish when you save." : "Görünüm anında uygulanır. Profil değişiklikleri kaydettiğinde yayınlanır."}
+        actions={
+          <label className="relative w-full sm:w-72">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-4" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && firstMatch) switchSection(firstMatch.id);
+              }}
+              placeholder={lang === "en" ? "Search settings" : "Ayarlarda ara"}
+              className="input !h-8 !pl-8"
+              aria-label={lang === "en" ? "Search settings" : "Ayarlarda ara"}
+            />
+          </label>
+        }
+      />
 
-      {/* Başarı Toast */}
-      <div
-        className="fixed top-20 right-4 sm:right-8 z-50 transition-all duration-300 pointer-events-none"
-        style={{
-          opacity: showSuccess ? 1 : 0,
-          transform: showSuccess ? "translateY(0)" : "translateY(-12px)",
-        }}
-      >
-        <div
-          className="flex items-center gap-3 rounded-2xl border px-5 py-3.5 text-sm shadow-2xl backdrop-blur-xl"
-          style={{
-            backgroundColor: "rgba(9, 9, 11, 0.95)",
-            borderColor: accentBorder,
-            boxShadow: `0 8px 32px ${accent}25`,
-          }}
-        >
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-xl"
-            style={{ backgroundColor: accentBg, color: accent }}
-          >
-            <Check className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="font-semibold text-zinc-100">{t.settings.saved}</p>
-            <p className="text-xs text-zinc-400">
-              {lang === "tr"
-                ? "Değişikliklerin anında profiline uygulandı."
-                : "Changes have been applied to your profile."}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Hata Bildirimi */}
       {state?.error && (
-        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-red-500/25 bg-red-500/10 px-5 py-3.5 text-sm text-red-400 backdrop-blur-md">
-          <span className="h-2 w-2 rounded-full bg-red-400 shrink-0 animate-pulse" />
-          <span className="font-medium">{state.error}</span>
+        <div className="mb-5 flex items-center gap-2.5 rounded-[var(--r-control)] border border-[color-mix(in_oklab,var(--hue-red)_35%,transparent)] bg-[color-mix(in_oklab,var(--hue-red)_10%,transparent)] px-3.5 py-2.5 text-[13px] text-bad">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" />
+          {state.error}
         </div>
       )}
 
-      {/* ── Mobil Sekme Çubuğu (Yatay Kaydırılabilir) ── */}
-      <div className="lg:hidden mb-6">
-        <div className="flex items-center gap-1.5 overflow-x-auto p-1.5 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md custom-scroll">
-          {navItems.map((item) => {
-            const isActive = activeSection === item.id;
+      {/* Phones and tablets: section switcher */}
+      <div className="lg:hidden -mx-4 mb-5 overflow-x-auto px-4 [scrollbar-width:none]">
+        <div className="seg">
+          {navItems.filter(matches).map((item) => {
             const Icon = item.icon;
             return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => switchSection(item.id)}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 transition-all duration-150 active:scale-95"
-                style={
-                  isActive
-                    ? {
-                        color: accent,
-                        backgroundColor: accentBg,
-                        border: `1px solid ${accentBorder}`,
-                      }
-                    : {
-                        color: "#71717a",
-                        backgroundColor: "transparent",
-                        border: "1px solid transparent",
-                      }
-                }
-              >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span>{item.label}</span>
+              <button key={item.id} type="button" aria-pressed={activeSection === item.id} onClick={() => switchSection(item.id)}>
+                <Icon className="h-3.5 w-3.5" />
+                {item.label}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* ── Ana Grid: Sidebar + Aktif Sekme İçeriği ── */}
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {/* ── Desktop Sol Sidebar ── */}
-        <aside className="hidden lg:block w-72 shrink-0">
-          <div className="sticky top-24 space-y-4">
-            <nav className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 backdrop-blur-md p-3 space-y-4">
-              {navGroups.map((group) => {
-                const groupItems = navItems.filter((item) => item.group === group.id);
-                return (
-                  <div key={group.id} className="space-y-1">
-                    <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                      {group.label}
-                    </p>
-                    <div className="space-y-0.5">
-                      {groupItems.map((item) => {
-                        const isActive = activeSection === item.id;
-                        const Icon = item.icon;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => switchSection(item.id)}
-                            className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs text-left transition-all duration-200 group relative"
-                            style={
-                              isActive
-                                ? {
-                                    color: accent,
-                                    backgroundColor: accentBg,
-                                  }
-                                : {
-                                    color: "#a1a1aa",
-                                    backgroundColor: "transparent",
-                                  }
-                            }
-                          >
-                            {/* Aktif sol vurgu çubuğu */}
-                            {isActive && (
-                              <span
-                                className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full"
-                                style={{ backgroundColor: accent }}
-                              />
-                            )}
-
-                            <span
-                              className="flex h-7 w-7 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105"
-                              style={
-                                isActive
-                                  ? { backgroundColor: `${accent}22`, color: accent }
-                                  : { backgroundColor: "rgba(39, 39, 42, 0.5)", color: "#71717a" }
-                              }
-                            >
-                              <Icon className="h-3.5 w-3.5 shrink-0" />
-                            </span>
-
-                            <div className="min-w-0 flex-1">
-                              <p className={`truncate ${isActive ? "font-semibold text-zinc-100" : "font-medium text-zinc-300"}`}>
-                                {item.label}
-                              </p>
-                              <p className="truncate text-[10px] text-zinc-500">
-                                {item.shortDesc}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </nav>
-
-            {/* Bilgilendirme Notu */}
-            <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 text-[11px] text-zinc-400 space-y-1.5">
-              <div className="flex items-center gap-2 font-medium text-zinc-300">
-                <Info className="h-3.5 w-3.5" style={{ color: accent }} />
-                <span>{lang === "tr" ? "Tek Tıkla Kayıt" : "One-Click Save"}</span>
-              </div>
-              <p className="leading-relaxed text-zinc-500">
-                {lang === "tr"
-                  ? "Tüm sekmelerdeki değişiklikler kaydedilene kadar tek bir formda saklanır. Sekmeler arasında güvenle geçiş yapabilirsiniz."
-                  : "Changes across all tabs are preserved within the form until saved. You can switch tabs freely without losing data."}
-              </p>
-            </div>
-          </div>
-        </aside>
-
-        {/* ── Form & Sekme İçeriği (Yalnızca Seçilen Sekme Görüntülenir) ── */}
-        <form action={formAction} className="min-w-0 flex-1 w-full pb-32">
-          {/* 1. GÖRÜNÜM SEKME İÇERİĞİ */}
-          <div className={activeSection === "gorunum" ? "block" : "hidden"}>
-            <Section
-              icon={Palette}
-              title={t.settings.tabAppearance}
-              desc={t.settings.themeDesc}
-              badge={t.settings.navAppearance}
-              accent={accent}
-              accentBorder={accentBorder}
-              accentBg={accentBg}
-            >
-              <div className="space-y-6">
-                {/* Arayüz Dili / Interface Language */}
-                <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-4 sm:p-5">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4" style={{ color: accent }} />
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
-                          {t.settings.selectLanguage}
-                        </p>
-                        <p className="text-[11px] text-zinc-500 mt-0.5">
-                          {t.settings.languageDesc}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className="rounded-full px-2.5 py-0.5 text-[11px] font-medium border"
-                      style={{ borderColor: accentBorder, color: accent, backgroundColor: accentBg }}
-                    >
-                      {lang.toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 max-w-sm">
-                    <button
-                      type="button"
-                      onClick={() => setLang("tr")}
-                      className="flex items-center justify-between rounded-xl border p-3 text-left transition-all cursor-pointer"
-                      style={
-                        lang === "tr"
-                          ? { borderColor: accentBorder, backgroundColor: accentBg }
-                          : { borderColor: "#27272a", backgroundColor: "rgba(24, 24, 27, 0.4)" }
-                      }
-                    >
-                      <div>
-                        <span className="block text-xs font-semibold text-white">Türkçe</span>
-                        <span className="text-[10px] text-zinc-500">
-                          {lang === "en" ? "TR · Default" : "TR · Varsayılan"}
-                        </span>
-                      </div>
-                      {lang === "tr" && <Check className="h-4 w-4" style={{ color: accent }} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLang("en")}
-                      className="flex items-center justify-between rounded-xl border p-3 text-left transition-all cursor-pointer"
-                      style={
-                        lang === "en"
-                          ? { borderColor: accentBorder, backgroundColor: accentBg }
-                          : { borderColor: "#27272a", backgroundColor: "rgba(24, 24, 27, 0.4)" }
-                      }
-                    >
-                      <div>
-                        <span className="block text-xs font-semibold text-white">English</span>
-                        <span className="text-[10px] text-zinc-500">
-                          {lang === "en" ? "EN · International" : "EN · İngilizce"}
-                        </span>
-                      </div>
-                      {lang === "en" && <Check className="h-4 w-4" style={{ color: accent }} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tema Izgarası */}
-                <div>
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                      {t.settings.colorPalette}
-                    </p>
-                    <span
-                      className="rounded-full px-2.5 py-0.5 text-[11px] font-medium border"
-                      style={{ borderColor: accentBorder, color: accent, backgroundColor: accentBg }}
-                    >
-                      {t.settings.active}: {THEMES[selectedTheme].label}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                    {(Object.entries(THEMES) as [ThemeAccent, (typeof THEMES)[ThemeAccent]][]).map(([key, theme]) => {
-                      const isSelected = selectedTheme === key;
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+        <aside className="sticky top-16 hidden w-56 shrink-0 lg:block">
+          <nav className="flex flex-col gap-5" aria-label={t.settings.title}>
+            {navGroups.map((group) => {
+              const items = navItems.filter((item) => item.group === group.id);
+              return (
+                <div key={group.id}>
+                  <p className="mb-1.5 px-2.5 text-[11.5px] text-ink-4">{group.label}</p>
+                  <div className="flex flex-col gap-0.5">
+                    {items.map((item) => {
+                      const on = activeSection === item.id;
+                      const Icon = item.icon;
+                      const hit = matches(item);
                       return (
                         <button
-                          key={key}
+                          key={item.id}
                           type="button"
-                          onClick={() => setSelectedTheme(key)}
-                          className="group relative flex flex-col items-center gap-2.5 rounded-2xl border p-3.5 transition-all duration-200 text-center"
-                          style={
-                            isSelected
-                              ? {
-                                  borderColor: theme.accentBorder,
-                                  backgroundColor: theme.accentBg,
-                                  boxShadow: `0 0 16px ${theme.accent}20`,
-                                }
-                              : {
-                                  borderColor: "#27272a",
-                                  backgroundColor: "rgba(24, 24, 27, 0.4)",
-                                }
-                          }
+                          onClick={() => switchSection(item.id)}
+                          aria-current={on ? "page" : undefined}
+                          className={cn(
+                            "relative flex h-8 items-center gap-2.5 rounded-[var(--r-control)] px-2.5 text-left text-[13px] transition-colors",
+                            on ? "bg-raised text-ink font-medium" : "text-ink-3 hover:bg-raised hover:text-ink",
+                            !hit && "opacity-35",
+                          )}
                         >
-                          <div
-                            className="h-9 w-9 rounded-full transition-all duration-200 flex items-center justify-center"
-                            style={{
-                              backgroundColor: theme.accent,
-                              transform: isSelected ? "scale(1.08)" : "scale(1)",
-                              boxShadow: isSelected ? `0 0 16px ${theme.accent}60` : "none",
-                            }}
-                          >
-                            {isSelected && <Check className="h-4 w-4 text-zinc-950 font-bold" />}
-                          </div>
-                          <span
-                            className="text-xs font-medium"
-                            style={{ color: isSelected ? theme.accent : "#71717a" }}
-                          >
-                            {theme.label}
-                          </span>
+                          {on && <span className="absolute -left-2 top-1.5 bottom-1.5 w-[2px] rounded-full bg-accent" />}
+                          <Icon className={cn("h-3.5 w-3.5 shrink-0", on && "text-accent")} />
+                          <span className="truncate">{item.label}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
+              );
+            })}
+          </nav>
+          <p className="mt-6 px-2.5 text-[11.5px] leading-relaxed text-ink-4">
+            {lang === "en" ? "Profile sections share one save button; switching sections keeps your edits." : "Profil bölümleri tek bir kaydet düğmesini paylaşır; bölüm değiştirmek düzenlemelerini silmez."}
+          </p>
+        </aside>
 
-                {/* Canlı Önizleme Kartı */}
-                <div
-                  className="rounded-2xl border p-5 sm:p-6 transition-all duration-300"
-                  style={{ backgroundColor: accentBg, borderColor: accentBorder }}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkle className="h-3.5 w-3.5" style={{ color: accent }} />
-                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>
-                        {t.settings.liveThemePreview}
-                      </p>
-                    </div>
-                    <span className="text-[11px] text-zinc-500">
-                      {THEMES[selectedTheme].accent}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-                    {/* Streak Önizleme (Tacky emoji yerine Flame ikonu) */}
-                    <div
-                      className="flex flex-col items-center justify-center gap-1 rounded-xl border p-4 text-center"
-                      style={{ borderColor: accentBorder, backgroundColor: "rgba(9, 9, 11, 0.6)" }}
-                    >
-                      <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                        <Flame className="h-4 w-4" style={{ color: accent }} />
-                        <span className="font-medium">{t.settings.dailyStreak}</span>
-                      </div>
-                      <span className="text-3xl font-extrabold tabular-nums mt-1" style={{ color: accent }}>
-                        14
-                      </span>
-                      <span className="text-[10px] text-zinc-500 font-medium">
-                        {lang === "en" ? "consecutive days" : "kesintisiz gün"}
-                      </span>
-                    </div>
-
-                    {/* Progress Bar & Hedef Önizleme */}
-                    <div
-                      className="sm:col-span-2 rounded-xl border p-4 space-y-3"
-                      style={{ borderColor: accentBorder, backgroundColor: "rgba(9, 9, 11, 0.6)" }}
-                    >
-                      <div>
-                        <div className="mb-1.5 flex justify-between text-xs">
-                          <span className="text-zinc-400 font-medium">
-                            {lang === "en" ? "Weekly Contribution Goal" : "Haftalık Katkı Hedefi"}
-                          </span>
-                          <span className="font-semibold" style={{ color: accent }}>18 / 25 commit</span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800/80">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: "72%", backgroundColor: accent }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Heatmap Tonları Önizleme */}
-                      <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between">
-                        <span className="text-[11px] text-zinc-500 font-medium">
-                          {lang === "en" ? "Contribution Intensity Shades" : "Katkı Yoğunluk Tonları"}
-                        </span>
-                        <div className="flex gap-1.5">
-                          {previewColors.shades.map((shade, i) => (
-                            <div
-                              key={i}
-                              className="h-4 w-4 rounded-md transition-transform hover:scale-110"
-                              style={{ backgroundColor: shade }}
-                              title={lang === "en" ? `Contribution level ${i + 1}` : `Katkı düzeyi ${i + 1}`}
-                            />
-                          ))}
-                          <div
-                            className="h-4 w-4 rounded-md bg-zinc-800"
-                            title={lang === "en" ? "No contributions" : "Katkı yok"}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <input type="hidden" name="theme_accent" value={selectedTheme} />
-              </div>
+        <form action={formAction} className="min-w-0 flex-1 w-full max-w-[920px] pb-28">
+          <div className={activeSection === "gorunum" ? "block" : "hidden"}>
+            <Section
+              icon={Palette}
+              title={t.settings.tabAppearance}
+              desc={lang === "en" ? "Interface, colors, type and motion for this browser." : "Bu tarayıcı için arayüz, renkler, yazı ve hareket."}
+              accent={accent}
+              accentBorder={accentBorder}
+              accentBg={accentBg}
+            >
+              <AppearanceSettings />
             </Section>
           </div>
 
@@ -779,7 +498,7 @@ export default function SettingsForm({
                         ? "Briefly introduce yourself, your focus areas, or your work style..."
                         : "Kendinizi, odaklandığınız alanları veya çalışma tarzınızı kısaca tanıtın..."
                     }
-                    className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
+                    className="w-full resize-none rounded-[var(--r-control)] border border-zinc-800 bg-zinc-900/90 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
                   />
                 </Field>
 
@@ -804,7 +523,7 @@ export default function SettingsForm({
                           ? "e.g. Open-source CLI tools and Rust..."
                           : "Örn: Açık kaynak CLI araçları ve Rust..."
                       }
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none"
+                      className="w-full rounded-[var(--r-control)] border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none"
                     />
                   </Field>
 
@@ -828,7 +547,7 @@ export default function SettingsForm({
                           ? "e.g. 1000 commits and 5 open-source contributions..."
                           : "Örn: 1000 commit ve 5 açık kaynak katkısı..."
                       }
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none"
+                      className="w-full rounded-[var(--r-control)] border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none"
                     />
                   </Field>
                 </div>
@@ -849,7 +568,7 @@ export default function SettingsForm({
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     placeholder="TypeScript, React, Rust, Docker, PostgreSQL..."
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none"
+                    className="w-full rounded-[var(--r-control)] border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none"
                   />
 
                   {/* Aktif Etiketler */}
@@ -928,9 +647,9 @@ export default function SettingsForm({
                         <span
                           className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-bold border"
                           style={{
-                            borderColor: selectedPinned[i] ? accentBorder : "#27272a",
-                            backgroundColor: selectedPinned[i] ? accentBg : "#18181b",
-                            color: selectedPinned[i] ? accent : "#71717a",
+                            borderColor: selectedPinned[i] ? accentBorder : "var(--line)",
+                            backgroundColor: selectedPinned[i] ? accentBg : "var(--bg-2)",
+                            color: selectedPinned[i] ? accent : "var(--ink-3)",
                           }}
                         >
                           {i + 1}
@@ -948,7 +667,7 @@ export default function SettingsForm({
                               return next.filter(Boolean);
                             });
                           }}
-                          className="w-full appearance-none rounded-xl border border-zinc-800 bg-zinc-900/90 py-2.5 pl-11 pr-4 text-xs text-zinc-100 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
+                          className="w-full appearance-none rounded-[var(--r-control)] border border-zinc-800 bg-zinc-900/90 py-2.5 pl-11 pr-4 text-xs text-zinc-100 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
                         >
                           <option value="">
                             {lang === "en"
@@ -1087,24 +806,24 @@ export default function SettingsForm({
                           key={src}
                           type="button"
                           onClick={() => setSelectedReadmeSource(src)}
-                          className="rounded-2xl border p-4 text-left transition-all duration-200"
+                          className="rounded-panel border p-4 text-left transition-all duration-200"
                           style={
                             isSelected
                               ? {
                                   borderColor: accentBorder,
                                   backgroundColor: accentBg,
-                                  boxShadow: `0 0 16px ${accent}15`,
+                                  boxShadow: `0 0 16px color-mix(in oklab, var(--accent) 8%, transparent)`,
                                 }
                               : {
-                                  borderColor: "#27272a",
-                                  backgroundColor: "rgba(24, 24, 27, 0.4)",
+                                  borderColor: "var(--line)",
+                                  backgroundColor: "var(--bg-2)",
                                 }
                           }
                         >
                           <div className="flex items-center justify-between">
                             <span
                               className="text-xs font-bold"
-                              style={{ color: isSelected ? accent : "#e4e4e7" }}
+                              style={{ color: isSelected ? accent : "var(--ink-1)" }}
                             >
                               {src === "github"
                                 ? lang === "en"
@@ -1139,7 +858,7 @@ export default function SettingsForm({
                       {lang === "en" ? "Fetched GitHub README Preview" : "Çekilen GitHub README Önizlemesi"}
                     </p>
                     {githubReadme ? (
-                      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 px-4 py-3.5 text-xs text-zinc-400 font-mono leading-relaxed max-h-56 overflow-y-auto whitespace-pre-wrap custom-scroll">
+                      <div className="rounded-panel border border-zinc-800 bg-zinc-900/90 px-4 py-3.5 text-xs text-zinc-400 font-mono leading-relaxed max-h-56 overflow-y-auto whitespace-pre-wrap custom-scroll">
                         {githubReadme.slice(0, 1000)}
                         {githubReadme.length > 1000
                           ? lang === "en"
@@ -1148,7 +867,7 @@ export default function SettingsForm({
                           : ""}
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4">
+                      <div className="rounded-panel border border-zinc-800/80 bg-zinc-900/40 p-4">
                         <p className="text-xs text-zinc-400 leading-relaxed">
                           {lang === "en" ? (
                             <>
@@ -1208,7 +927,7 @@ export default function SettingsForm({
                             key={key}
                             type="button"
                             onClick={() => applyPreset(key)}
-                            className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5 text-left transition-all duration-150 hover:border-zinc-700 hover:bg-zinc-900"
+                            className="rounded-[var(--r-control)] border border-zinc-800 bg-zinc-900/60 p-3.5 text-left transition-all duration-150 hover:border-zinc-700 hover:bg-zinc-900"
                           >
                             <p className="text-xs font-semibold text-zinc-200">
                               {loc ? (lang === "en" ? loc.labelEn : loc.labelTr) : preset.label}
@@ -1234,18 +953,18 @@ export default function SettingsForm({
                       return (
                         <div
                           key={key}
-                          className="flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all duration-150"
+                          className="flex items-center gap-3 rounded-panel border px-4 py-3 transition-all duration-150"
                           style={{
-                            borderColor: visible ? accentBorder : "#27272a",
-                            backgroundColor: visible ? accentBg : "rgba(24, 24, 27, 0.4)",
+                            borderColor: visible ? accentBorder : "var(--line)",
+                            backgroundColor: visible ? accentBg : "var(--bg-2)",
                           }}
                         >
                           <span
                             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
                             style={
                               visible
-                                ? { color: accent, backgroundColor: `${accent}20` }
-                                : { color: "#71717a", backgroundColor: "#18181b" }
+                                ? { color: accent, backgroundColor: "var(--accent-soft)" }
+                                : { color: "var(--ink-3)", backgroundColor: "var(--bg-2)" }
                             }
                           >
                             {i + 1}
@@ -1253,7 +972,7 @@ export default function SettingsForm({
 
                           <span
                             className="flex-1 text-sm font-medium"
-                            style={{ color: visible ? "#f4f4f5" : "#71717a" }}
+                            style={{ color: visible ? "var(--ink-1)" : "var(--ink-3)" }}
                           >
                             {getWidgetLabelByKey(key, lang)}
                           </span>
@@ -1261,17 +980,17 @@ export default function SettingsForm({
                           <button
                             type="button"
                             onClick={() => toggleWidget(key)}
-                            className="rounded-xl border px-3 py-1.5 text-xs font-medium transition-all"
+                            className="rounded-[var(--r-control)] border px-3 py-1.5 text-xs font-medium transition-all"
                             style={
                               visible
                                 ? {
                                     borderColor: accentBorder,
                                     color: accent,
-                                    backgroundColor: `${accent}20`,
+                                    backgroundColor: "var(--accent-soft)",
                                   }
                                 : {
-                                    borderColor: "#3f3f46",
-                                    color: "#71717a",
+                                    borderColor: "var(--line-2)",
+                                    color: "var(--ink-3)",
                                     backgroundColor: "transparent",
                                   }
                             }
@@ -1343,7 +1062,7 @@ export default function SettingsForm({
                   <p className="mb-2 text-xs font-semibold text-zinc-400">
                     {t.settings.badgeLiveView}
                   </p>
-                  <div className="flex items-center justify-center rounded-2xl border border-zinc-800/80 bg-zinc-950 p-6">
+                  <div className="flex items-center justify-center rounded-panel border border-zinc-800/80 bg-zinc-950 p-6">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={badgeUrl} alt={lang === "en" ? "Devboard Badge" : "Devboard Rozet"} className="block max-w-full drop-shadow-md" />
                   </div>
@@ -1441,10 +1160,10 @@ export default function SettingsForm({
             >
               <div className="space-y-4">
                 <div
-                  className="flex items-start justify-between gap-4 rounded-2xl border p-5 transition-all"
+                  className="flex items-start justify-between gap-4 rounded-panel border p-5 transition-all"
                   style={{
-                    borderColor: optIn ? `${accent}40` : "#27272a",
-                    backgroundColor: optIn ? accentBg : "rgba(24, 24, 27, 0.4)",
+                    borderColor: optIn ? "var(--accent-line)" : "var(--line)",
+                    backgroundColor: optIn ? accentBg : "var(--bg-2)",
                   }}
                 >
                   <div className="space-y-1.5">
@@ -1492,10 +1211,10 @@ export default function SettingsForm({
                     aria-label={lang === "en" ? "Leaderboard opt-in toggle" : "Liderlik tablosu katılım anahtarı"}
                     onClick={() => setOptIn((v) => !v)}
                     className="relative shrink-0 h-7 w-12 rounded-full transition-colors duration-200 mt-1"
-                    style={{ backgroundColor: optIn ? accent : "#3f3f46" }}
+                    style={{ backgroundColor: optIn ? accent : "var(--line-2)" }}
                   >
                     <span
-                      className="absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200"
+                      className="absolute top-1 left-1 h-5 w-5 rounded-full bg-ink shadow-md transition-transform duration-200"
                       style={{ transform: optIn ? "translateX(20px)" : "translateX(0)" }}
                     />
                   </button>
@@ -1505,55 +1224,31 @@ export default function SettingsForm({
             </Section>
           </div>
 
-          {/* ── Alt Sabit Kaydet Barı ── */}
-          <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-xl">
-            <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-2.5">
-                <span
-                  className="flex h-6 w-6 items-center justify-center rounded-lg shrink-0"
-                  style={{ backgroundColor: accentBg, color: accent }}
-                >
-                  <CurrentIcon className="h-3.5 w-3.5" />
-                </span>
-                <p className="text-xs text-zinc-400">
-                  <span className="text-zinc-200 font-medium">
-                    {lang === "tr" ? "Aktif Sekme:" : "Active Tab:"}
-                  </span>{" "}
-                  {currentNav.label}
-                  <span className="hidden md:inline text-zinc-500">
-                    {" "}
-                    —{" "}
-                    {lang === "tr"
-                      ? "Tüm sekmelerdeki değişiklikler birlikte kaydedilir."
-                      : "Changes across all tabs are saved together."}
+          {activeSection !== "gorunum" && (
+            <div
+              className={cn(
+                "fixed inset-x-0 z-40 flex justify-center px-3 pointer-events-none",
+                prefs.ui === "studio"
+                  ? "bottom-[calc(env(safe-area-inset-bottom)+82px)] md:bottom-4"
+                  : "bottom-[calc(env(safe-area-inset-bottom)+66px)] md:bottom-9",
+              )}
+            >
+              <div className="pointer-events-auto surface-pop flex w-full max-w-2xl items-center gap-3 p-2 pl-3.5">
+                <CurrentIcon className="h-4 w-4 shrink-0 text-accent" />
+                <p className="min-w-0 flex-1 truncate text-[12.5px] text-ink-3">
+                  <span className="text-ink">{currentNav.label}</span>
+                  <span className="hidden sm:inline">
+                    {" · "}
+                    {lang === "tr" ? "değişiklikler herkese açık profiline yayınlanır" : "changes publish to your public profile"}
                   </span>
                 </p>
+                <button type="submit" disabled={pending} className="btn btn-primary">
+                  {pending ? <Loader2 className="animate-spin" /> : <Check />}
+                  {pending ? t.settings.saving : t.settings.saveChanges}
+                </button>
               </div>
-
-              <button
-                type="submit"
-                disabled={pending}
-                className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50 shadow-lg cursor-pointer"
-                style={{
-                  backgroundColor: accent,
-                  color: "#09090b",
-                  boxShadow: `0 4px 20px ${accent}30`,
-                }}
-              >
-                {pending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t.settings.saving}
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4" />
-                    {t.settings.saveChanges}
-                  </>
-                )}
-              </button>
             </div>
-          </div>
+          )}
         </form>
       </div>
     </div>
@@ -1562,68 +1257,44 @@ export default function SettingsForm({
 
 // ── Alt Bileşenler ─────────────────────────────────────────────────────────────
 
+const SEARCH_HINTS: Record<SettingsSectionId, string> = {
+  gorunum: "tema theme renk color şema scheme arayüz interface terminal editör editor stüdyo studio yazı font dil language yoğunluk density koyu açık dark light",
+  profil: "bio biyografi tag etiket pinned sabit repo hedef goal",
+  sosyal: "twitter x linkedin website discord sosyal social link",
+  "profil-sayfasi": "readme markdown widget profil sayfası page",
+  badge: "badge rozet shield markdown html embed",
+  "readme-widgets": "readme widget svg embed github stats",
+  bildirimler: "push bildirim notification",
+  gizlilik: "privacy gizlilik leaderboard sıralama opt-in",
+};
+
 function Section({
   icon: Icon,
   title,
   desc,
   badge,
   children,
-  accent,
-  accentBorder,
-  accentBg,
 }: {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   title: string;
   desc: string;
   badge?: string;
   children: React.ReactNode;
-  accent: string;
-  accentBorder: string;
-  accentBg: string;
+  accent?: string;
+  accentBorder?: string;
+  accentBg?: string;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 overflow-hidden backdrop-blur-sm shadow-xl">
-      {/* Üst accent ince vurgu gradyanı */}
-      <div
-        className="h-1 w-full"
-        style={{
-          background: `linear-gradient(to right, ${accent}, ${accentBorder}, transparent)`,
-        }}
-      />
-
-      <div className="p-5 sm:p-7 space-y-6">
-        {/* Başlık Alanı */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-zinc-800/70">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-              style={{ backgroundColor: accentBg, color: accent }}
-            >
-              <Icon className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-zinc-100 tracking-tight">{title}</h2>
-              <p className="mt-0.5 text-xs text-zinc-400 leading-relaxed">{desc}</p>
-            </div>
-          </div>
-
-          {badge && (
-            <span
-              className="self-start sm:self-center rounded-full px-3 py-1 text-[11px] font-semibold border"
-              style={{
-                borderColor: accentBorder,
-                backgroundColor: accentBg,
-                color: accent,
-              }}
-            >
-              {badge}
-            </span>
-          )}
+    <section className="min-w-0">
+      <header className="mb-6 flex items-start gap-3 border-b border-line pb-4">
+        <Icon className="mt-1 h-4 w-4 shrink-0 text-accent" />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[18px] font-[650] tracking-[-0.01em] text-ink">{title}</h2>
+          <p className="mt-0.5 max-w-[70ch] text-[13px] leading-relaxed text-ink-3">{desc}</p>
         </div>
-
-        {/* İçerik */}
-        <div>{children}</div>
-      </div>
+        {badge && <span className="chip shrink-0">{badge}</span>}
+      </header>
+      <div>{children}</div>
     </section>
   );
 }
@@ -1640,12 +1311,12 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <label className="text-xs font-semibold text-zinc-300">{label}</label>
-        {hint && <span className="text-[11px] text-zinc-500 font-mono">{hint}</span>}
+        <label className="text-[13px] font-medium text-ink">{label}</label>
+        {hint && <span className="font-mono text-[11px] text-ink-4">{hint}</span>}
       </div>
-      {desc && <p className="text-[11px] text-zinc-500 leading-normal">{desc}</p>}
+      {desc && <p className="text-[12px] leading-normal text-ink-3">{desc}</p>}
       {children}
     </div>
   );
@@ -1667,10 +1338,10 @@ function PrefixInput({
   maxLength: number;
 }) {
   return (
-    <div className="flex items-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/90 transition-colors focus-within:border-zinc-500">
-      <div className="flex items-center gap-2 shrink-0 border-r border-zinc-800/80 bg-zinc-900/40 px-3 py-2.5 text-xs text-zinc-400">
+    <div className="flex h-8 items-stretch overflow-hidden rounded-[var(--r-control)] border border-line-strong bg-canvas transition-[border-color,box-shadow] focus-within:border-accent focus-within:shadow-[0_0_0_3px_var(--accent-soft)]">
+      <div className="flex shrink-0 items-center gap-2 border-r border-line bg-raised px-2.5 text-ink-3">
         {icon}
-        <span className="font-mono text-[11px]">{prefix}</span>
+        <span className="font-mono text-[11.5px]">{prefix}</span>
       </div>
       <input
         name={name}
@@ -1678,23 +1349,13 @@ function PrefixInput({
         defaultValue={defaultValue}
         maxLength={maxLength}
         placeholder={placeholder}
-        className="flex-1 bg-transparent px-3 py-2.5 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none"
+        className="min-w-0 flex-1 bg-transparent px-2.5 text-[13px] text-ink placeholder:text-ink-4 focus:outline-none"
       />
     </div>
   );
 }
 
-function CopyBox({
-  value,
-  accentColor,
-  accentBg,
-  accentBorder,
-}: {
-  value: string;
-  accentColor: string;
-  accentBg: string;
-  accentBorder: string;
-}) {
+function CopyBox({ value }: { value: string; accentColor?: string; accentBg?: string; accentBorder?: string }) {
   const { lang } = useLanguage();
   const [copied, setCopied] = useState(false);
 
@@ -1707,29 +1368,12 @@ function CopyBox({
 
   return (
     <div className="flex items-stretch gap-2">
-      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-3 text-xs text-zinc-400 font-mono custom-scroll">
+      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-[var(--r-control)] border border-line bg-canvas px-3 py-2 font-mono text-[12px] text-ink-2">
         {value}
       </code>
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="flex shrink-0 items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all duration-200 cursor-pointer active:scale-95"
-        style={
-          copied
-            ? { borderColor: accentBorder, color: accentColor, backgroundColor: accentBg }
-            : { borderColor: "#3f3f46", color: "#a1a1aa", backgroundColor: "rgba(24, 24, 27, 0.4)" }
-        }
-      >
-        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        <span>
-          {copied
-            ? lang === "en"
-              ? "Copied"
-              : "Kopyalandı"
-            : lang === "en"
-            ? "Copy"
-            : "Kopyala"}
-        </span>
+      <button type="button" onClick={handleCopy} className="btn shrink-0">
+        {copied ? <Check className="text-good" /> : <Copy />}
+        {copied ? (lang === "en" ? "Copied" : "Kopyalandı") : lang === "en" ? "Copy" : "Kopyala"}
       </button>
     </div>
   );
@@ -1830,7 +1474,7 @@ function ReadmeEditor({
   return (
     <div className="space-y-2">
       {/* Editör Araç Çubuğu */}
-      <div className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/90 p-1.5">
+      <div className="flex items-center gap-1 rounded-[var(--r-control)] border border-zinc-800 bg-zinc-900/90 p-1.5">
         <button
           type="button"
           onClick={() => applyFormat("bold")}
@@ -1919,7 +1563,7 @@ function ReadmeEditor({
             ? "### Hello!\n\nI am a software developer.\n\n- Currently working on **project**\n- Developing with **Rust & TypeScript**"
             : "### Merhaba!\n\nBen bir yazılım geliştiriciyim.\n\n- Şu an **proje** üzerinde çalışıyorum\n- **Rust & TypeScript** ile geliştirme yapıyorum"
         }
-        className="w-full resize-y rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-3 font-mono text-xs leading-relaxed text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
+        className="w-full resize-y rounded-[var(--r-control)] border border-zinc-800 bg-zinc-900/90 px-4 py-3 font-mono text-xs leading-relaxed text-zinc-100 placeholder-zinc-600 transition-colors focus:border-zinc-500 focus:outline-none custom-scroll"
       />
 
       <div className="flex items-center justify-between text-[11px] text-zinc-500">
@@ -1934,7 +1578,7 @@ function ReadmeEditor({
               className="h-full rounded-full transition-all"
               style={{
                 width: `${charPct}%`,
-                backgroundColor: charPct > 90 ? "#f87171" : accentColor,
+                backgroundColor: charPct > 90 ? "var(--hue-red)" : accentColor,
               }}
             />
           </div>
@@ -1960,6 +1604,8 @@ function ReadmeWidgets({
 }) {
   const { lang } = useLanguage();
   const [active, setActive] = useState<string>("streak");
+  const [wScheme, setWScheme] = useState<string>("");
+  const [wLang, setWLang] = useState<"tr" | "en">(lang === "en" ? "en" : "tr");
 
   const widgetItems = [
     {
@@ -1967,8 +1613,8 @@ function ReadmeWidgets({
       label: "Streak Widget",
       desc:
         lang === "en"
-          ? "Daily commit streak, longest streak, and a 14-day mini bar chart."
-          : "Günlük commit serisi, en uzun streak ve son 14 günlük mini bar grafiği.",
+          ? "Current and longest streak, plus the last 21 days with the running streak highlighted."
+          : "Güncel ve en uzun seri, aktif serinin vurgulandığı son 21 gün.",
       path: (u: string) => `/api/widget/streak/${u}`,
     },
     {
@@ -1976,8 +1622,8 @@ function ReadmeWidgets({
       label: "Stats Widget",
       desc:
         lang === "en"
-          ? "Yearly commits, streak, repo count, and total stars — 4-column compact card."
-          : "Yıllık commit, streak, repo sayısı ve toplam yıldız — 4 sütunlu kompakt kart.",
+          ? "Yearly commits, streak, active days, repos and stars in one compact row."
+          : "Yıllık commit, seri, aktif gün, repo ve yıldız tek satırda.",
       path: (u: string) => `/api/widget/stats/${u}`,
     },
     {
@@ -1985,8 +1631,8 @@ function ReadmeWidgets({
       label: "Top Languages",
       desc:
         lang === "en"
-          ? "Top 5 most used programming languages and percentage distribution bar."
-          : "En çok kullandığınız 5 programlama dili ve yüzdelik dağılım çubuğu.",
+          ? "Your 6 most used languages with a stacked share bar."
+          : "En çok kullandığın 6 dil ve yüzdelik dağılım çubuğu.",
       path: (u: string) => `/api/widget/langs/${u}`,
     },
     {
@@ -1994,15 +1640,18 @@ function ReadmeWidgets({
       label: "Contribution Heatmap",
       desc:
         lang === "en"
-          ? "52-week contribution heatmap — SVG card styled with your chosen theme accent."
-          : "Son 52 haftanın katkı ısı haritası — seçilen tema renginizle uyumlu SVG kartı.",
+          ? "The last 53 weeks of commits, colored with your scheme and accent."
+          : "Son 53 haftanın commit ısı haritası; şema ve vurgu rengine uyar.",
       path: (u: string) => `/api/widget/heatmap/${u}`,
     },
   ] as const;
 
   const current = widgetItems.find((w) => w.id === active)!;
-  const base = typeof window !== "undefined" ? window.location.origin : "https://devanalytics.app";
-  const imgUrl = `${base}${current.path(username)}`;
+  // Resolve the origin after mount so server and client render the same markup.
+  const origin = useOrigin();
+  const base = origin || (process.env.NEXT_PUBLIC_BASE_URL ?? "");
+  const query = new URLSearchParams({ ...(wScheme ? { scheme: wScheme } : {}), ...(wLang !== "tr" ? { lang: wLang } : {}) }).toString();
+  const imgUrl = `${base}${current.path(username)}${query ? `?${query}` : ""}`;
   const profileUrl = `${base}/u/${username}`;
 
   const mdSnippet = `[![${current.label}](${imgUrl})](${profileUrl})`;
@@ -2017,11 +1666,11 @@ function ReadmeWidgets({
             key={w.id}
             type="button"
             onClick={() => setActive(w.id)}
-            className="rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer"
+            className="rounded-[var(--r-control)] border px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer"
             style={
               active === w.id
                 ? { borderColor: accentBorder, color: accentColor, backgroundColor: accentBg }
-                : { borderColor: "#27272a", color: "#a1a1aa", backgroundColor: "rgba(24, 24, 27, 0.4)" }
+                : { borderColor: "var(--line)", color: "var(--ink-2)", backgroundColor: "var(--bg-2)" }
             }
           >
             {w.label}
@@ -2032,8 +1681,29 @@ function ReadmeWidgets({
       {/* Açıklama */}
       <p className="text-xs text-zinc-400">{current.desc}</p>
 
+      {/* Görünüm: şema ve dil, URL parametresi olarak eklenir */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-[12.5px] text-ink-3">
+          {lang === "en" ? "Scheme" : "Şema"}
+          <select value={wScheme} onChange={(e) => setWScheme(e.target.value)} className="input !h-8 !w-auto !py-0 font-mono !text-[12px]">
+            <option value="">devboard-night</option>
+            {[...DARK_SCHEMES, ...LIGHT_SCHEMES].filter((id) => id !== "devboard-night").map((id) => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
+        </label>
+        <div className="seg" role="group" aria-label={lang === "en" ? "Widget language" : "Widget dili"}>
+          {(["tr", "en"] as const).map((x) => (
+            <button key={x} type="button" aria-pressed={wLang === x} onClick={() => setWLang(x)} className="font-mono">
+              {x}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11.5px] text-ink-4">{lang === "en" ? "Added to the URL as ?scheme= and ?lang=" : "URL'ye ?scheme= ve ?lang= olarak eklenir"}</span>
+      </div>
+
       {/* Canlı Önizleme */}
-      <div className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950 p-6 flex items-center justify-center min-h-[100px]">
+      <div className="overflow-hidden rounded-panel border border-zinc-800/80 bg-zinc-950 p-6 flex items-center justify-center min-h-[100px]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img key={imgUrl} src={imgUrl} alt={current.label} className="max-w-full block drop-shadow-md" />
       </div>

@@ -1,9 +1,9 @@
 import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { calcRepoHealth, HEALTH_COLORS } from "@/lib/repo-health";
 import RepoDetailClient from "./repo-detail-client";
+import { daysAgoISO } from "@/lib/ui/format";
 
 type Props = { params: Promise<{ reponame: string }> };
 
@@ -28,8 +28,8 @@ export default async function RepoDetailPage({ params }: Props) {
 
   if (!repo) notFound();
 
-  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const oneYearAgo = daysAgoISO(365);
+  const ninetyDaysAgo = daysAgoISO(90);
 
   const [allCommitsRes, langsRes, prsRes, issuesRes] = await Promise.all([
     // Tüm commitler — heatmap, scatter, timeline için

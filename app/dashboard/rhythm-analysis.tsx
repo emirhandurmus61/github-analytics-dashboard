@@ -1,207 +1,261 @@
 "use client";
 
-import { useThemeColors } from "@/components/theme-provider";
+import { Sunrise, Sun, Sunset, Moon, Clock3 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { Sunrise, Sun, Sunset, Moon, Calendar } from "lucide-react";
+import { Panel, Track } from "@/components/ui/primitives";
+import { KV } from "@/components/ui/glance";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { WEEKDAYS_SHORT, fmtPct, cn, type Lang } from "@/lib/ui/format";
 
 type HourEntry = { hour: number; day: number; count: number };
-type Props = { hourData: HourEntry[]; commitTimestamps: string[] };
-
 type PeriodKey = "morning" | "afternoon" | "evening" | "night";
-type Period = {
-  key: PeriodKey;
-  labelTr: string;
-  labelEn: string;
-  coderTr: string;
-  coderEn: string;
-  icon: React.ComponentType<{ className?: string }>;
-  hours: number[];
-};
 
-const PERIODS: Period[] = [
-  { key: "morning",   labelTr: "Sabah", labelEn: "Morning",   coderTr: "Sabah Kodcusu", coderEn: "Morning Coder",   icon: Sunrise, hours: [6,7,8,9,10,11] },
-  { key: "afternoon", labelTr: "Öğle",  labelEn: "Afternoon", coderTr: "Öğle Kodcusu",  coderEn: "Afternoon Coder", icon: Sun,     hours: [12,13,14,15,16,17] },
-  { key: "evening",   labelTr: "Akşam", labelEn: "Evening",   coderTr: "Akşam Kodcusu", coderEn: "Evening Coder",   icon: Sunset,  hours: [18,19,20,21] },
-  { key: "night",     labelTr: "Gece",  labelEn: "Night",     coderTr: "Gece Kodcusu",  coderEn: "Night Owl",       icon: Moon,    hours: [22,23,0,1,2,3,4,5] },
+const PERIODS: { key: PeriodKey; tr: string; en: string; coderTr: string; coderEn: string; icon: typeof Sun; hours: number[] }[] = [
+  { key: "morning", tr: "Sabah", en: "Morning", coderTr: "Sabahçı", coderEn: "Early bird", icon: Sunrise, hours: [6, 7, 8, 9, 10, 11] },
+  { key: "afternoon", tr: "Öğleden sonra", en: "Afternoon", coderTr: "Gündüzcü", coderEn: "Day coder", icon: Sun, hours: [12, 13, 14, 15, 16, 17] },
+  { key: "evening", tr: "Akşam", en: "Evening", coderTr: "Akşamcı", coderEn: "Evening coder", icon: Sunset, hours: [18, 19, 20, 21] },
+  { key: "night", tr: "Gece", en: "Night", coderTr: "Gece kuşu", coderEn: "Night owl", icon: Moon, hours: [22, 23, 0, 1, 2, 3, 4, 5] },
 ];
 
-const DAY_NAMES_TR = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
-const DAY_NAMES_EN = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+function analyze(hourData: HourEntry[], timestamps: string[]) {
+  const grid = Array.from({ length: 7 }, () => new Array(24).fill(0) as number[]);
+  for (const { hour, day, count } of hourData) if (day >= 0 && day < 7 && hour >= 0 && hour < 24) grid[day][hour] = count;
+  const hours = Array.from({ length: 24 }, (_, h) => grid.reduce((s, r) => s + r[h], 0));
+  const days = grid.map((r) => r.reduce((s, c) => s + c, 0));
+  const total = hours.reduce((s, v) => s + v, 0);
+  const period = Object.fromEntries(PERIODS.map((p) => [p.key, p.hours.reduce((s, h) => s + hours[h], 0)])) as Record<PeriodKey, number>;
+  const top = PERIODS.reduce((a, b) => (period[b.key] > period[a.key] ? b : a));
+  const peakHour = hours.indexOf(Math.max(...hours));
+  const peakDay = days.indexOf(Math.max(...days));
+  const weekday = days.slice(0, 5).reduce((s, v) => s + v, 0);
 
-function buildStats(hourData: HourEntry[], commitTimestamps: string[], lang: string) {
-  const grid: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
-  for (const { hour, day, count } of hourData) {
-    if (day >= 0 && day < 7 && hour >= 0 && hour < 24) grid[day][hour] = count;
-  }
-  const total = grid.flat().reduce((s, c) => s + c, 0);
-  const hourTotals = Array.from({ length: 24 }, (_, h) => grid.reduce((s, row) => s + row[h], 0));
-  const periodCounts: Record<PeriodKey, number> = { morning: 0, afternoon: 0, evening: 0, night: 0 };
-  for (const p of PERIODS) periodCounts[p.key] = p.hours.reduce((s, h) => s + hourTotals[h], 0);
-
-  const weekdayTotal = grid.slice(0, 5).flat().reduce((s, c) => s + c, 0);
-  const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
-  const dayTotals = grid.map((row) => row.reduce((s, c) => s + c, 0));
-  const dayMax = Math.max(...dayTotals, 1);
-  const DAY_NAMES = lang === "en" ? DAY_NAMES_EN : DAY_NAMES_TR;
-  const peakDayIndex = dayTotals.indexOf(Math.max(...dayTotals));
-  const peakDay = DAY_NAMES[peakDayIndex];
-
-  const maxPeriod = Math.max(...Object.values(periodCounts));
-  let identityKey: PeriodKey = "afternoon";
-  for (const p of PERIODS) if (periodCounts[p.key] === maxPeriod) { identityKey = p.key; break; }
-  const identityPeriod = PERIODS.find((p) => p.key === identityKey)!;
-
-  let longestSession = 0;
-  if (commitTimestamps.length > 0) {
-    const sorted = [...commitTimestamps].sort();
-    let sStart = new Date(sorted[0]).getTime();
-    let sEnd = sStart;
-    let best = 0;
+  let session = 0;
+  if (timestamps.length) {
+    const sorted = [...timestamps].sort();
+    let a = new Date(sorted[0]).getTime();
+    let b = a;
     for (let i = 1; i < sorted.length; i++) {
-      const curr = new Date(sorted[i]).getTime();
-      const sameDay = new Date(sorted[i]).toDateString() === new Date(sorted[i - 1]).toDateString();
-      if (sameDay && (curr - sEnd) / 3600000 <= 3) { sEnd = curr; }
-      else { best = Math.max(best, Math.round((sEnd - sStart) / 3600000)); sStart = curr; sEnd = curr; }
+      const t = new Date(sorted[i]).getTime();
+      const same = new Date(sorted[i]).toDateString() === new Date(sorted[i - 1]).toDateString();
+      if (same && (t - b) / 3600000 <= 3) b = t;
+      else {
+        session = Math.max(session, (b - a) / 3600000);
+        a = b = t;
+      }
     }
-    longestSession = Math.max(best, Math.round((sEnd - sStart) / 3600000));
+    session = Math.round(Math.max(session, (b - a) / 3600000));
   }
-
-  const weekdayPct = total > 0 ? Math.round((weekdayTotal / total) * 100) : 0;
-  return { total, periodCounts, weekdayPct, weekendPct: 100 - weekdayPct, peakHour, peakDay, peakDayIndex, dayTotals, dayMax, DAY_NAMES, identityPeriod, longestSession, hourTotals };
+  return { hours, days, total, period, top, peakHour, peakDay, weekdayPct: total ? Math.round((weekday / total) * 100) : 0, session };
 }
 
-export default function RhythmAnalysis({ hourData, commitTimestamps }: Props) {
-  const theme = useThemeColors();
-  const { lang } = useLanguage();
-  if (hourData.length === 0) return null;
+const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
-  const s = buildStats(hourData, commitTimestamps, lang);
-  const hourMax = Math.max(...s.hourTotals, 1);
-  const IdentityIcon = s.identityPeriod.icon;
-
+/** 24-hour radial histogram. Midnight at the top, clockwise. */
+function Clock({ hours, peak, size }: { hours: number[]; peak: number; size: number }) {
+  const max = Math.max(...hours, 1);
+  const c = size / 2;
+  const r0 = size * 0.2;
+  const r1 = size * 0.4;
+  const a = (h: number) => ((h / 24) * 360 - 90) * (Math.PI / 180);
+  const rd = (n: number) => Math.round(n * 100) / 100;
+  const pt = (h: number, r: number) => [rd(c + r * Math.cos(a(h))), rd(c + r * Math.sin(a(h)))] as const;
+  const wedge = (h: number, r: number) => {
+    const s = h + 0.12;
+    const e = h + 0.88;
+    const [x1, y1] = pt(s, r0);
+    const [x2, y2] = pt(s, r);
+    const [x3, y3] = pt(e, r);
+    const [x4, y4] = pt(e, r0);
+    return `M${x1},${y1} L${x2},${y2} A${rd(r)},${rd(r)} 0 0 1 ${x3},${y3} L${x4},${y4} A${rd(r0)},${rd(r0)} 0 0 0 ${x1},${y1} Z`;
+  };
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3 shrink-0">
-        <div>
-          <h2 className="text-sm font-medium text-zinc-400">
-            {lang === "en" ? "Work Rhythm" : "Çalışma Ritmi"}
-          </h2>
-          <p className="text-xs text-zinc-600 mt-0.5">
-            {lang === "en" ? "Analysis of commit habits" : "Commit alışkanlıklarının analizi"}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1" style={{ borderColor: theme.accentBorder, backgroundColor: theme.accentBg }}>
-          <IdentityIcon className="w-3.5 h-3.5 text-[var(--accent)]" />
-          <span className="text-xs font-medium" style={{ color: theme.accent }}>
-            {lang === "en" ? s.identityPeriod.coderEn : s.identityPeriod.coderTr}
-          </span>
-        </div>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" aria-hidden>
+      <circle cx={c} cy={c} r={r1} fill="none" stroke="var(--line)" strokeDasharray="2 4" />
+      <circle cx={c} cy={c} r={r0 - 3} fill="var(--bg-2)" />
+      {hours.map((v, h) => (
+        <path
+          key={h}
+          d={wedge(h, r0 + Math.max(0.04, v / max) * (r1 - r0))}
+          fill={h === peak ? "var(--accent)" : v ? `color-mix(in oklab, var(--accent) ${30 + (v / max) * 45}%, var(--bg-3))` : "var(--bg-3)"}
+        >
+          <title>{`${hh(h)} · ${v}`}</title>
+        </path>
+      ))}
+      {[0, 6, 12, 18].map((h) => {
+        const [x, y] = pt(h, r1 + size * 0.07);
+        return (
+          <text key={h} x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(9, size * 0.055)} fontFamily="var(--font-code)" fill="var(--ink-4)">
+            {String(h).padStart(2, "0")}
+          </text>
+        );
+      })}
+      <text x={c} y={c - size * 0.02} textAnchor="middle" fontSize={size * 0.09} fontWeight={700} fontFamily="var(--font-code)" fill="var(--ink-1)">
+        {String(peak).padStart(2, "0")}
+      </text>
+      <text x={c} y={c + size * 0.075} textAnchor="middle" fontSize={size * 0.05} fontFamily="var(--font-code)" fill="var(--ink-3)">
+        :00
+      </text>
+    </svg>
+  );
+}
+
+function HourBars({ hours, peak, axis }: { hours: number[]; peak: number; axis?: boolean }) {
+  const max = Math.max(...hours, 1);
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex flex-1 min-h-0 items-end gap-[2px]">
+        {hours.map((v, h) => (
+          <span
+            key={h}
+            title={`${hh(h)} · ${v}`}
+            className="flex-1 rounded-[2px]"
+            style={{ height: `${v ? Math.max(6, (v / max) * 100) : 3}%`, background: h === peak ? "var(--accent)" : v ? "var(--heat-2)" : "var(--bg-3)" }}
+          />
+        ))}
       </div>
-
-      {/* Content */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {/* Left: Period bars */}
-        <div className="space-y-2">
-          {PERIODS.map((period) => {
-            const count = s.periodCounts[period.key];
-            const pct = s.total > 0 ? Math.round((count / s.total) * 100) : 0;
-            const isTop = count === Math.max(...Object.values(s.periodCounts));
-            const Icon = period.icon;
-            const label = lang === "en" ? period.labelEn : period.labelTr;
-            return (
-              <div key={period.key}>
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Icon className={`w-3.5 h-3.5 ${isTop ? "text-[var(--accent)]" : "text-zinc-600"}`} />
-                    <span className={`text-xs ${isTop ? "text-zinc-200 font-medium" : "text-zinc-500"}`}>{label}</span>
-                  </div>
-                  <span className="text-[10px] text-zinc-600 tabular-nums">{pct}%</span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: isTop ? theme.accent : theme.shades[1] }} />
-                </div>
-              </div>
-            );
-          })}
+      {axis && (
+        <div className="mt-1 grid grid-cols-4 font-mono text-[9.5px] text-ink-4">
+          <span>00</span>
+          <span>06</span>
+          <span>12</span>
+          <span>18</span>
         </div>
+      )}
+    </div>
+  );
+}
 
-        {/* Right: Stats */}
-        <div className="space-y-2">
-          {/* Günlük dağılım bar grafiği */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-            <p className="text-[10px] text-zinc-600 mb-2">
-              {lang === "en" ? "Daily Distribution" : "Gün Bazlı Dağılım"}
-            </p>
-            <div className="flex items-end gap-1 h-12">
-              {s.dayTotals.map((count, i) => {
-                const pct = s.dayMax > 0 ? (count / s.dayMax) * 100 : 0;
-                const isWeekend = i >= 5;
-                const isPeak = i === s.peakDayIndex;
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                    <div
-                      className="w-full rounded-sm transition-all hover:opacity-80"
-                      title={`${s.DAY_NAMES[i]}: ${count} commit${lang === "en" && count !== 1 ? "s" : ""}`}
-                      style={{
-                        height: `${Math.max(pct, count > 0 ? 8 : 4)}%`,
-                        backgroundColor: isPeak
-                          ? theme.accent
-                          : isWeekend
-                          ? theme.shades[2]
-                          : count > 0 ? theme.shades[1] : "#1a1a1e",
-                      }}
-                    />
-                    <span className={`text-[8px] tabular-nums ${isPeak ? "" : "text-zinc-700"}`} style={{ color: isPeak ? theme.accent : undefined }}>
-                      {s.DAY_NAMES[i]}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-between text-[10px] mt-1.5">
-              <span style={{ color: theme.accent }}>
-                {lang === "en" ? `${s.weekdayPct}% weekdays` : `%${s.weekdayPct} hafta içi`}
-              </span>
-              <span className="text-zinc-500">
-                {lang === "en" ? `${s.weekendPct}% weekends` : `%${s.weekendPct} hafta sonu`}
-              </span>
-            </div>
-          </div>
+export default function RhythmAnalysis({ hourData, commitTimestamps }: { hourData: HourEntry[]; commitTimestamps: string[] }) {
+  const { lang } = useLanguage();
+  const l = lang as Lang;
+  const { shape, w, h } = useWidgetSize();
+  const title = l === "en" ? "Work rhythm" : "Çalışma ritmi";
+  if (!hourData.length) {
+    return (
+      <Panel title={title} icon={Clock3}>
+        <p className="text-[12.5px] text-ink-3">{l === "en" ? "No commit times in this range." : "Bu aralıkta commit saati yok."}</p>
+      </Panel>
+    );
+  }
+  const s = analyze(hourData, commitTimestamps);
+  const Icon = s.top.icon;
+  const identity = l === "en" ? s.top.coderEn : s.top.coderTr;
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-              <p className="text-[10px] text-zinc-600 mb-1">{lang === "en" ? "Peak Hour" : "Pik Saat"}</p>
-              <p className="text-lg font-bold tabular-nums" style={{ color: theme.accent }}>
-                {String(s.peakHour).padStart(2, "0")}:00
-              </p>
+  const periods = (
+    <ul className="flex flex-col gap-2">
+      {PERIODS.map((p) => {
+        const v = s.period[p.key];
+        const pct = s.total ? (v / s.total) * 100 : 0;
+        const on = p.key === s.top.key;
+        const PI = p.icon;
+        return (
+          <li key={p.key}>
+            <div className="mb-1 flex items-center gap-1.5 text-[12px]">
+              <PI size={12} className={on ? "text-accent" : "text-ink-4"} />
+              <span className={on ? "text-ink font-medium" : "text-ink-3"}>{l === "en" ? p.en : p.tr}</span>
+              <span className="ml-auto font-mono text-[11px] text-ink-3 num">{fmtPct(pct, l)}</span>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-              <div className="flex items-center gap-1 mb-1">
-                <Calendar className="w-2.5 h-2.5 text-zinc-600" />
-                <p className="text-[10px] text-zinc-600">{lang === "en" ? "Most Active Day" : "En Aktif Gün"}</p>
-              </div>
-              <p className="text-sm font-semibold text-zinc-200">{s.peakDay}</p>
-            </div>
-          </div>
-        </div>
+            <Track value={pct} color={on ? "var(--accent)" : "var(--heat-2)"} height={4} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  const weekdays = (
+    <div>
+      <div className="flex items-end gap-1 h-12">
+        {s.days.map((v, i) => (
+          <span
+            key={i}
+            title={`${WEEKDAYS_SHORT[l][i]} · ${v}`}
+            className="flex-1 rounded-[2px]"
+            style={{ height: `${v ? Math.max(8, (v / Math.max(...s.days, 1)) * 100) : 4}%`, background: i === s.peakDay ? "var(--accent)" : i >= 5 ? "var(--heat-1)" : "var(--heat-2)" }}
+          />
+        ))}
       </div>
-
-      {/* 24h bar chart */}
-      <div className="mt-3 shrink-0">
-        <div className="flex items-end gap-px h-8">
-          {s.hourTotals.map((count, h) => {
-            const hPct = hourMax > 0 ? (count / hourMax) * 100 : 0;
-            return (
-              <div
-                key={h} className="flex-1 rounded-t-sm hover:opacity-80 transition-opacity"
-                title={`${String(h).padStart(2, "0")}:00 -- ${count} commit${lang === "en" && count !== 1 ? "s" : ""}`}
-                style={{ height: `${Math.max(hPct, count > 0 ? 8 : 2)}%`, backgroundColor: h === s.peakHour ? theme.accent : count > 0 ? theme.shades[1] : "#1a1a1e" }}
-              />
-            );
-          })}
-        </div>
+      <div className="mt-1 flex gap-1 font-mono text-[9.5px] text-ink-4">
+        {WEEKDAYS_SHORT[l].map((d, i) => (
+          <span key={d} className={cn("flex-1 text-center", i === s.peakDay && "text-accent")}>{d.slice(0, 2)}</span>
+        ))}
       </div>
     </div>
+  );
+
+  const identityChip = (
+    <span className="chip" data-tone="accent">
+      <Icon /> {identity}
+    </span>
+  );
+
+  return (
+    <Panel title={title} icon={Clock3} meta={`${l === "en" ? "peak" : "zirve"} ${hh(s.peakHour)}`}>
+      {shape === "glance" && (
+        <div className="flex h-full flex-col">
+          <div className="flex items-center gap-2">
+            <Icon size={18} className="text-accent shrink-0" />
+            <span className="figure text-[20px] @min-[200px]:text-[24px] truncate">{identity}</span>
+          </div>
+          <div className="mt-1.5 text-[11.5px] text-ink-3">
+            {l === "en" ? "busiest at" : "en yoğun"} <span className="font-mono text-ink-2">{hh(s.peakHour)}</span>
+          </div>
+          <div className="mt-auto h-8 pt-1">
+            <HourBars hours={s.hours} peak={s.peakHour} />
+          </div>
+        </div>
+      )}
+
+      {shape === "strip" && (
+        <div className="flex h-full gap-5">
+          <div className="flex shrink-0 flex-col justify-center gap-2">
+            {identityChip}
+            <div className="text-[12px] text-ink-3">
+              {l === "en" ? "weekdays" : "hafta içi"} <span className="font-mono text-ink">{fmtPct(s.weekdayPct, l)}</span>
+            </div>
+            {w >= 3 && (
+              <div className="text-[12px] text-ink-3">
+                {l === "en" ? "longest session" : "en uzun oturum"} <span className="font-mono text-ink">{s.session}{l === "en" ? "h" : " sa"}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <HourBars hours={s.hours} peak={s.peakHour} axis />
+          </div>
+        </div>
+      )}
+
+      {shape === "column" && (
+        <div className="flex h-full flex-col items-center gap-3">
+          {identityChip}
+          <Clock hours={s.hours} peak={s.peakHour} size={h >= 3 ? 200 : 150} />
+          <div className="w-full flex flex-col gap-1">
+            <KV k={l === "en" ? "Busiest day" : "En yoğun gün"} v={WEEKDAYS_SHORT[l][s.peakDay]} />
+            <KV k={l === "en" ? "Weekdays" : "Hafta içi"} v={fmtPct(s.weekdayPct, l)} />
+            {h >= 3 && <KV k={l === "en" ? "Longest session" : "En uzun oturum"} v={`${s.session}${l === "en" ? "h" : " sa"}`} />}
+          </div>
+        </div>
+      )}
+
+      {shape === "block" && (
+        <div className="flex h-full gap-5 @max-[420px]:flex-col @max-[420px]:items-center">
+          <div className="flex flex-col items-center justify-center gap-2">
+            <Clock hours={s.hours} peak={s.peakHour} size={h >= 3 || w >= 3 ? 220 : 170} />
+            <div className="hidden @max-[420px]:flex w-full flex-col gap-1">
+              <KV k={l === "en" ? "Busiest day" : "En yoğun gün"} v={WEEKDAYS_SHORT[l][s.peakDay]} />
+              <KV k={l === "en" ? "Weekdays" : "Hafta içi"} v={fmtPct(s.weekdayPct, l)} />
+            </div>
+            {identityChip}
+          </div>
+          <div className="flex flex-1 min-w-0 flex-col justify-between gap-3 self-stretch @max-[420px]:hidden">
+            {periods}
+            {weekdays}
+            <div className="flex flex-col gap-1">
+              <KV k={l === "en" ? "Weekday share" : "Hafta içi payı"} v={fmtPct(s.weekdayPct, l)} />
+              <KV k={l === "en" ? "Longest session" : "En uzun oturum"} v={`${s.session}${l === "en" ? "h" : " sa"}`} />
+            </div>
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }

@@ -1,6 +1,9 @@
-// Grid system: 4 columns, each cell CELL_SIZE px tall
-// Cards span colSpan (1-4) x rowSpan (1-4) cells
-// Content fills the cell; overflows scroll
+// Overview grid configuration.
+//
+// Desktop: 4 columns; a card spans colSpan × rowSpan cells within its min/max.
+// Compact grid (< 1024px): 2 columns; a card takes one of four sizes:
+//   S = 1×1, M = 2×1, L = 2×2, XL = 2×3
+// Every card ships a dedicated layout for each shape (see components/ui/widget-size).
 
 export type WidgetId =
   | "stat-repos"
@@ -30,130 +33,116 @@ export type WidgetId =
   | "advanced-goals"
   | "follow-feed";
 
+export type MobileSize = "S" | "M" | "L" | "XL";
+
+export const MOBILE_DIMS: Record<MobileSize, { w: number; h: number }> = {
+  S: { w: 1, h: 1 },
+  M: { w: 2, h: 1 },
+  L: { w: 2, h: 2 },
+  XL: { w: 2, h: 3 },
+};
+
 export interface WidgetConfig {
   id: WidgetId;
   label: string;
-  colSpan: number;   // 1-4
-  rowSpan: number;   // 1-4
+  colSpan: number;
+  rowSpan: number;
   minCol: number;
   maxCol: number;
   minRow: number;
   maxRow: number;
   visible: boolean;
+  mobile: MobileSize;
+  mobileSizes: MobileSize[];
 }
 
-export const CELL_SIZE = 180;
-export const GRID_GAP = 10;
+/** Legacy pixel constants (overridden by the density setting at runtime). */
+export const CELL_SIZE = 184;
+export const GRID_GAP = 12;
 
-// Pixel heights for reference:
-// 1 row = 180px
-// 2 rows = 370px (180+10+180)
-// 3 rows = 560px (180+10+180+10+180)
-// 4 rows = 750px
+const ALL: MobileSize[] = ["S", "M", "L", "XL"];
+const NO_XL: MobileSize[] = ["S", "M", "L"];
 
-export const DEFAULT_WIDGET_CONFIGS: WidgetConfig[] = [
-  // Row 1: 4 stat cards (1x1 each = 180px square)
-  { id: "stat-repos",    label: "Toplam Repo",         colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, visible: true },
-  { id: "stat-commits",  label: "Commit Sayisi",       colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, visible: true },
-  { id: "stat-langs",    label: "Kullanilan Dil",      colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, visible: true },
-  { id: "week-compare",  label: "Haftalik Karsilastir", colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, visible: true },
+type Def = Omit<WidgetConfig, "visible" | "mobileSizes"> & { mobileSizes?: MobileSize[] };
 
-  // Row 2: streak 2x1, goal 2x1
-  { id: "streak",        label: "Streak",              colSpan: 2, rowSpan: 1, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
-  { id: "goal",          label: "Haftalik Hedef",      colSpan: 2, rowSpan: 1, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
+const DEFS: Def[] = [
+  // Pulse: four glance tiles
+  { id: "stat-commits", label: "Commit sayısı", colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, mobile: "S", mobileSizes: NO_XL },
+  { id: "streak", label: "Seri", colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "S" },
+  { id: "week-compare", label: "Bu hafta", colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, mobile: "S", mobileSizes: NO_XL },
+  { id: "goal", label: "Haftalık hedef", colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "S" },
 
-  // Row 3: insights 4x1
-  { id: "insights",      label: "Icgoruler",           colSpan: 4, rowSpan: 1, minCol: 2, maxCol: 4, minRow: 1, maxRow: 2, visible: true },
+  // The year at a glance
+  { id: "heatmap", label: "Katkı haritası", colSpan: 4, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "L" },
 
-  // Badges 4x2
-  { id: "badges",        label: "Rozetler",            colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
+  { id: "activity-bar", label: "Son 30 gün", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "M" },
+  { id: "lang-dist", label: "Dil dağılımı", colSpan: 1, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "L" },
+  { id: "stat-repos", label: "Repolar", colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, mobile: "S", mobileSizes: NO_XL },
+  { id: "stat-langs", label: "Diller", colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, mobile: "S", mobileSizes: NO_XL },
 
-  // Code stats 4x1
-  { id: "code-stats",    label: "Kod Istatistikleri",  colSpan: 4, rowSpan: 1, minCol: 2, maxCol: 4, minRow: 1, maxRow: 2, visible: true },
+  { id: "insights", label: "İçgörüler", colSpan: 4, rowSpan: 1, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "M" },
 
-  // Month compare 4x2
-  { id: "month-compare", label: "Aylik Karsilastir",   colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
+  { id: "velocity", label: "Hız", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "L" },
+  { id: "rhythm", label: "Çalışma ritmi", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "L" },
 
-  // Velocity chart 4x2
-  { id: "velocity",      label: "Velocity",            colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
+  { id: "hour-heatmap", label: "Saat haritası", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "L" },
+  { id: "commit-quality", label: "Commit kalitesi", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "XL" },
 
-  // Lang evolution 4x2
-  { id: "lang-evolution",label: "Dil Evrimi",          colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
+  { id: "code-stats", label: "Kod istatistikleri", colSpan: 4, rowSpan: 1, minCol: 1, maxCol: 4, minRow: 1, maxRow: 2, mobile: "M", mobileSizes: NO_XL },
 
-  // Contribution heatmap 4x2
-  { id: "heatmap",       label: "Katki Haritasi",      colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
+  { id: "lang-evolution", label: "Dil evrimi", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "L" },
+  { id: "month-compare", label: "Aylık karşılaştırma", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "L" },
 
-  // Activity 2x2, Lang dist 2x2
-  { id: "activity-bar",  label: "Aktivite",            colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
-  { id: "lang-dist",     label: "Dil Dagilimi",        colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
+  { id: "repo-list", label: "Aktif repolar", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "L" },
+  { id: "repo-health", label: "Repo sağlığı", colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "XL" },
 
-  // Rhythm 4x2
-  { id: "rhythm",        label: "Calisma Ritmi",       colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
+  { id: "badges", label: "Rozetler", colSpan: 4, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, mobile: "L" },
 
-  // Commit quality 4x2
-  { id: "commit-quality",label: "Commit Kalitesi",     colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
+  { id: "developer-dna", label: "Developer DNA", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "L" },
+  { id: "percentile-rank", label: "Sıralaman", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "L" },
 
-  // Hour heatmap 4x2
-  { id: "hour-heatmap",  label: "Saat Haritasi",       colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
-
-  // Repo list 4x2
-  { id: "repo-list",     label: "Aktif Repolar",       colSpan: 4, rowSpan: 2, minCol: 2, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
-
-  // Repo health 4x3
-  { id: "repo-health",   label: "Repo Saglik",         colSpan: 4, rowSpan: 3, minCol: 2, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
-
-  // Profil görüntülenme 2x2
-  { id: "profile-views",   label: "Profil Görüntülenme", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 3, visible: true },
-
-  // Developer Card 2x3
-  { id: "developer-card", label: "Developer Card",      colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
-
-  // Developer DNA 2x3
-  { id: "developer-dna",  label: "Developer DNA",       colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
-
-  // Percentile Rank 2x3
-  { id: "percentile-rank", label: "Sıralaman",          colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
-
-  // Advanced Goals 2x3
-  { id: "advanced-goals",  label: "Gelişmiş Hedefler",  colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
-
-  // Follow Feed 2x3
-  { id: "follow-feed",     label: "Takip Akışı",         colSpan: 2, rowSpan: 3, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, visible: true },
+  { id: "advanced-goals", label: "Hedef zinciri", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "L" },
+  { id: "follow-feed", label: "Takip akışı", colSpan: 1, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "L" },
+  { id: "profile-views", label: "Profil ziyaretleri", colSpan: 1, rowSpan: 1, minCol: 1, maxCol: 2, minRow: 1, maxRow: 2, mobile: "S", mobileSizes: NO_XL },
+  { id: "developer-card", label: "Developer Card", colSpan: 2, rowSpan: 2, minCol: 1, maxCol: 4, minRow: 1, maxRow: 4, mobile: "L" },
 ];
 
+export const DEFAULT_WIDGET_CONFIGS: WidgetConfig[] = DEFS.map((d) => ({
+  ...d,
+  visible: true,
+  mobileSizes: d.mobileSizes ?? ALL,
+}));
+
 export const WIDGET_LABELS_EN: Record<WidgetId, string> = {
-  "stat-repos": "Total Repos",
-  "stat-commits": "Commit Count",
-  "stat-langs": "Languages Used",
-  "week-compare": "Weekly Comparison",
-  "streak": "Streak",
-  "goal": "Weekly Goal",
-  "insights": "Insights",
-  "badges": "Badges",
-  "code-stats": "Code Stats",
-  "month-compare": "Monthly Comparison",
-  "velocity": "Velocity",
-  "lang-evolution": "Language Evolution",
-  "heatmap": "Contribution Heatmap",
-  "activity-bar": "Activity",
-  "lang-dist": "Language Distribution",
-  "rhythm": "Work Rhythm",
-  "commit-quality": "Commit Quality",
-  "hour-heatmap": "Hourly Heatmap",
-  "repo-list": "Active Repos",
-  "repo-health": "Repo Health",
-  "profile-views": "Profile Views",
+  "stat-repos": "Repositories",
+  "stat-commits": "Commits",
+  "stat-langs": "Languages",
+  "week-compare": "This week",
+  streak: "Streak",
+  goal: "Weekly goal",
+  insights: "Insights",
+  badges: "Badges",
+  "code-stats": "Code stats",
+  "month-compare": "Month over month",
+  velocity: "Velocity",
+  "lang-evolution": "Language evolution",
+  heatmap: "Contribution map",
+  "activity-bar": "Last 30 days",
+  "lang-dist": "Language mix",
+  rhythm: "Work rhythm",
+  "commit-quality": "Commit quality",
+  "hour-heatmap": "Hour map",
+  "repo-list": "Active repos",
+  "repo-health": "Repo health",
+  "profile-views": "Profile visits",
   "developer-card": "Developer Card",
   "developer-dna": "Developer DNA",
-  "percentile-rank": "Your Ranking",
-  "advanced-goals": "Advanced Goals",
-  "follow-feed": "Follow Feed",
+  "percentile-rank": "Your ranking",
+  "advanced-goals": "Goal chain",
+  "follow-feed": "Following",
 };
 
 export function getWidgetLabel(id: WidgetId, lang: "tr" | "en" = "tr"): string {
-  if (lang === "en") {
-    return WIDGET_LABELS_EN[id] ?? id;
-  }
-  const cfg = DEFAULT_WIDGET_CONFIGS.find((c) => c.id === id);
-  return cfg?.label ?? id;
+  if (lang === "en") return WIDGET_LABELS_EN[id] ?? id;
+  return DEFAULT_WIDGET_CONFIGS.find((c) => c.id === id)?.label ?? id;
 }

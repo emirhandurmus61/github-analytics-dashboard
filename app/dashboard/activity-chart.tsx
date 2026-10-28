@@ -1,158 +1,121 @@
 "use client";
 
 import { useState } from "react";
-import { useThemeColors } from "@/components/theme-provider";
-import { type Language } from "@/lib/i18n";
-import { Calendar, Activity, Zap } from "lucide-react";
+import { Activity } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import { Panel, Bars } from "@/components/ui/primitives";
+import { Glance } from "@/components/ui/glance";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { fmtDay, cn, type Lang } from "@/lib/ui/format";
+import type { DayCount } from "./types";
 
-interface ActivityChartProps {
-  data: { date: string; commit_count: number }[];
-  emptyText?: string;
-  lang?: Language;
-}
-
-export default function ActivityChart({
-  data,
-  emptyText = "Veri yok",
-  lang = "tr",
-}: ActivityChartProps) {
-  const theme = useThemeColors();
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[160px] text-xs text-zinc-600 gap-2">
-        <Calendar className="w-5 h-5 text-zinc-700" />
-        <span>{emptyText}</span>
-      </div>
-    );
-  }
-
+/** Interactive daily bars with a readout that replaces the summary on hover. */
+function DayBars({ data, l, axis }: { data: DayCount[]; l: Lang; axis?: boolean }) {
+  const [hi, setHi] = useState<number | null>(null);
   const max = Math.max(...data.map((d) => d.commit_count), 1);
-  const totalCommits = data.reduce((s, d) => s + d.commit_count, 0);
-  const activeDays = data.filter((d) => d.commit_count > 0).length;
-
-  const activePoint = selectedIndex !== null ? data[selectedIndex] : null;
-
+  const avg = data.reduce((s, d) => s + d.commit_count, 0) / Math.max(1, data.length);
+  const pt = hi !== null ? data[hi] : null;
   return (
-    <div className="flex flex-col flex-1 justify-between gap-3 w-full min-h-[160px]">
-      {/* Top info row: selected day or overview stats */}
-      <div className="flex items-center justify-between min-h-[24px] text-xs shrink-0">
-        {activePoint ? (
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-400 font-medium">
-              {new Date(activePoint.date + "T00:00:00").toLocaleDateString(
-                lang === "en" ? "en-US" : "tr-TR",
-                { month: "short", day: "numeric", weekday: "short" }
-              )}
-            </span>
-            <span
-              className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
-              style={{
-                backgroundColor: activePoint.commit_count > 0 ? theme.accentBg : "rgba(63, 63, 70, 0.4)",
-                color: activePoint.commit_count > 0 ? theme.accent : "#a1a1aa",
-              }}
-            >
-              {activePoint.commit_count} {lang === "en" ? (activePoint.commit_count === 1 ? "commit" : "commits") : "commit"}
-            </span>
-          </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-2 h-4 font-mono text-[11.5px] text-ink-3">
+        {pt ? (
+          <>
+            <span className="text-ink font-semibold">{pt.commit_count}</span> commit · {fmtDay(pt.date, l, { weekday: "short", day: "numeric", month: "short" })}
+          </>
         ) : (
-          <div className="flex items-center gap-3 text-zinc-400">
-            <div className="flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-zinc-500" />
-              <span className="font-semibold text-zinc-200 tabular-nums">{totalCommits}</span>
-              <span className="text-[11px] text-zinc-500">commit</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-zinc-500" />
-              <span className="font-semibold text-zinc-200 tabular-nums">{activeDays}</span>
-              <span className="text-[11px] text-zinc-500">
-                / {data.length} {lang === "en" ? "active days" : "aktif gün"}
-              </span>
-            </div>
-          </div>
+          <span>
+            {l === "en" ? "avg" : "ort."} {avg.toFixed(1)}/{l === "en" ? "day" : "gün"} · {l === "en" ? "peak" : "zirve"} {max}
+          </span>
         )}
-
-        <div className="text-[11px] text-zinc-500">
-          {totalCommits > 0 ? (
-            <span>
-              {lang === "en" ? "Peak" : "Zirve"}:{" "}
-              <strong className="text-zinc-300 font-semibold">{max}</strong>/gün
-            </span>
-          ) : (
-            <span className="text-zinc-600">
-              {lang === "en" ? "No commits in period" : "Dönemde commit yok"}
-            </span>
-          )}
-        </div>
       </div>
-
-      {/* 30-Day Bar Histogram with explicit pixel heights */}
-      <div
-        className="w-full h-[110px] flex items-end gap-1 px-0.5 relative pt-2"
-        onMouseLeave={() => setSelectedIndex(null)}
-      >
-        {data.map((d, index) => {
-          const hasCommits = d.commit_count > 0;
-          // Calculate height directly in pixels (8px base to 100px max) so flex percentage collapse never occurs on mobile
-          const heightPx = hasCommits
-            ? Math.max(Math.round((d.commit_count / max) * 95), 16)
-            : 8;
-
-          const isSelected = selectedIndex === index;
-
+      <div className="relative flex flex-1 min-h-0 items-end gap-[3px]" onMouseLeave={() => setHi(null)}>
+        <span className="pointer-events-none absolute inset-x-0 border-t border-dashed border-line-strong" style={{ bottom: `${(avg / max) * 100}%` }} />
+        {data.map((d, i) => {
+          const wd = new Date(d.date + "T12:00:00").getDay();
+          const weekend = wd === 0 || wd === 6;
+          const on = hi === i;
           return (
-            <div
+            <button
               key={d.date}
-              className="flex-1 flex flex-col justify-end items-center h-full cursor-pointer py-1"
-              onMouseEnter={() => setSelectedIndex(index)}
-              onClick={() => setSelectedIndex(isSelected ? null : index)}
-              onTouchStart={() => setSelectedIndex(index)}
+              type="button"
+              tabIndex={-1}
+              onMouseEnter={() => setHi(i)}
+              onFocus={() => setHi(i)}
+              onClick={() => setHi(on ? null : i)}
+              className="relative flex h-full flex-1 items-end"
+              aria-label={`${d.date}: ${d.commit_count}`}
             >
-              <div
-                className="w-full rounded-t-sm transition-all duration-150"
+              <span
+                className="w-full rounded-[2px] transition-[height,background-color] duration-300"
                 style={{
-                  height: `${heightPx}px`,
-                  minHeight: "8px",
-                  backgroundColor: hasCommits
-                    ? isSelected
-                      ? "#ffffff"
-                      : theme.accent
-                    : isSelected
-                    ? "rgba(161, 161, 170, 0.6)"
-                    : "rgba(63, 63, 70, 0.45)",
-                  boxShadow: isSelected && hasCommits ? `0 0 8px ${theme.accent}` : "none",
-                  transform: isSelected ? "scaleY(1.05)" : "scaleY(1)",
-                  transformOrigin: "bottom",
+                  height: `${d.commit_count ? Math.max(5, (d.commit_count / max) * 100) : 2.5}%`,
+                  background: d.commit_count === 0 ? "var(--bg-3)" : on ? "var(--ink-1)" : i === data.length - 1 ? "var(--accent)" : weekend ? "var(--heat-2)" : "var(--heat-3)",
                 }}
               />
-            </div>
+            </button>
           );
         })}
       </div>
-
-      {/* Date timeline footer */}
-      <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-2 border-t border-zinc-800/60 shrink-0">
-        <span>
-          {data[0]?.date
-            ? new Date(data[0].date + "T00:00:00").toLocaleDateString(
-                lang === "en" ? "en-US" : "tr-TR",
-                { month: "short", day: "numeric" }
-              )
-            : ""}
-        </span>
-        <span className="text-zinc-600">
-          {data[Math.floor(data.length / 2)]?.date
-            ? new Date(data[Math.floor(data.length / 2)].date + "T00:00:00").toLocaleDateString(
-                lang === "en" ? "en-US" : "tr-TR",
-                { month: "short", day: "numeric" }
-              )
-            : ""}
-        </span>
-        <span>
-          {lang === "en" ? "Today" : "Bugün"}
-        </span>
-      </div>
+      {axis && (
+        <div className="mt-1.5 flex justify-between font-mono text-[10px] text-ink-4">
+          <span>{fmtDay(data[0].date, l)}</span>
+          <span>{fmtDay(data[Math.floor(data.length / 2)].date, l)}</span>
+          <span>{l === "en" ? "today" : "bugün"}</span>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function ActivityChart({ data }: { data: DayCount[] }) {
+  const { lang } = useLanguage();
+  const l = lang as Lang;
+  const { shape } = useWidgetSize();
+  const total = data.reduce((s, d) => s + d.commit_count, 0);
+  const active = data.filter((d) => d.commit_count > 0).length;
+  const title = l === "en" ? "Last 30 days" : "Son 30 gün";
+
+  if (!data.length) {
+    return (
+      <Panel title={title} icon={Activity}>
+        <p className="text-[12.5px] text-ink-3">{l === "en" ? "No activity yet." : "Henüz aktivite yok."}</p>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title={title} icon={Activity} meta={`${active}/30 ${l === "en" ? "days" : "gün"}`}>
+      {shape === "glance" && (
+        <Glance figure={total} unit="commit" sub={l === "en" ? `${active} active days` : `${active} aktif gün`} viz={<Bars values={data.map((d) => d.commit_count)} height={30} />} />
+      )}
+      {shape === "strip" && (
+        <div className="flex h-full gap-5">
+          <div className="flex shrink-0 flex-col justify-center">
+            <div className="figure text-[34px]">{total}</div>
+            <div className="label mt-2">{l === "en" ? `commits, ${active} days` : `commit, ${active} gün`}</div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <DayBars data={data} l={l} />
+          </div>
+        </div>
+      )}
+      {(shape === "column" || shape === "block") && (
+        <div className="flex h-full flex-col gap-3">
+          <div className={cn("flex items-end gap-6", shape === "column" && "flex-col items-start gap-1")}>
+            <div>
+              <div className="figure text-[36px]">{total}</div>
+              <div className="label mt-1.5">commit</div>
+            </div>
+            <div>
+              <div className="figure text-[22px] !text-ink-2">{active}</div>
+              <div className="label mt-1.5">{l === "en" ? "active days" : "aktif gün"}</div>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <DayBars data={data} l={l} axis />
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }

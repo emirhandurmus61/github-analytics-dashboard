@@ -1,133 +1,126 @@
 "use client";
 
-import { useThemeColors } from "@/components/theme-provider";
+import { useState } from "react";
+import { Lightbulb, CircleCheck, TriangleAlert, CircleX, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import {
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-  Info,
-  Sparkles,
-} from "lucide-react";
+import { Panel } from "@/components/ui/primitives";
+import { useWidgetSize } from "@/components/ui/widget-size";
 import type { Insight } from "@/lib/insights";
+import { cn, type Lang } from "@/lib/ui/format";
 
-const TYPE_META = {
-  positive: {
-    Icon: TrendingUp,
-    label: { tr: "İyi gidişat", en: "Good progress" },
-    badgeBg: "rgba(52,211,153,0.12)",
-    badgeBorder: "rgba(52,211,153,0.25)",
-    badgeText: "#34d399",
-  },
-  negative: {
-    Icon: TrendingDown,
-    label: { tr: "Dikkat", en: "Attention" },
-    badgeBg: "rgba(239,68,68,0.10)",
-    badgeBorder: "rgba(239,68,68,0.22)",
-    badgeText: "#f87171",
-  },
-  warning: {
-    Icon: AlertTriangle,
-    label: { tr: "Uyarı", en: "Warning" },
-    badgeBg: "rgba(234,179,8,0.10)",
-    badgeBorder: "rgba(234,179,8,0.22)",
-    badgeText: "#facc15",
-  },
-  neutral: {
-    Icon: Info,
-    label: { tr: "Bilgi", en: "Info" },
-    badgeBg: "rgba(96,165,250,0.10)",
-    badgeBorder: "rgba(96,165,250,0.20)",
-    badgeText: "#60a5fa",
-  },
-} as const;
+// Rendered like an editor's Problems panel: severity glyph + message.
+const SEV: Record<Insight["type"], { icon: typeof Info; color: string; tr: string; en: string }> = {
+  positive: { icon: CircleCheck, color: "var(--hue-green)", tr: "iyi", en: "good" },
+  neutral: { icon: Info, color: "var(--hue-blue)", tr: "bilgi", en: "info" },
+  warning: { icon: TriangleAlert, color: "var(--hue-yellow)", tr: "uyarı", en: "warning" },
+  negative: { icon: CircleX, color: "var(--hue-red)", tr: "dikkat", en: "attention" },
+};
 
-export default function InsightCards({ insights }: { insights: Insight[] }) {
-  const theme = useThemeColors();
-  const { lang, t } = useLanguage();
+// Insight copy ships with emoji; the panel already carries tone through its glyphs.
+const clean = (s: string) => s.replace(/\s*[\p{Extended_Pictographic}\u{FE0F}]+/gu, "").trim();
 
-  if (insights.length === 0) return null;
+export default function InsightCards({ insights: raw }: { insights: Insight[] }) {
+  const insights = raw.map((x) => ({ ...x, message: clean(x.message) }));
+  const { lang } = useLanguage();
+  const l = lang as Lang;
+  const { shape, w, h } = useWidgetSize();
+  const [i, setI] = useState(0);
+  const title = l === "en" ? "Insights" : "İçgörüler";
+  const counts = (Object.keys(SEV) as Insight["type"][]).map((k) => ({ k, n: insights.filter((x) => x.type === k).length })).filter((x) => x.n);
+
+  const meta = (
+    <span className="inline-flex items-center gap-2">
+      {counts.map(({ k, n }) => {
+        const S = SEV[k];
+        const I = S.icon;
+        return (
+          <span key={k} className="inline-flex items-center gap-0.5" style={{ color: S.color }}>
+            <I size={11} />
+            {n}
+          </span>
+        );
+      })}
+    </span>
+  );
+
+  if (!insights.length) {
+    return (
+      <Panel title={title} icon={Lightbulb}>
+        <p className="text-[12.5px] text-ink-3">{l === "en" ? "Nothing to report. Insights show up after a few weeks of activity." : "Şimdilik söylenecek bir şey yok. Birkaç haftalık aktiviteden sonra içgörüler belirir."}</p>
+      </Panel>
+    );
+  }
+
+  const row = (x: Insight, k: number, compact?: boolean) => {
+    const S = SEV[x.type];
+    const I = S.icon;
+    return (
+      <li key={k} className={cn("flex items-start gap-2.5", !compact && "py-2 border-b border-line last:border-0")}>
+        <I size={14} className="mt-[2px] shrink-0" style={{ color: S.color }} />
+        <p className="text-[12.5px] leading-snug text-ink-2">{x.message}</p>
+      </li>
+    );
+  };
+
+  if (shape === "glance") {
+    const x = insights[i % insights.length];
+    const S = SEV[x.type];
+    const I = S.icon;
+    return (
+      <Panel
+        title={title}
+        icon={Lightbulb}
+        meta={`${(i % insights.length) + 1}/${insights.length}`}
+      >
+        <div className="flex h-full flex-col">
+          <div className="flex items-start gap-2">
+            <I size={15} className="mt-[1px] shrink-0" style={{ color: S.color }} />
+            <p className="text-[12.5px] leading-snug text-ink-2 line-clamp-4">{x.message}</p>
+          </div>
+          {insights.length > 1 && (
+            <div className="mt-auto flex justify-end gap-1">
+              <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setI((v) => (v - 1 + insights.length) % insights.length)} aria-label={l === "en" ? "Previous" : "Önceki"}>
+                <ChevronLeft />
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setI((v) => (v + 1) % insights.length)} aria-label={l === "en" ? "Next" : "Sonraki"}>
+                <ChevronRight />
+              </button>
+            </div>
+          )}
+        </div>
+      </Panel>
+    );
+  }
+
+  if (shape === "strip") {
+    const per = Math.max(1, Math.min(w, 4));
+    return (
+      <Panel title={title} icon={Lightbulb} meta={meta}>
+        <ul className="flex h-full gap-3 overflow-x-auto snap-x snap-mandatory [scrollbar-width:none]">
+          {insights.map((x, k) => {
+            const S = SEV[x.type];
+            const I = S.icon;
+            return (
+              <li
+                key={k}
+                className="snap-start shrink-0 flex flex-col gap-1.5 rounded-[var(--r-control)] border border-line bg-raised p-2.5 overflow-hidden"
+                style={{ width: `calc((100% - ${(per - 1) * 12}px) / ${per})` }}
+              >
+                <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px]" style={{ color: S.color }}>
+                  <I size={12} /> {S[l]}
+                </span>
+                <p className="text-[12.5px] leading-snug text-ink-2 line-clamp-3">{x.message}</p>
+              </li>
+            );
+          })}
+        </ul>
+      </Panel>
+    );
+  }
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 sm:p-5 h-full flex flex-col gap-3">
-      {/* Header */}
-      <div className="flex items-center gap-2 shrink-0">
-        <Sparkles
-          className="w-3.5 h-3.5 shrink-0"
-          style={{ color: theme.accent }}
-        />
-        <h2 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-          {lang === "en" ? "Insights" : "İçgörüler"}
-        </h2>
-        <span
-          className="ml-auto text-[10px] font-medium rounded-full px-2 py-0.5"
-          style={{
-            background: theme.accentBg,
-            color: theme.accent,
-            border: `1px solid ${theme.accentBorder}`,
-          }}
-        >
-          {insights.length}
-        </span>
-      </div>
-
-      {/* Divider */}
-      <div className="h-px bg-zinc-800/60 shrink-0" />
-
-      {/* Cards */}
-      <ul className="flex flex-col gap-2 flex-1 min-h-0 overflow-auto custom-scroll pr-0.5">
-        {insights.map((insight, i) => {
-          const meta = TYPE_META[insight.type];
-          const { Icon } = meta;
-
-          /* positive tipi için tema rengini kullan */
-          const isPositive = insight.type === "positive";
-          const iconColor = isPositive ? theme.accent : meta.badgeText;
-          const bg = isPositive ? theme.accentBg : meta.badgeBg;
-          const border = isPositive ? theme.accentBorder : meta.badgeBorder;
-          const badgeText = isPositive ? theme.accent : meta.badgeText;
-          const badgeBg = isPositive
-            ? `${theme.accentBg}`
-            : meta.badgeBg;
-          const badgeBorder = isPositive ? theme.accentBorder : meta.badgeBorder;
-          const label = meta.label[lang] || meta.label.tr;
-
-          return (
-            <li
-              key={i}
-              className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors"
-              style={{
-                background: bg,
-                border: `1px solid ${border}`,
-              }}
-            >
-              {/* Icon bubble */}
-              <div
-                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
-                style={{
-                  background: badgeBg,
-                  border: `1px solid ${badgeBorder}`,
-                }}
-              >
-                <Icon className="w-3 h-3" style={{ color: iconColor }} />
-              </div>
-
-              {/* Text */}
-              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                <span
-                  className="text-[9px] font-semibold uppercase tracking-widest leading-none"
-                  style={{ color: badgeText, opacity: 0.75 }}
-                >
-                  {label}
-                </span>
-                <p className="text-xs leading-snug text-zinc-300">
-                  {insight.message}
-                </p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <Panel title={title} icon={Lightbulb} meta={meta}>
+      <ul className={cn("h-full overflow-y-auto pr-1", shape === "column" && h < 3 && "text-[12px]")}>{insights.map((x, k) => row(x, k))}</ul>
+    </Panel>
   );
 }

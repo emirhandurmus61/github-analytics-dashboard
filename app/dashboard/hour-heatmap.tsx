@@ -1,112 +1,125 @@
 "use client";
 
-import { useThemeColors } from "@/components/theme-provider";
+import { Fragment as RowFrag } from "react";
+import { Clock4 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { Clock } from "lucide-react";
-import { useRef, useState, useEffect } from "react";
+import { Panel } from "@/components/ui/primitives";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { WEEKDAYS_SHORT, cn, type Lang } from "@/lib/ui/format";
 
-type Props = { data: { hour: number; day: number; count: number }[] };
+type Entry = { hour: number; day: number; count: number };
 
-const DAYS_TR = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
-const DAYS_EN = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const hh = (h: number) => String(h).padStart(2, "0");
 
-export default function HourHeatmap({ data }: Props) {
-  const theme = useThemeColors();
+export default function HourHeatmap({ data }: { data: Entry[] }) {
   const { lang } = useLanguage();
-  const days = lang === "en" ? DAYS_EN : DAYS_TR;
-  const max = Math.max(...data.map((d) => d.count), 1);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [rowH, setRowH] = useState(20);
-  const gap = 2;
+  const l = lang as Lang;
+  const { shape, w, h } = useWidgetSize();
+  const grid = Array.from({ length: 7 }, () => new Array(24).fill(0) as number[]);
+  for (const e of data) if (e.day >= 0 && e.day < 7 && e.hour >= 0 && e.hour < 24) grid[e.day][e.hour] = e.count;
+  const max = Math.max(...grid.flat(), 1);
+  const hours = Array.from({ length: 24 }, (_, i) => grid.reduce((s, r) => s + r[i], 0));
+  const days = grid.map((r) => r.reduce((s, c) => s + c, 0));
+  let peak = { d: 0, h: 0, v: 0 };
+  grid.forEach((r, d) => r.forEach((v, hr) => v > peak.v && (peak = { d, h: hr, v })));
+  const color = (v: number) => (v === 0 ? "var(--heat-0)" : `color-mix(in oklab, var(--accent) ${22 + (v / max) * 78}%, var(--bg-3))`);
+  const title = l === "en" ? "Hour map" : "Saat haritası";
+  const peakLabel = `${WEEKDAYS_SHORT[l][peak.d]} ${hh(peak.h)}:00`;
 
-  const grid: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
-  for (const { hour, day, count } of data) {
-    if (day >= 0 && day < 7 && hour >= 0 && hour < 24) grid[day][hour] = count;
+  const renderGrid = ({ labels, transpose, gap = 2 }: { labels?: boolean; transpose?: boolean; gap?: number }) =>
+    transpose ? (
+      <div className="grid h-full min-h-0" style={{ gridTemplateColumns: `${labels ? "22px " : ""}repeat(7, minmax(0,1fr))`, gridTemplateRows: `${labels ? "12px " : ""}repeat(24, minmax(0,1fr))`, gap }}>
+        {labels && <span />}
+        {labels && WEEKDAYS_SHORT[l].map((d) => <span key={d} className="text-center font-mono text-[9px] leading-none text-ink-4">{d.slice(0, 1)}</span>)}
+        {Array.from({ length: 24 }).map((_, hr) => (
+          <RowFrag key={hr}>{renderRow(hr)}</RowFrag>
+        ))}
+      </div>
+    ) : (
+      <div className="grid h-full min-h-0" style={{ gridTemplateColumns: `${labels ? "28px " : ""}repeat(24, minmax(0,1fr))`, gridTemplateRows: `repeat(7, minmax(0,1fr))${labels ? " 12px" : ""}`, gap }}>
+        {grid.map((r, d) => (
+          <RowFrag key={d}>{renderDayRow(r, d)}</RowFrag>
+        ))}
+        {labels && <span />}
+        {labels &&
+          Array.from({ length: 24 }).map((_, i) => (
+            <span key={i} className="font-mono text-[9px] leading-none text-ink-4">{i % 6 === 0 ? hh(i) : ""}</span>
+          ))}
+      </div>
+    );
+
+  function renderDayRow(r: number[], d: number) {
+    return (
+      <>
+        {shape === "block" || (shape === "strip" && w >= 3) ? (
+          <span className={cn("flex items-center font-mono text-[9.5px] text-ink-4", d === peak.d && "text-accent")}>{WEEKDAYS_SHORT[l][d]}</span>
+        ) : null}
+        {r.map((v, hr) => (
+          <span key={hr} title={`${WEEKDAYS_SHORT[l][d]} ${hh(hr)}:00 · ${v}`} className="rounded-[2px] min-h-[3px]" style={{ background: color(v), outline: d === peak.d && hr === peak.h ? "1px solid var(--ink-2)" : undefined }} />
+        ))}
+      </>
+    );
   }
 
-  const hourTotals = Array.from({ length: 24 }, (_, h) => grid.reduce((s, r) => s + r[h], 0));
-  const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
+  function renderRow(hr: number) {
+    return (
+      <>
+        <span className="flex items-center font-mono text-[9px] leading-none text-ink-4">{hr % 3 === 0 ? hh(hr) : ""}</span>
+        {grid.map((r, d) => (
+          <span key={d} title={`${WEEKDAYS_SHORT[l][d]} ${hh(hr)}:00 · ${r[hr]}`} className="rounded-[2px] min-h-[3px]" style={{ background: color(r[hr]) }} />
+        ))}
+      </>
+    );
+  }
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      const { height } = entries[0]?.contentRect ?? {};
-      // Kullanılabilir yükseklik: saat etiketleri (16px) + legend (20px) + boşluklar
-      const avail = (height ?? 220) - 36 - gap * 6;
-      const size = Math.floor(avail / 7);
-      setRowH(Math.max(12, Math.min(size, 36)));
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  function getColor(count: number) {
-    if (count === 0) return "#1a1a1e";
-    const t = count / max;
-    if (t < 0.25) return theme.shades[0];
-    if (t < 0.5) return theme.shades[1];
-    if (t < 0.75) return theme.shades[2];
-    return theme.shades[3];
+  if (!data.length) {
+    return (
+      <Panel title={title} icon={Clock4}>
+        <p className="text-[12.5px] text-ink-3">{l === "en" ? "No commit times in this range." : "Bu aralıkta commit saati yok."}</p>
+      </Panel>
+    );
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 h-full flex flex-col">
-      <div className="flex items-center justify-between shrink-0 mb-3">
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-sm font-medium text-zinc-400">
-            {lang === "en" ? "Hourly Distribution" : "Saat Dağılımı"}
-          </h2>
+    <Panel title={title} icon={Clock4} meta={peakLabel}>
+      {shape === "glance" && (
+        <div className="flex h-full flex-col gap-2">
+          <div>
+            <div className="figure text-[20px] @min-[200px]:text-[24px]">{peakLabel}</div>
+            <div className="mt-1 text-[11.5px] text-ink-3">{l === "en" ? `busiest slot · ${peak.v} commits` : `en yoğun dilim · ${peak.v} commit`}</div>
+          </div>
+          <div className="flex-1 min-h-0">
+            {renderGrid({ gap: 1 })}
+          </div>
         </div>
-        <span className="text-xs text-zinc-600">
-          {lang === "en" ? "Peak" : "Pik"}: <span className="font-semibold" style={{ color: theme.accent }}>{String(peakHour).padStart(2, "0")}:00</span>
-        </span>
-      </div>
-
-      {/* Container: scroll YOK, karta sığacak */}
-      <div ref={containerRef} className="flex-1 min-h-0 flex flex-col">
-        {/* Saat etiketleri */}
-        <div className="flex shrink-0 mb-1" style={{ paddingLeft: 36 }}>
-          {Array.from({ length: 24 }, (_, i) => (
-            <div key={i} className="flex-1 text-[10px] text-zinc-700 leading-none">
-              {i % 6 === 0 ? String(i).padStart(2, "0") : ""}
+      )}
+      {shape === "strip" && renderGrid({ labels: w >= 3, gap: 2 })}
+      {shape === "column" && renderGrid({ transpose: true, labels: true, gap: 2 })}
+      {shape === "block" && (
+        <div className="flex h-full flex-col gap-3">
+          <div className="flex-1 min-h-0 flex gap-3">
+            <div className="flex-1 min-w-0">
+              {renderGrid({ labels: true, gap: h >= 3 ? 3 : 2 })}
             </div>
-          ))}
-        </div>
-
-        {/* Grid satırları */}
-        <div className="flex flex-col shrink-0" style={{ gap }}>
-          {days.map((day, di) => (
-            <div key={day} className="flex items-center" style={{ gap: 4 }}>
-              <span className="shrink-0 text-right text-[10px] text-zinc-600" style={{ width: 28 }}>{day}</span>
-              <div className="flex flex-1" style={{ gap: 1 }}>
-                {grid[di].map((count, hi) => (
-                  <div
-                    key={hi}
-                    title={`${day} ${String(hi).padStart(2, "0")}:00 — ${count} commit${lang === "en" && count !== 1 ? "s" : ""}`}
-                    className="flex-1 rounded-[2px] hover:opacity-80 transition-opacity"
-                    style={{ height: rowH, backgroundColor: getColor(count) }}
-                  />
+            {w >= 3 && (
+              <div className="grid w-16 shrink-0" style={{ gridTemplateRows: "repeat(7, minmax(0,1fr)) 12px", gap: h >= 3 ? 3 : 2 }}>
+                {days.map((v, d) => (
+                  <div key={d} className="flex items-center gap-1.5">
+                    <span className="h-[60%] rounded-[2px]" style={{ width: `${(v / Math.max(...days, 1)) * 100}%`, background: d === peak.d ? "var(--accent)" : "var(--heat-2)" }} />
+                    <span className="font-mono text-[9.5px] text-ink-4 num">{v}</span>
+                  </div>
                 ))}
               </div>
-            </div>
-          ))}
+            )}
+          </div>
+          <div className="flex items-end gap-[2px] h-8 pl-[30px]">
+            {hours.map((v, i) => (
+              <span key={i} title={`${hh(i)}:00 · ${v}`} className="flex-1 rounded-[2px]" style={{ height: `${v ? Math.max(8, (v / Math.max(...hours, 1)) * 100) : 4}%`, background: i === peak.h ? "var(--accent)" : "var(--heat-2)" }} />
+            ))}
+            {w >= 3 && <span className="w-16 shrink-0 ml-3" />}
+          </div>
         </div>
-
-        {/* Legend */}
-        <div className="mt-2 flex items-center justify-end gap-1 shrink-0">
-          <span className="text-[10px] text-zinc-600">{lang === "en" ? "Less" : "Az"}</span>
-          {["#1a1a1e", ...theme.shades].map((c) => (
-            <div
-              key={c}
-              className="rounded-[2px]"
-              style={{ width: Math.min(rowH, 14), height: Math.min(rowH, 14), backgroundColor: c }}
-            />
-          ))}
-          <span className="text-[10px] text-zinc-600">{lang === "en" ? "More" : "Çok"}</span>
-        </div>
-      </div>
-    </div>
+      )}
+    </Panel>
   );
 }

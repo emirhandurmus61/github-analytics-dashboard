@@ -1,39 +1,33 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  Trophy,
-  Flame,
-  Award,
-  ChevronRight,
-  EyeOff,
-  Eye,
-  Crown,
-  Sparkles,
-  User,
-} from "lucide-react";
+import { Search, X, Eye, EyeOff, GitCommitHorizontal, Flame, Award } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, Seg, Dot } from "@/components/ui/primitives";
+import { langColor } from "@/lib/ui/lang-colors";
+import { ACCENT_HUE, isValidTheme } from "@/lib/themes";
+import { fmtInt, cn, type Lang } from "@/lib/ui/format";
 import { toggleLeaderboardOptIn } from "./actions";
 import type { LeaderboardEntry, LeaderboardCategory } from "./page";
-import { useLanguage } from "@/lib/i18n";
 
-const LANG_COLORS: Record<string, string> = {
-  TypeScript: "#3178c6",
-  JavaScript: "#f1e05a",
-  Python: "#3572A5",
-  Rust: "#dea584",
-  Go: "#00ADD8",
-  CSS: "#563d7c",
-  HTML: "#e34c26",
-  Java: "#b07219",
-  "C++": "#f34b7d",
-  "C#": "#178600",
-  C: "#555555",
-  Swift: "#F05138",
-  Kotlin: "#7F52FF",
-  Ruby: "#701516",
-};
+function hueOf(e: LeaderboardEntry) {
+  return isValidTheme(e.accent) ? `var(--hue-${ACCENT_HUE[e.accent]})` : "var(--accent)";
+}
+
+function Avatar({ e, size }: { e: LeaderboardEntry; size: number }) {
+  return e.avatarUrl ? (
+    <Image src={e.avatarUrl} alt="" width={size} height={size} unoptimized className="shrink-0 rounded-full ring-1 ring-line-strong" style={{ width: size, height: size }} />
+  ) : (
+    <span className="grid shrink-0 place-items-center rounded-full bg-raised text-[11px] font-semibold text-ink-3" style={{ width: size, height: size }}>
+      {e.username[0]?.toUpperCase()}
+    </span>
+  );
+}
+
+const RANK_COLOR = ["var(--hue-yellow)", "var(--ink-2)", "var(--hue-orange)"];
 
 export default function LeaderboardClient({
   weekly,
@@ -48,485 +42,182 @@ export default function LeaderboardClient({
   currentUsername: string | null;
   isOptedIn: boolean;
 }) {
-  const { lang, t } = useLanguage();
-  const [category, setCategory] = useState<LeaderboardCategory>("weekly");
+  const { lang } = useLanguage();
+  const l = lang as Lang;
+  const T = (tr: string, en: string) => (l === "en" ? en : tr);
+  const [cat, setCat] = useState<LeaderboardCategory>("weekly");
+  const [q, setQ] = useState("");
   const [optedIn, setOptedIn] = useState(initialOptedIn);
-  const [isPending, startTransition] = useTransition();
+  const [pending, start] = useTransition();
 
-  const categories = [
-    {
-      id: "weekly" as LeaderboardCategory,
-      label: lang === "tr" ? "Bu Hafta" : "This Week",
-      icon: Flame,
-      desc: lang === "tr" ? "commit" : "commits",
-      metricLabel: t.leaderboard.weeklyCommits,
-    },
-    {
-      id: "streak" as LeaderboardCategory,
-      label: t.leaderboard.filterStreak,
-      icon: Trophy,
-      desc: lang === "tr" ? "gün" : "days",
-      metricLabel: t.leaderboard.longestStreak,
-    },
-    {
-      id: "badges" as LeaderboardCategory,
-      label: t.leaderboard.filterBadges,
-      icon: Award,
-      desc: lang === "tr" ? "rozet" : "badges",
-      metricLabel: t.leaderboard.badgeCount,
-    },
-  ];
+  const meta = {
+    weekly: { key: "weeklyCommits" as const, unit: "commit", icon: GitCommitHorizontal, flag: "week", label: T("Bu hafta commit", "Commits this week") },
+    streak: { key: "currentStreak" as const, unit: T("gün", "days"), icon: Flame, flag: "streak", label: T("Güncel seri", "Current streak") },
+    badges: { key: "badgeCount" as const, unit: T("rozet", "badges"), icon: Award, flag: "badges", label: T("Kazanılan rozet", "Badges earned") },
+  }[cat];
 
-  const entries =
-    category === "weekly" ? weekly : category === "streak" ? streaks : badges;
-  const currentCat = categories.find((c) => c.id === category)!;
+  const entries = cat === "weekly" ? weekly : cat === "streak" ? streaks : badges;
+  const max = Math.max(...entries.map((e) => e[meta.key] as number), 1);
+  const shown = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s ? entries.filter((e) => e.username.toLowerCase().includes(s) || e.displayName.toLowerCase().includes(s)) : entries;
+  }, [entries, q]);
+  const me = currentUsername ? entries.find((e) => e.username === currentUsername) : null;
+  const leader = entries[0];
+  const gap = me && leader ? (leader[meta.key] as number) - (me[meta.key] as number) : 0;
+  const ahead = me ? entries[me.rank - 2] : null;
 
-  const valueKey: keyof LeaderboardEntry =
-    category === "weekly"
-      ? "weeklyCommits"
-      : category === "streak"
-      ? "currentStreak"
-      : "badgeCount";
-
-  // Mevcut kullanıcının sıralamadaki yeri
-  const userEntry = currentUsername
-    ? entries.find((e) => e.username === currentUsername)
-    : null;
-
-  function toggleOptIn() {
-    if (!currentUsername) return;
-    startTransition(async () => {
-      const result = await toggleLeaderboardOptIn(!optedIn);
-      if (result.success) setOptedIn(!optedIn);
+  const toggle = () =>
+    start(async () => {
+      const r = await toggleLeaderboardOptIn(!optedIn);
+      if (r.success) setOptedIn((v) => !v);
     });
-  }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-24">
-      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-12 lg:px-8 space-y-8">
-        {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-zinc-800/80">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-400 shadow-lg shadow-amber-500/10">
-              <Trophy className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-100">
-                  {t.leaderboard.title}
-                </h1>
-                <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400">
-                  {lang === "tr" ? "Canlı Sıralama" : "Live Ranking"}
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs sm:text-sm text-zinc-400">
-                {t.leaderboard.subtitle}
-              </p>
-            </div>
+    <div>
+      <PageHeader
+        title={T("Sıralama", "Leaderboard")}
+        command={`rank --by=${meta.flag}`}
+        subtitle={T(`${entries.length} geliştirici · her pazartesi sıfırlanır (haftalık)`, `${entries.length} developers · weekly board resets every Monday`)}
+        actions={
+          <Seg
+            value={cat}
+            onChange={setCat}
+            options={[
+              { value: "weekly", label: <><GitCommitHorizontal /> {T("Bu hafta", "This week")}</> },
+              { value: "streak", label: <><Flame /> {T("Seri", "Streak")}</> },
+              { value: "badges", label: <><Award /> {T("Rozet", "Badges")}</> },
+            ]}
+          />
+        }
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0">
+          <div className="mb-3 flex items-center gap-2">
+            <label className="relative w-full max-w-xs">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-4" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={T("geliştirici ara", "find a developer")} className="input !h-8 !pl-8 font-mono !text-[12.5px]" aria-label={T("Geliştirici ara", "Find a developer")} />
+              {q && (
+                <button type="button" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-4 hover:text-ink" aria-label={T("Temizle", "Clear")}>
+                  <X size={13} />
+                </button>
+              )}
+            </label>
+            <span className="ml-auto font-mono text-[11.5px] text-ink-4">{meta.label}</span>
           </div>
 
-          {currentUsername && (
-            <button
-              onClick={toggleOptIn}
-              disabled={isPending}
-              className="self-start sm:self-center flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95"
-              style={{
-                borderColor: optedIn ? "#3f3f46" : "#ef444450",
-                backgroundColor: optedIn ? "rgba(24, 24, 27, 0.6)" : "rgba(239, 68, 68, 0.08)",
-                color: optedIn ? "#a1a1aa" : "#f87171",
-              }}
-              title={optedIn ? (lang === "tr" ? "Sıralamadan gizlen" : "Hide from leaderboard") : (lang === "tr" ? "Sıralamada tekrar görün" : "Show on leaderboard")}
-            >
-              {isPending ? (
-                <span className="h-3.5 w-3.5 border-2 border-current rounded-full border-t-transparent animate-spin" />
-              ) : optedIn ? (
-                <Eye className="h-3.5 w-3.5 text-emerald-400" />
-              ) : (
-                <EyeOff className="h-3.5 w-3.5" />
-              )}
-              <span>
-                {isPending
-                  ? (lang === "tr" ? "Güncelleniyor..." : "Updating...")
-                  : optedIn
-                  ? (lang === "tr" ? "Listede Görünüyorsun" : "Visible on Board")
-                  : (lang === "tr" ? "Sıralamada Gizlisin" : "Hidden from Board")}
-              </span>
-            </button>
+          {entries.length === 0 ? (
+            <div className="rounded-panel border border-dashed border-line-strong px-6 py-14 text-center">
+              <p className="text-[14px] text-ink-2">{T("Henüz sıralamada kimse yok.", "Nobody is on the board yet.")}</p>
+              <p className="mt-1 text-[12.5px] text-ink-3">{T("Senkron yapan geliştiriciler burada görünür.", "Developers who sync show up here.")}</p>
+            </div>
+          ) : (
+            <ol className="overflow-hidden rounded-panel border border-line bg-surface">
+              <li className="hidden grid-cols-[52px_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1.6fr)] gap-3 border-b border-line px-3 py-2 text-[11px] text-ink-4 sm:grid">
+                <span>#</span>
+                <span>{T("geliştirici", "developer")}</span>
+                <span>{T("ana dil", "top language")}</span>
+                <span>{meta.label.toLowerCase()}</span>
+              </li>
+              {shown.map((e) => {
+                const v = e[meta.key] as number;
+                const top = e.rank <= 3;
+                const mine = e.username === currentUsername;
+                return (
+                  <li key={e.username} className={cn("relative border-b border-line last:border-0", mine && "bg-[var(--accent-soft)]")}>
+                    {mine && <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent" aria-hidden />}
+                    <Link
+                      href={`/u/${e.username}`}
+                      className={cn(
+                        "grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 px-3 hover:bg-raised sm:grid-cols-[52px_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1.6fr)]",
+                        top ? "py-3" : "py-2",
+                      )}
+                    >
+                      <span className={cn("font-mono font-semibold num", top ? "text-[18px]" : "text-[13px] text-ink-3")} style={top ? { color: RANK_COLOR[e.rank - 1] } : undefined}>
+                        {e.rank}
+                      </span>
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <Avatar e={e} size={top ? 34 : 26} />
+                        <span className="min-w-0">
+                          <span className={cn("block truncate text-ink", top ? "text-[14px] font-semibold" : "text-[13px] font-medium")}>{e.displayName}</span>
+                          <span className="block truncate font-mono text-[11.5px] text-ink-4">@{e.username}</span>
+                        </span>
+                      </span>
+                      <span className="hidden min-w-0 items-center gap-1.5 text-[12.5px] text-ink-2 sm:flex">
+                        {e.topLang ? (
+                          <>
+                            <Dot color={langColor(e.topLang)} size={7} />
+                            <span className="truncate">{e.topLang}</span>
+                          </>
+                        ) : (
+                          <span className="text-ink-4">–</span>
+                        )}
+                      </span>
+                      <span className="flex items-center gap-3">
+                        <span className="relative hidden h-2 flex-1 overflow-hidden rounded-full bg-inset sm:block">
+                          <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${(v / max) * 100}%`, background: hueOf(e) }} />
+                        </span>
+                        <span className={cn("w-12 text-right font-mono num", top ? "text-[16px] font-semibold text-ink" : "text-[13px] text-ink-2")}>{fmtInt(v, l)}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+              {shown.length === 0 && <li className="px-4 py-8 text-center text-[13px] text-ink-3">{T("Bu isimle kimse yok.", "No one by that name.")}</li>}
+            </ol>
           )}
         </div>
 
-        {/* ── Kategori Sekmeleri ── */}
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md overflow-x-auto custom-scroll">
-          {categories.map((c) => {
-            const isSelected = category === c.id;
-            const Icon = c.icon;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setCategory(c.id)}
-                className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer"
-                style={
-                  isSelected
-                    ? {
-                        backgroundColor: "rgba(245, 158, 11, 0.15)",
-                        borderColor: "rgba(245, 158, 11, 0.4)",
-                        borderWidth: "1px",
-                        borderStyle: "solid",
-                        color: "#fbbf24",
-                        boxShadow: "0 0 16px rgba(245, 158, 11, 0.15)",
-                      }
-                    : {
-                        color: "#a1a1aa",
-                        backgroundColor: "transparent",
-                        borderWidth: "1px",
-                        borderStyle: "solid",
-                        borderColor: "transparent",
-                      }
-                }
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{c.label}</span>
-                <span
-                  className="rounded-md px-1.5 py-0.5 text-[10px] font-mono"
-                  style={{
-                    backgroundColor: isSelected ? "rgba(245, 158, 11, 0.2)" : "rgba(39, 39, 42, 0.6)",
-                    color: isSelected ? "#fef3c7" : "#71717a",
-                  }}
-                >
-                  {c.desc}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ── Giriş Yapmış Kullanıcı Konum Özeti ── */}
-        {userEntry && (
-          <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 via-zinc-900/60 to-zinc-900/40 p-4 sm:p-5 flex items-center justify-between gap-4 backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-sm">
-                #{userEntry.rank}
+        <aside className="order-first flex flex-col gap-4 xl:order-none">
+          {currentUsername ? (
+            <Panel title={T("Senin konumun", "Your position")} icon={meta.icon} className="!h-auto" tone={me ? "accent" : undefined}>
+              {me ? (
+                <div>
+                  <div className="flex items-end gap-4">
+                    <div>
+                      <div className="figure text-[40px]">#{me.rank}</div>
+                      <div className="label mt-1.5">{T(`${entries.length} kişiden`, `of ${entries.length}`)}</div>
+                    </div>
+                    <div>
+                      <div className="figure text-[24px]">{fmtInt(me[meta.key] as number, l)}</div>
+                      <div className="label mt-1.5">{meta.unit}</div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-[12.5px] text-ink-3">
+                    {me.rank === 1
+                      ? T("Zirvedesin. Bir sonraki satırla arandaki fark:", "You are on top. Lead over the next row:") + ` ${fmtInt((me[meta.key] as number) - ((entries[1]?.[meta.key] as number) ?? 0), l)} ${meta.unit}.`
+                      : ahead
+                        ? T(`@${ahead.username} ile arandaki fark ${fmtInt((ahead[meta.key] as number) - (me[meta.key] as number), l)} ${meta.unit}; lidere ${fmtInt(gap, l)}.`, `${fmtInt((ahead[meta.key] as number) - (me[meta.key] as number), l)} ${meta.unit} behind @${ahead.username}; ${fmtInt(gap, l)} behind the leader.`)
+                        : null}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[12.5px] text-ink-3">{optedIn ? T("Bu listede henüz yoksun. Bir senkron sonrası görünürsün.", "You are not listed yet. You will appear after a sync.") : T("Şu an listede gizlisin.", "You are hidden from the board.")}</p>
+              )}
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+                <span className="text-[12.5px] text-ink-2">{optedIn ? T("Sıralamada görünüyorsun", "You are visible") : T("Sıralamada gizlisin", "You are hidden")}</span>
+                <button type="button" className="btn btn-sm" onClick={toggle} disabled={pending}>
+                  {optedIn ? <EyeOff /> : <Eye />}
+                  {optedIn ? T("Gizlen", "Hide me") : T("Görün", "Show me")}
+                </button>
               </div>
-              <div>
-                <p className="text-xs text-zinc-400 font-medium">
-                  {lang === "tr" ? "Bu Kategorideki Sıralamanız" : "Your Rank in this Category"}
-                </p>
-                <p className="text-sm font-bold text-zinc-100">
-                  {userEntry.rank === 1
-                    ? (lang === "tr" ? "Tebrikler, 1. sıradasınız! Zirveyi koruyorsunuz." : "Congratulations, you are #1! Leading the charts.")
-                    : (lang === "tr"
-                        ? `${userEntry.rank}. sıradasınız — ${((userEntry[valueKey] as number) || 0).toLocaleString("tr-TR")} ${currentCat.desc}`
-                        : `Ranked #${userEntry.rank} — ${((userEntry[valueKey] as number) || 0).toLocaleString("en-US")} ${currentCat.desc}`)}
-                </p>
-              </div>
-            </div>
-            <Link
-              href={`/u/${currentUsername}`}
-              className="hidden sm:flex items-center gap-1.5 rounded-xl border border-zinc-700/80 bg-zinc-800/60 px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors"
-            >
-              <span>{t.nav.myProfile}</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        )}
-
-        {/* ── Sıralama Listesi (Alt alta dikey kompozisyon, asla yan yana değil) ── */}
-        {entries.length === 0 ? (
-          <div className="text-center py-20 space-y-4 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-sm p-8">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-800 border border-zinc-700">
-              <Trophy className="h-7 w-7 text-zinc-500" />
-            </div>
-            <p className="text-base font-bold text-zinc-200">
-              {lang === "tr" ? "Henüz sıralama verisi bulunmuyor" : "No ranking data available yet"}
-            </p>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
-              {lang === "tr"
-                ? "Kullanıcılar senkronize oldukça ve GitHub aktiviteleri toplandıkça sıralama otomatik güncellenecektir."
-                : "Rankings will automatically update as developers sync and collect GitHub activities."}
-            </p>
-            {!currentUsername && (
-              <Link
-                href="/"
-                className="inline-block mt-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-emerald-400"
-              >
-                {lang === "tr" ? "Giriş Yap ve Katıl" : "Sign In & Join"}
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {entries.map((entry) => {
-              const isSelf = entry.username === currentUsername;
-              const value = (entry[valueKey] as number) || 0;
-
-              return (
-                <RankCard
-                  key={entry.username}
-                  entry={entry}
-                  rank={entry.rank}
-                  isSelf={isSelf}
-                  value={value}
-                  valueSuffix={currentCat.desc}
-                  lang={lang}
-                  youLabel={t.leaderboard.you}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── Sıralamaya Katıl Banner (Giriş Yapmamış Kullanıcılar İçin) ── */}
-        {!currentUsername && entries.length > 0 && (
-          <div className="rounded-3xl border border-zinc-800/90 bg-gradient-to-b from-zinc-900/80 to-zinc-900/40 p-8 text-center space-y-4 backdrop-blur-md shadow-xl">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-base font-bold text-zinc-100">
-                {lang === "tr" ? "Siz de Liderlik Tablosunda Yer Alın" : "Join the Leaderboard"}
-              </p>
-              <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto leading-relaxed">
-                {lang === "tr"
-                  ? "GitHub hesabınızla bağlanın, commit verilerinizi senkronize edin ve topluluk geliştiricileri arasındaki yerinizi görün."
-                  : "Connect your GitHub account, sync your commit metrics, and claim your place among community developers."}
-              </p>
-            </div>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-6 py-2.5 text-xs font-bold text-zinc-950 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
-            >
-              {lang === "tr" ? "GitHub ile Giriş Yap" : "Sign in with GitHub"}
-            </Link>
-          </div>
-        )}
-
-        {/* Bilgilendirme Alt Notu */}
-        <p className="text-center text-xs text-zinc-600 leading-relaxed">
-          {lang === "tr"
-            ? "Liderlik tablosuna katılım tamamen isteğe bağlıdır. Ayarlar → Gizlilik bölümünden istediğiniz zaman sıralamadan ayrılabilirsiniz."
-            : "Participation in the leaderboard is completely optional. You can opt out anytime from Settings → Privacy."}
-        </p>
+            </Panel>
+          ) : (
+            <Panel title={T("Listeye katıl", "Join the board")} className="!h-auto">
+              <p className="text-[12.5px] text-ink-3">{T("GitHub ile giriş yap; ilk senkrondan sonra haftalık sıralamada yer alırsın. İstediğin an gizlenebilirsin.", "Sign in with GitHub; after your first sync you appear on the weekly board. You can hide any time.")}</p>
+            </Panel>
+          )}
+          <Panel title={T("Nasıl sıralanır", "How it ranks")} className="!h-auto hidden xl:flex">
+            <ul className="flex flex-col gap-2 text-[12.5px] text-ink-3">
+              <li><span className="font-mono text-ink-2">week</span> · {T("pazartesiden bu yana commit", "commits since Monday")}</li>
+              <li><span className="font-mono text-ink-2">streak</span> · {T("bugüne kadar kesintisiz gün", "unbroken days up to today")}</li>
+              <li><span className="font-mono text-ink-2">badges</span> · {T("açılmış rozet seviyesi", "unlocked badge tiers")}</li>
+              <li className="pt-1 text-[11.5px] text-ink-4">{T("Çubuk rengi, o geliştiricinin kendi vurgu rengi.", "Bar color is each developer's own accent.")}</li>
+            </ul>
+          </Panel>
+        </aside>
       </div>
     </div>
-  );
-}
-
-// ── Dikey Sıralama Kartı (1, 2, 3 ve diğerleri tek birleşik hiyerarşide alt alta) ─────────────────────────
-
-function RankCard({
-  entry,
-  rank,
-  isSelf,
-  value,
-  valueSuffix,
-  lang,
-  youLabel,
-}: {
-  entry: LeaderboardEntry;
-  rank: number;
-  isSelf: boolean;
-  value: number;
-  valueSuffix: string;
-  lang: string;
-  youLabel: string;
-}) {
-  // Sıralama basamağına göre renk ve stil konfigürasyonu
-  const isFirst = rank === 1;
-  const isSecond = rank === 2;
-  const isThird = rank === 3;
-
-  let containerStyle: React.CSSProperties = {
-    borderColor: isSelf ? "rgba(52, 211, 153, 0.45)" : "#27272a",
-    backgroundColor: isSelf ? "rgba(52, 211, 153, 0.05)" : "rgba(24, 24, 27, 0.45)",
-    ...(isSelf ? { borderLeftWidth: "4px", borderLeftColor: "#10b981" } : {}),
-  };
-
-  let badgeElement = null;
-  let valueColor = "#f4f4f5";
-
-  if (isFirst) {
-    containerStyle = {
-      borderColor: "rgba(245, 158, 11, 0.45)",
-      background:
-        "linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(24, 24, 27, 0.85) 45%, rgba(24, 24, 27, 0.6) 100%)",
-      boxShadow: "0 0 24px rgba(245, 158, 11, 0.12)",
-      ...(isSelf ? { borderLeftWidth: "4px", borderLeftColor: "#10b981" } : {}),
-    };
-    valueColor = "#fbbf24";
-    badgeElement = (
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-zinc-950 font-black text-sm shadow-md shadow-amber-500/30 ring-1 ring-amber-300">
-        <Crown className="h-5 w-5 fill-zinc-950" />
-      </div>
-    );
-  } else if (isSecond) {
-    containerStyle = {
-      borderColor: "rgba(203, 213, 225, 0.35)",
-      background:
-        "linear-gradient(90deg, rgba(203, 213, 225, 0.08) 0%, rgba(24, 24, 27, 0.85) 45%, rgba(24, 24, 27, 0.6) 100%)",
-      boxShadow: "0 0 20px rgba(203, 213, 225, 0.08)",
-      ...(isSelf ? { borderLeftWidth: "4px", borderLeftColor: "#10b981" } : {}),
-    };
-    valueColor = "#e2e8f0";
-    badgeElement = (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 text-zinc-950 font-black text-sm shadow-md shadow-slate-300/20 ring-1 ring-slate-100">
-        <span className="font-mono text-base font-black">2</span>
-      </div>
-    );
-  } else if (isThird) {
-    containerStyle = {
-      borderColor: "rgba(180, 83, 9, 0.35)",
-      background:
-        "linear-gradient(90deg, rgba(180, 83, 9, 0.08) 0%, rgba(24, 24, 27, 0.85) 45%, rgba(24, 24, 27, 0.6) 100%)",
-      boxShadow: "0 0 20px rgba(180, 83, 9, 0.08)",
-      ...(isSelf ? { borderLeftWidth: "4px", borderLeftColor: "#10b981" } : {}),
-    };
-    valueColor = "#f59e0b";
-    badgeElement = (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-600 via-amber-700 to-amber-800 text-amber-100 font-black text-sm shadow-md shadow-amber-700/20 ring-1 ring-amber-600">
-        <span className="font-mono text-base font-black">3</span>
-      </div>
-    );
-  } else {
-    badgeElement = (
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-800/80 border border-zinc-700/60 text-zinc-400 font-bold text-xs font-mono">
-        #{rank}
-      </div>
-    );
-  }
-
-  return (
-    <Link
-      href={`/u/${entry.username}`}
-      className="group relative flex items-center gap-3.5 sm:gap-5 rounded-2xl border p-4 sm:p-5 transition-all duration-200 hover:scale-[1.008] hover:border-zinc-500 backdrop-blur-sm"
-      style={containerStyle}
-    >
-      {/* ── Sol: Sıralama Rozeti ── */}
-      <div className="shrink-0 flex items-center justify-center">{badgeElement}</div>
-
-      {/* ── Avatar ── */}
-      <div className="relative shrink-0">
-        {entry.avatarUrl ? (
-          <Image
-            src={entry.avatarUrl}
-            alt={entry.username}
-            width={isFirst ? 48 : 42}
-            height={isFirst ? 48 : 42}
-            className="rounded-full object-cover transition-transform group-hover:scale-105"
-            style={{
-              outline: isSelf
-                ? "2px solid #34d399"
-                : isFirst
-                ? "2px solid #fbbf24"
-                : isSecond
-                ? "2px solid #cbd5e1"
-                : isThird
-                ? "2px solid #b45309"
-                : "1px solid #3f3f46",
-              outlineOffset: 2,
-            }}
-          />
-        ) : (
-          <div
-            className="flex items-center justify-center rounded-full font-bold uppercase transition-transform group-hover:scale-105"
-            style={{
-              width: isFirst ? 48 : 42,
-              height: isFirst ? 48 : 42,
-              backgroundColor: `${entry.accentColor}25`,
-              color: entry.accentColor,
-              outline: isSelf
-                ? "2px solid #34d399"
-                : isFirst
-                ? "2px solid #fbbf24"
-                : isSecond
-                ? "2px solid #cbd5e1"
-                : isThird
-                ? "2px solid #b45309"
-                : "1px solid #3f3f46",
-              outlineOffset: 2,
-            }}
-          >
-            {entry.displayName[0] ?? entry.username[0] ?? "?"}
-          </div>
-        )}
-
-        {/* Kendin olduğunu belirten zarif köşe avatar rozeti */}
-        {isSelf && (
-          <div
-            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-zinc-950 ring-2 ring-zinc-900 shadow-sm"
-            title={lang === "tr" ? "Hesabınız (Siz)" : "Your account (You)"}
-          >
-            <User className="h-2.5 w-2.5 stroke-[3]" />
-          </div>
-        )}
-      </div>
-
-      {/* ── İsim, Kullanıcı Adı ve Dil Etiketi ── */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-          <p className="font-bold text-sm sm:text-base text-zinc-100 truncate group-hover:text-white transition-colors">
-            {entry.displayName}
-          </p>
-
-          {isFirst && (
-            <span className="shrink-0 rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-              {lang === "tr" ? "Lider" : "Leader"}
-            </span>
-          )}
-
-          {isSecond && (
-            <span className="shrink-0 rounded-full bg-slate-300/15 border border-slate-300/30 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
-              {lang === "tr" ? "2. Sıra" : "2nd"}
-            </span>
-          )}
-
-          {isThird && (
-            <span className="shrink-0 rounded-full bg-amber-700/20 border border-amber-700/40 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
-              {lang === "tr" ? "3. Sıra" : "3rd"}
-            </span>
-          )}
-
-          {isSelf && (
-            <span
-              className="shrink-0 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 flex items-center gap-1"
-              title={lang === "tr" ? "Hesabınız (Siz)" : "Your account (You)"}
-            >
-              <User className="h-2.5 w-2.5" />
-              <span className="hidden sm:inline">{youLabel}</span>
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 min-w-0">
-          <span className="font-mono text-zinc-400 truncate">@{entry.username}</span>
-          {entry.topLang && (
-            <>
-              <span className="text-zinc-700 shrink-0">·</span>
-              <div className="flex items-center gap-1.5 shrink-0 min-w-0">
-                <span
-                  className="h-2 w-2 rounded-full shrink-0"
-                  style={{ backgroundColor: LANG_COLORS[entry.topLang] ?? "#71717a" }}
-                />
-                <span className="text-zinc-400 text-[11px] font-medium truncate">{entry.topLang}</span>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ── Sağ: İstatistik Değeri ve Birim ── */}
-      <div className="text-right shrink-0 pr-1">
-        <p
-          className="font-black text-xl sm:text-2xl tabular-nums leading-none tracking-tight"
-          style={{ color: valueColor }}
-        >
-          {value.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
-        </p>
-        <p className="mt-1 text-[11px] text-zinc-500 font-medium">{valueSuffix}</p>
-      </div>
-
-      {/* ── Sağ Ok ── */}
-      <ChevronRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-300 group-hover:translate-x-0.5 transition-all shrink-0" />
-    </Link>
   );
 }

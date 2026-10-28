@@ -1,43 +1,170 @@
 "use client";
 
-import { useThemeColors } from "@/components/theme-provider";
+import { Flame, Check, Clock3 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { Flame, Zap, CalendarDays } from "lucide-react";
+import { Panel, Track } from "@/components/ui/primitives";
+import { Glance } from "@/components/ui/glance";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { fmtDay, cn, type Lang } from "@/lib/ui/format";
+import type { DashboardData, DayCount } from "./types";
+import type { StreakStatus } from "./streak-guard";
+import { HeatGrid, buildWeeks, type Cell as HeatCell } from "./contribution-heatmap";
+import { useMemo } from "react";
 
-type Props = {
-  currentStreak: number;
-  longestStreak: number;
-  totalActiveDays: number;
-};
+const DAY = 86400000;
+const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 
-export default function StreakCard({ currentStreak, longestStreak, totalActiveDays }: Props) {
-  const theme = useThemeColors();
+type Cell = { date: string; v: number; inStreak: boolean; today: boolean };
+
+/** Last n days, flagged with whether each day belongs to the running streak. */
+function chain(heatmap: DayCount[], n: number, current: number): Cell[] {
+  const m = new Map(heatmap.map((d) => [d.date, d.commit_count]));
+  const todayStr = iso(Date.now());
+  const hasToday = (m.get(todayStr) ?? 0) > 0;
+  // The streak ends today if there is a commit today, otherwise yesterday.
+  const end = hasToday ? 0 : 1;
+  return Array.from({ length: n }, (_, i) => {
+    const back = n - 1 - i;
+    const date = iso(Date.now() - back * DAY);
+    return { date, v: m.get(date) ?? 0, inStreak: current > 0 && back >= end && back < end + current, today: back === 0 };
+  });
+}
+
+/** Dates that belong to the running streak. */
+function streakDates(heatmap: DayCount[], current: number) {
+  return new Set(chain(heatmap, Math.max(current + 2, 2), current).filter((c) => c.inStreak).map((c) => c.date));
+}
+
+function cellColor(c: Cell) {
+  if (c.inStreak) return "var(--accent)";
+  if (c.v > 0) return "var(--heat-2)";
+  return "var(--heat-0)";
+}
+
+export default function StreakCard({
+  streak,
+  heatmap,
+  status,
+  todayCommits,
+}: {
+  streak: DashboardData["streak"];
+  heatmap: DayCount[];
+  status: StreakStatus;
+  todayCommits: number;
+}) {
   const { lang } = useLanguage();
+  const l = lang as Lang;
+  const { shape, w, h } = useWidgetSize();
+  const { currentStreak: cur, longestStreak: rec, totalActiveDays: active } = streak;
+  const onFire = cur > 0;
+  const atRisk = status === "at_risk";
+  const hoursLeft = 24 - new Date().getHours();
+  const weeks = useMemo(() => buildWeeks(heatmap), [heatmap]);
+  const inStreak = useMemo(() => streakDates(heatmap, cur), [heatmap, cur]);
+  const colorOf = (c: HeatCell) => (inStreak.has(c.date) ? "var(--accent)" : c.v > 0 ? "var(--heat-2)" : "var(--heat-0)");
 
-  const items = [
-    { icon: <Flame className="w-5 h-5" />, value: currentStreak, label: "Streak", color: theme.accent },
-    { icon: <Zap className="w-5 h-5" />, value: longestStreak, label: lang === "en" ? "Record" : "Rekor", color: "#facc15" },
-    { icon: <CalendarDays className="w-5 h-5" />, value: totalActiveDays, label: lang === "en" ? "Active Days" : "Aktif Gün", color: theme.accentMid },
-  ];
+  const todayLine = todayCommits > 0 ? (
+    <span className="inline-flex items-center gap-1 text-good"><Check size={12} strokeWidth={2.5} />{l === "en" ? `${todayCommits} today` : `bugün ${todayCommits}`}</span>
+  ) : atRisk ? (
+    <span className="inline-flex items-center gap-1 text-warn"><Clock3 size={12} />{l === "en" ? `${hoursLeft}h left today` : `bugün ${hoursLeft} sa kaldı`}</span>
+  ) : (
+    <span>{l === "en" ? "no commit today" : "bugün commit yok"}</span>
+  );
+
+  const toRecord = rec > 0 ? (
+    <div>
+      <Track value={cur} max={Math.max(rec, 1)} height={4} />
+      <div className="mt-1 flex justify-between font-mono text-[10.5px] text-ink-4">
+        <span>{cur >= rec && cur > 0 ? (l === "en" ? "record" : "rekor") : `${rec - cur} ${l === "en" ? "to record" : "rekora"}`}</span>
+        <span>{rec}</span>
+      </div>
+    </div>
+  ) : null;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      <div className="grid grid-cols-3 gap-3 flex-1">
-        {items.map((item) => (
-          <div key={item.label} className="flex flex-col items-center justify-center text-center gap-2">
-            <div
-              className="flex items-center justify-center w-10 h-10 rounded-xl"
-              style={{ backgroundColor: `${item.color}15`, color: item.color }}
-            >
-              {item.icon}
-            </div>
-            <div className="text-2xl font-bold tabular-nums" style={{ color: item.color }}>
-              {item.value}
-            </div>
-            <div className="text-[10px] text-zinc-500">{item.label}</div>
+    <Panel
+      title={l === "en" ? "Streak" : "Seri"}
+      icon={Flame}
+      meta={onFire && cur >= rec ? (l === "en" ? "record run" : "rekor serisi") : `${l === "en" ? "best" : "en iyi"} ${rec}`}
+      tone={atRisk ? "accent" : undefined}
+    >
+      {shape === "glance" && (
+        <Glance
+          figure={cur}
+          figureColor={onFire ? "var(--accent)" : undefined}
+          unit={l === "en" ? (cur === 1 ? "day" : "days") : "gün"}
+          sub={todayLine}
+          viz={toRecord}
+        />
+      )}
+
+      {shape === "strip" && (
+        <div className="flex h-full flex-col justify-between gap-2">
+          <div className="flex items-end gap-6">
+            <Fig v={cur} label={l === "en" ? "current" : "güncel"} accent={onFire} />
+            <Fig v={rec} label={l === "en" ? "best" : "rekor"} />
+            {w >= 2 && <Fig v={active} label={l === "en" ? "active days" : "aktif gün"} />}
+            <div className="ml-auto text-[12px] text-ink-3 self-center">{todayLine}</div>
           </div>
-        ))}
+          <Row cells={chain(heatmap, w >= 4 ? 42 : w >= 3 ? 35 : 21, cur)} l={l} />
+        </div>
+      )}
+
+      {shape === "column" && (
+        <div className="flex h-full flex-col gap-3">
+          <Glance figure={cur} figureColor={onFire ? "var(--accent)" : undefined} unit={l === "en" ? "days" : "gün"} sub={todayLine} className="!h-auto" />
+          {toRecord}
+          <div className="flex-1 min-h-0">
+            <HeatGrid weeks={weeks} l={l} vertical dayLabels maxCell={30} minCell={10} gap={3} colorOf={colorOf} />
+          </div>
+        </div>
+      )}
+
+      {shape === "block" && (
+        <div className="flex h-full flex-col gap-3">
+          <div className="flex flex-wrap items-end gap-x-7 gap-y-2">
+            <Fig v={cur} label={l === "en" ? "day streak" : "günlük seri"} accent={onFire} big />
+            <Fig v={rec} label={l === "en" ? "longest" : "en uzun"} />
+            <Fig v={active} label={l === "en" ? "active days / yr" : "aktif gün / yıl"} />
+            <div className="ml-auto text-[12px] text-ink-3">{todayLine}</div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <HeatGrid weeks={weeks} l={l} monthLabels dayLabels maxCell={h >= 3 ? 30 : 22} minCell={9} gap={3} colorOf={colorOf} />
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-ink-3">
+            <span className="inline-flex items-center gap-1.5"><i className="size-2.5 rounded-[2px] bg-accent" />{l === "en" ? "current streak" : "güncel seri"}</span>
+            <span className="inline-flex items-center gap-1.5"><i className="size-2.5 rounded-[2px]" style={{ background: "var(--heat-2)" }} />{l === "en" ? "active" : "aktif"}</span>
+            <span className="inline-flex items-center gap-1.5"><i className="size-2.5 rounded-[2px] bg-inset" />{l === "en" ? "no commits" : "commit yok"}</span>
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function Fig({ v, label, accent, big }: { v: number; label: string; accent?: boolean; big?: boolean }) {
+  return (
+    <div>
+      <div className={cn("figure", big ? "text-[40px]" : "text-[26px]")} style={accent ? { color: "var(--accent)" } : undefined}>
+        {v}
       </div>
+      <div className="label mt-1.5 whitespace-nowrap">{label}</div>
     </div>
   );
 }
+
+function Row({ cells, l }: { cells: Cell[]; l: Lang }) {
+  return (
+    <div className="flex gap-[3px]">
+      {cells.map((c) => (
+        <span
+          key={c.date}
+          title={`${fmtDay(c.date, l)} · ${c.v}`}
+          className={cn("h-4 flex-1 rounded-[3px]", c.today && "ring-1 ring-ink-3 ring-offset-1 ring-offset-[var(--bg-1)]")}
+          style={{ background: cellColor(c) }}
+        />
+      ))}
+    </div>
+  );
+}
+

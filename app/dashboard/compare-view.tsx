@@ -1,90 +1,121 @@
 "use client";
 
-import { useThemeColors } from "@/components/theme-provider";
+import { GitCompareArrows } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Panel, Delta } from "@/components/ui/primitives";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { fmtCompact, fmtInt, type Lang } from "@/lib/ui/format";
+import type { MonthSummary } from "./types";
 
-type MonthData = {
-  label: string;
-  commits: number;
-  activeDays: number;
-  linesAdded: number;
-};
+type Key = "commits" | "activeDays" | "linesAdded";
 
-const MONTH_MAP_TR_TO_EN: Record<string, string> = {
-  Ocak: "January", Şubat: "February", Mart: "March", Nisan: "April",
-  Mayıs: "May", Haziran: "June", Temmuz: "July", Ağustos: "August",
-  Eylül: "September", Ekim: "October", Kasım: "November", Aralık: "December",
-};
+const pct = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 100) : a > 0 ? 100 : 0);
 
-function localizeMonth(label: string, lang: string): string {
-  if (lang !== "en") return label;
-  return MONTH_MAP_TR_TO_EN[label] ?? label;
-}
-
-export default function CompareView({
-  thisMonth,
-  lastMonth,
-}: {
-  thisMonth: MonthData;
-  lastMonth: MonthData;
-}) {
-  const theme = useThemeColors();
+export default function CompareView({ thisMonth, lastMonth }: { thisMonth: MonthSummary; lastMonth: MonthSummary }) {
   const { lang } = useLanguage();
+  const l = lang as Lang;
+  const { shape, w, h } = useWidgetSize();
+  const now = new Date();
+  const dayOfMonth = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  // The current month is partial: compare its projected total to last month.
+  const project = (v: number) => Math.round((v / Math.max(1, dayOfMonth)) * daysInMonth);
 
-  const thisMonthLabel = localizeMonth(thisMonth.label, lang);
-  const lastMonthLabel = localizeMonth(lastMonth.label, lang);
-
-  const metrics: { key: keyof MonthData; label: string; format: (v: number) => string }[] = [
-    { key: "commits", label: "Commit", format: (v) => v.toLocaleString(lang === "en" ? "en-US" : "tr-TR") },
-    { key: "activeDays", label: lang === "en" ? "Active Days" : "Aktif Gün", format: (v) => lang === "en" ? `${v} days` : `${v} gün` },
-    { key: "linesAdded", label: lang === "en" ? "Lines Added" : "Eklenen Satır", format: (v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v) },
+  const metrics: { key: Key; label: string; fmt: (v: number) => string }[] = [
+    { key: "commits", label: "commit", fmt: (v) => fmtInt(v, l) },
+    { key: "activeDays", label: l === "en" ? "active days" : "aktif gün", fmt: (v) => String(v) },
+    { key: "linesAdded", label: l === "en" ? "lines added" : "eklenen satır", fmt: (v) => fmtCompact(v, l) },
   ];
+  const title = `${thisMonth.label} / ${lastMonth.label}`;
+  const progress = `${dayOfMonth}/${daysInMonth}`;
+  const commitsDelta = pct(project(thisMonth.commits), lastMonth.commits);
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      <h2 className="mb-4 text-sm font-medium text-zinc-400 shrink-0">
-        {thisMonthLabel} vs {lastMonthLabel}
-      </h2>
-      <div className="flex-1 min-h-0 flex flex-col justify-between gap-4">
-        {metrics.map(({ key, label, format }) => {
-          const a = thisMonth[key] as number;
-          const b = lastMonth[key] as number;
-          const max = Math.max(a, b, 1);
-          const pctDiff = b > 0 ? Math.round(((a - b) / b) * 100) : a > 0 ? 100 : 0;
-          const isUp = pctDiff >= 0;
-
-          return (
-            <div key={key} className="flex-1">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm text-zinc-400">{label}</span>
-                <span className="flex items-center gap-1 text-sm font-semibold" style={{ color: pctDiff === 0 ? "#71717a" : isUp ? theme.accent : "#f87171" }}>
-                  {pctDiff === 0
-                    ? <Minus className="w-3.5 h-3.5" />
-                    : isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                  {lang === "en" ? `${Math.abs(pctDiff)}%` : `%${Math.abs(pctDiff)}`}
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 text-right text-xs text-zinc-400">{thisMonthLabel}</span>
-                  <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${(a / max) * 100}%`, backgroundColor: theme.accent }} />
-                  </div>
-                  <span className="w-12 shrink-0 text-xs text-zinc-300 tabular-nums font-medium">{format(a)}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 text-right text-xs text-zinc-600">{lastMonthLabel}</span>
-                  <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
-                    <div className="h-full rounded-full bg-zinc-600" style={{ width: `${(b / max) * 100}%` }} />
-                  </div>
-                  <span className="w-12 shrink-0 text-xs text-zinc-500 tabular-nums">{format(b)}</span>
-                </div>
-              </div>
+    <Panel title={l === "en" ? "Month over month" : "Aylık karşılaştırma"} icon={GitCompareArrows} meta={shape === "glance" ? progress : title}>
+      {shape === "glance" && (
+        <div className="flex h-full flex-col">
+          <div className="flex items-baseline gap-1.5">
+            <span className="figure text-[26px] @min-[200px]:text-[30px]">{fmtInt(thisMonth.commits, l)}</span>
+            <span className="text-[11.5px] text-ink-3 truncate">{thisMonth.label}</span>
+          </div>
+          <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-ink-3">
+            <Delta value={commitsDelta} lang={l} />
+            {l === "en" ? `pace vs ${lastMonth.commits}` : `tempo, ${lastMonth.commits}'e karşı`}
+          </div>
+          <div className="mt-auto">
+            <div className="track" style={{ height: 4 }}>
+              <i style={{ width: `${(dayOfMonth / daysInMonth) * 100}%` }} />
             </div>
-          );
-        })}
-      </div>
+            <div className="mt-1 font-mono text-[10.5px] text-ink-4">{l === "en" ? `day ${dayOfMonth} of ${daysInMonth}` : `${daysInMonth} günün ${dayOfMonth}.si`}</div>
+          </div>
+        </div>
+      )}
+
+      {shape === "strip" && (
+        <div className="grid h-full items-center gap-4" style={{ gridTemplateColumns: `repeat(${w >= 2 ? 3 : 1}, minmax(0,1fr))` }}>
+          {metrics.slice(0, w >= 2 ? 3 : 1).map((m) => {
+            const a = thisMonth[m.key];
+            const b = lastMonth[m.key];
+            return (
+              <div key={m.key} className="min-w-0">
+                <div className="text-[11.5px] text-ink-3">{m.label}</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="figure text-[24px]">{m.fmt(a)}</span>
+                  <span className="font-mono text-[12px] text-ink-4 num">/ {m.fmt(b)}</span>
+                </div>
+                <div className="mt-1">
+                  <Delta value={pct(project(a), b)} lang={l} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {(shape === "column" || shape === "block") && (
+        <div className="flex h-full flex-col justify-between gap-3">
+          {metrics.map((m) => {
+            const a = thisMonth[m.key];
+            const b = lastMonth[m.key];
+            const pa = project(a);
+            const max = Math.max(pa, b, 1);
+            return (
+              <div key={m.key}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <span className="text-[12.5px] text-ink-2">{m.label}</span>
+                  <Delta value={pct(pa, b)} lang={l} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <BarRow label={thisMonth.label} value={a} projected={pa} max={max} fmt={m.fmt} accent short={shape === "column" || w < 2} />
+                  <BarRow label={lastMonth.label} value={b} max={max} fmt={m.fmt} short={shape === "column" || w < 2} />
+                </div>
+              </div>
+            );
+          })}
+          {h >= 2 && (
+            <p className="text-[11.5px] text-ink-3">
+              {l === "en"
+                ? `Dashed: ${thisMonth.label} projected from ${dayOfMonth} of ${daysInMonth} days.`
+                : `Kesikli: ${thisMonth.label}, ${daysInMonth} günün ${dayOfMonth}'ine göre tahmin.`}
+            </p>
+          )}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function BarRow({ label, value, projected, max, fmt, accent, short }: { label: string; value: number; projected?: number; max: number; fmt: (v: number) => string; accent?: boolean; short?: boolean }) {
+  return (
+    <div className="grid items-center gap-2" style={{ gridTemplateColumns: short ? "30px 1fr 44px" : "64px 1fr 56px" }}>
+      <span className="truncate font-mono text-[10.5px] text-ink-4">{short ? label.slice(0, 3) : label}</span>
+      <span className="relative h-2.5 rounded-[2px] bg-inset">
+        {projected !== undefined && projected > value && (
+          <span className="absolute inset-y-0 left-0 rounded-[2px] border border-dashed border-accent" style={{ width: `${(projected / max) * 100}%` }} />
+        )}
+        <span className="absolute inset-y-0 left-0 rounded-[2px]" style={{ width: `${(value / max) * 100}%`, background: accent ? "var(--accent)" : "var(--line-2)" }} />
+      </span>
+      <span className="text-right font-mono text-[11.5px] text-ink num">{fmt(value)}</span>
     </div>
   );
 }

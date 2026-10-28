@@ -5,10 +5,12 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { Language, Dictionary } from "./types";
-import { dictionaries, tr, en } from "./dictionaries";
+import { dictionaries, tr } from "./dictionaries";
 
 interface LanguageContextType {
   lang: Language;
@@ -25,46 +27,62 @@ const LanguageContext = createContext<LanguageContextType>({
 });
 
 const STORAGE_KEY = "devboard_lang";
+const noop = () => () => {};
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Language>("tr");
+function detectLang(): Language {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "tr" || stored === "en") return stored;
+    return navigator.language?.toLowerCase().startsWith("tr") ? "tr" : "en";
+  } catch {
+    return "tr";
+  }
+}
 
-  // Load language from storage/cookie on client mount
+function persist(lang: Language) {
+  try {
+    localStorage.setItem(STORAGE_KEY, lang);
+  } catch {
+    /* storage unavailable */
+  }
+  try {
+    document.cookie = `${STORAGE_KEY}=${lang}; path=/; max-age=31536000; SameSite=Lax`;
+    document.documentElement.lang = lang;
+  } catch {
+    /* cookies unavailable */
+  }
+}
+
+/**
+ * `initialLang` comes from the cookie read on the server. When it is missing
+ * (first visit) we fall back to localStorage, then the browser language.
+ */
+export function LanguageProvider({
+  children,
+  initialLang,
+}: {
+  children: ReactNode;
+  initialLang?: Language;
+}) {
+  // First visit (no cookie): read localStorage / the browser language on the client.
+  const detected = useSyncExternalStore(noop, detectLang, () => "tr" as Language);
+  const [override, setOverride] = useState<Language | null>(null);
+  const lang: Language = override ?? initialLang ?? detected;
+
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
-      if (stored === "tr" || stored === "en") {
-        setLangState(stored);
-        document.documentElement.lang = stored;
-        return;
-      }
-      // Check browser preference
-      if (typeof navigator !== "undefined" && navigator.language?.startsWith("tr")) {
-        setLangState("tr");
-        document.documentElement.lang = "tr";
-      } else if (typeof navigator !== "undefined") {
-        setLangState("en");
-        document.documentElement.lang = "en";
-      }
-    } catch {
-      // Fallback
-    }
+    if (!initialLang) persist(detected);
+  }, [initialLang, detected]);
+
+  const setLang = useCallback((newLang: Language) => {
+    setOverride(newLang);
+    persist(newLang);
   }, []);
 
-  const setLang = (newLang: Language) => {
-    setLangState(newLang);
-    try {
-      localStorage.setItem(STORAGE_KEY, newLang);
-      document.cookie = `${STORAGE_KEY}=${newLang}; path=/; max-age=31536000; SameSite=Lax`;
-      document.documentElement.lang = newLang;
-    } catch {
-      // Storage unavailable
-    }
-  };
-
-  const toggleLang = () => {
-    setLang(lang === "tr" ? "en" : "tr");
-  };
+  const toggleLang = useCallback(() => {
+    const next = lang === "tr" ? "en" : "tr";
+    setOverride(next);
+    persist(next);
+  }, [lang]);
 
   const t = dictionaries[lang] ?? tr;
 

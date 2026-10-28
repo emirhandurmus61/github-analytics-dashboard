@@ -3,159 +3,173 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Users, Flame, Award, TrendingUp, RefreshCw, GitCommit, Clock } from "lucide-react";
+import { Rss, Flame, Award, TrendingUp, GitCommitHorizontal, Clock, RefreshCw, Users } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
+import { Panel } from "@/components/ui/primitives";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { timeAgo, cn, type Lang } from "@/lib/ui/format";
 
-type ActivityUser = {
-  id: string;
-  username: string;
-  name: string;
-  avatar_url: string | null;
-};
-
-type Activity = {
+type User = { id: string; username: string; name: string; avatar_url: string | null };
+type Item = {
   id: string;
   type: "streak_milestone" | "badge_earned" | "new_record" | "active_today" | "recent_sync";
   payload: Record<string, unknown>;
   created_at: string;
-  user: ActivityUser | null;
+  user: User | null;
 };
 
-function timeAgo(iso: string, lang: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 60) return lang === "en" ? `${minutes}m ago` : `${minutes}dk önce`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return lang === "en" ? `${hours}h ago` : `${hours}sa önce`;
-  return lang === "en" ? `${Math.floor(hours / 24)}d ago` : `${Math.floor(hours / 24)}g önce`;
-}
+const KIND = {
+  streak_milestone: { icon: Flame, color: "var(--hue-orange)" },
+  badge_earned: { icon: Award, color: "var(--hue-purple)" },
+  new_record: { icon: TrendingUp, color: "var(--hue-green)" },
+  active_today: { icon: GitCommitHorizontal, color: "var(--hue-cyan)" },
+  recent_sync: { icon: Clock, color: "var(--ink-3)" },
+} as const;
 
-function getActivityLabel(type: Activity["type"], payload: Record<string, unknown>, lang: string): string {
-  if (lang === "en") {
-    switch (type) {
-      case "streak_milestone": return `${payload.days}-day streak`;
-      case "badge_earned":     return `earned "${payload.badge}" badge`;
-      case "new_record":       return `New record: ${payload.value} commits`;
-      case "active_today":     return "committed today";
-      case "recent_sync":      return `${payload.commitCount} active days this month`;
+function describe(t: Item["type"], p: Record<string, unknown>, l: Lang) {
+  if (l === "en") {
+    switch (t) {
+      case "streak_milestone": return `hit a ${p.days}-day streak`;
+      case "badge_earned": return `earned “${p.badge}”`;
+      case "new_record": return `set a record: ${p.value} commits`;
+      case "active_today": return "committed today";
+      case "recent_sync": return `${p.commitCount} active days this month`;
     }
-  } else {
-    switch (type) {
-      case "streak_milestone": return `${payload.days} günlük streak`;
-      case "badge_earned":     return `"${payload.badge}" rozetini kazandı`;
-      case "new_record":       return `Yeni rekor: ${payload.value} commit`;
-      case "active_today":     return "bugün commit attı";
-      case "recent_sync":      return `bu ay ${payload.commitCount} aktif gün`;
-    }
+  }
+  switch (t) {
+    case "streak_milestone": return `${p.days} günlük seriye ulaştı`;
+    case "badge_earned": return `“${p.badge}” rozetini aldı`;
+    case "new_record": return `rekor kırdı: ${p.value} commit`;
+    case "active_today": return "bugün commit attı";
+    case "recent_sync": return `bu ay ${p.commitCount} aktif gün`;
   }
 }
 
-const TYPE_ICONS = {
-  streak_milestone: { icon: Flame, color: "#f97316" },
-  badge_earned:     { icon: Award, color: "#c084fc" },
-  new_record:       { icon: TrendingUp, color: "#34d399" },
-  active_today:     { icon: GitCommit, color: "#22d3ee" },
-  recent_sync:      { icon: Clock, color: "#a1a1aa" },
-};
+function Av({ u, size = 24 }: { u: User; size?: number }) {
+  return u.avatar_url ? (
+    <Image src={u.avatar_url} alt="" width={size} height={size} unoptimized className="rounded-full ring-2 ring-[var(--bg-1)] shrink-0" style={{ width: size, height: size }} />
+  ) : (
+    <span className="grid shrink-0 place-items-center rounded-full bg-raised text-[10px] text-ink-3 ring-2 ring-[var(--bg-1)]" style={{ width: size, height: size }}>
+      {u.username[0]?.toUpperCase()}
+    </span>
+  );
+}
 
 export default function FollowFeed() {
   const { lang } = useLanguage();
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const l = lang as Lang;
+  const { shape } = useWidgetSize();
+  const [items, setItems] = useState<Item[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [empty, setEmpty] = useState(false);
 
-  async function load() {
-    setLoading(true);
+  const fetchFeed = async () => {
     try {
       const res = await fetch("/api/follow/feed");
       const data = await res.json();
-      const list: Activity[] = data.activities ?? [];
-      setActivities(list);
-      setEmpty(list.length === 0);
+      setItems((data.activities ?? []).filter((a: Item) => a.user));
     } catch {
-      setEmpty(true);
+      setItems([]);
     } finally {
       setLoading(false);
     }
+  };
+  const load = () => {
+    setLoading(true);
+    void fetchFeed();
+  };
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/follow/feed")
+      .then((r) => r.json())
+      .then((data) => alive && setItems((data.activities ?? []).filter((a: Item) => a.user)))
+      .catch(() => alive && setItems([]))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const title = l === "en" ? "Following" : "Takip akışı";
+  const refresh = (
+    <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={load} aria-label={l === "en" ? "Refresh" : "Yenile"}>
+      <RefreshCw className={cn(loading && "animate-spin")} />
+    </button>
+  );
+
+  if (items === null) {
+    return (
+      <Panel title={title} icon={Rss}>
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skel h-8" />
+          ))}
+        </div>
+      </Panel>
+    );
   }
 
-  useEffect(() => { load(); }, []);
+  if (!items.length) {
+    return (
+      <Panel title={title} icon={Rss} actions={shape !== "glance" ? refresh : undefined}>
+        <div className="flex h-full flex-col items-start justify-center gap-1.5">
+          <Users size={18} className="text-ink-4" />
+          <p className="text-[12.5px] text-ink-2">{l === "en" ? "You are not following anyone." : "Henüz kimseyi takip etmiyorsun."}</p>
+          {shape !== "glance" && (
+            <p className="text-[12px] text-ink-3">
+              {l === "en" ? "Find developers on the " : "Geliştiricileri "}
+              <Link href="/leaderboard" className="text-accent hover:underline">{l === "en" ? "leaderboard" : "sıralamada"}</Link>
+              {l === "en" ? " and follow them from their profile." : " bul, profillerinden takip et."}
+            </p>
+          )}
+        </div>
+      </Panel>
+    );
+  }
+
+  const uniq = Array.from(new Map(items.map((a) => [a.user!.id, a.user!])).values());
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <Users className="w-3.5 h-3.5 text-zinc-500" />
-          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
-            {lang === "en" ? "Follow Feed" : "Takip Akışı"}
-          </h2>
-        </div>
-        <button
-          onClick={load}
-          className="text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
-          title={lang === "en" ? "Refresh" : "Yenile"}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="w-5 h-5 rounded-full border-2 border-zinc-700 border-t-zinc-400 animate-spin" />
-        </div>
-      ) : empty ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-4">
-          <Users className="w-8 h-8 text-zinc-700" />
-          <p className="text-xs text-zinc-600">
-            {lang === "en" ? "You're not following anyone yet." : "Henüz kimseyi takip etmiyorsun."}
+    <Panel title={title} icon={Rss} meta={`${items.length}`} actions={shape !== "glance" ? refresh : undefined}>
+      {shape === "glance" && (
+        <div className="flex h-full flex-col">
+          <div className="flex -space-x-2">
+            {uniq.slice(0, 5).map((u) => (
+              <Av key={u.id} u={u} size={28} />
+            ))}
+          </div>
+          <p className="mt-2 text-[12px] leading-snug text-ink-2 line-clamp-2">
+            <span className="font-medium text-ink">{items[0].user!.name || items[0].user!.username}</span> {describe(items[0].type, items[0].payload, l)}
           </p>
-          <p className="text-[11px] text-zinc-700">
-            {lang === "en" ? "Follow developers from their profile pages." : "Profil sayfalarından geliştiricileri takip et."}
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2 overflow-y-auto flex-1 custom-scroll">
-          {activities.map((a) => {
-            if (!a.user) return null;
-            const meta = TYPE_ICONS[a.type];
-            const Icon = meta.icon;
-            return (
-              <div key={a.id} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors">
-                <Link href={`/u/${a.user.username}`} className="shrink-0">
-                  {a.user.avatar_url ? (
-                    <Image
-                      src={a.user.avatar_url}
-                      alt={a.user.username}
-                      width={28}
-                      height={28}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-400">
-                      {a.user.username[0]?.toUpperCase()}
-                    </div>
-                  )}
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <Link
-                      href={`/u/${a.user.username}`}
-                      className="text-xs font-semibold text-zinc-300 hover:text-white transition-colors truncate"
-                    >
-                      {a.user.name || a.user.username}
-                    </Link>
-                    <Icon className="w-3 h-3 shrink-0" style={{ color: meta.color }} />
-                    <span className="text-[11px] text-zinc-500 truncate">
-                      {getActivityLabel(a.type, a.payload, lang)}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-zinc-700 mt-0.5">{timeAgo(a.created_at, lang)}</p>
-                </div>
-              </div>
-            );
-          })}
+          <p className="mt-auto font-mono text-[10.5px] text-ink-4">{timeAgo(items[0].created_at, l)}</p>
         </div>
       )}
-    </div>
+      {shape !== "glance" && (
+        <ul className={cn("h-full overflow-y-auto", shape === "strip" && "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] content-center overflow-hidden")}>
+          {items.slice(0, shape === "strip" ? 4 : 30).map((a) => {
+            const k = KIND[a.type];
+            const I = k.icon;
+            return (
+              <li key={a.id} className={cn("flex items-start gap-2.5", shape !== "strip" && "py-2 border-b border-line last:border-0")}>
+                <Link href={`/u/${a.user!.username}`} className="relative shrink-0">
+                  <Av u={a.user!} size={26} />
+                  <span className="absolute -bottom-1 -right-1 grid size-4 place-items-center rounded-full bg-surface" style={{ color: k.color }}>
+                    <I size={10} />
+                  </span>
+                </Link>
+                <div className="min-w-0">
+                  <p className="text-[12.5px] leading-snug text-ink-2">
+                    <Link href={`/u/${a.user!.username}`} className="font-medium text-ink hover:text-accent">
+                      {a.user!.name || a.user!.username}
+                    </Link>{" "}
+                    {describe(a.type, a.payload, l)}
+                  </p>
+                  <p className="font-mono text-[10.5px] text-ink-4">{timeAgo(a.created_at, l)}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Panel>
   );
 }

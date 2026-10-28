@@ -6,7 +6,8 @@ import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import type { Metadata } from "next";
 import WrappedClient from "./wrapped-client";
 import { auth } from "@/lib/auth";
-import Navbar from "@/components/navbar";
+import AppShell from "@/components/shell/app-shell";
+import { yearPersona } from "@/lib/wrapped";
 
 type Props = { params: Promise<{ username: string; year: string }> };
 
@@ -191,111 +192,15 @@ export default async function WrappedPage({ params }: Props) {
     commits: count,
   }));
 
-  // ── Çalışma kimliği & Arketip ───────────────────────────────────────
-  const morningCommits   = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 6 && h < 12; }).length;
-  const afternoonCommits = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 12 && h < 18; }).length;
-  const eveningCommits   = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 18 && h < 22; }).length;
-  const nightCommits     = commits.filter((c) => { const h = new Date(c.committed_at).getHours(); return h >= 22 || h < 6; }).length;
-  const maxP = Math.max(morningCommits, afternoonCommits, eveningCommits, nightCommits);
-
-  let identity = {
-    label: "Öğleden Sonra Kodcusu",
-    emoji: "☀️",
-    en: { label: "Afternoon Coder" },
-  };
-  if (maxP === morningCommits && morningCommits > 0) {
-    identity = { label: "Sabah Kodcusu", emoji: "🌅", en: { label: "Morning Coder" } };
-  } else if (maxP === eveningCommits && eveningCommits > 0) {
-    identity = { label: "Akşam Kodcusu", emoji: "🌆", en: { label: "Evening Coder" } };
-  } else if (maxP === nightCommits && nightCommits > 0) {
-    identity = { label: "Gece Kodcusu", emoji: "🌙", en: { label: "Night Coder" } };
-  }
-
-  // Eğlenceli ve heyecan verici geliştirici arketipi
-  let archetype = {
-    title: "Açık Kaynak Kaşifi",
-    tagline: "Kodla dünyayı şekillendiren vizyoner geliştirici",
-    badge: "🚀 EXPLORER",
-    desc: `${totalCommits} commit ve ${activeRepoCount} aktif repo ile yılını dolu dolu üreterek geçirdin.`,
-    color: "#38bdf8",
-    en: {
-      title: "Open Source Explorer",
-      tagline: "A visionary developer shaping the world through code",
-      badge: "🚀 EXPLORER",
-      desc: `You spent the year producing intensely with ${totalCommits} commits across ${activeRepoCount} active repositories.`,
-    },
-  };
-  if (nightCommits > 0 && nightCommits >= maxP && (nightCommits / Math.max(totalCommits, 1)) > 0.25) {
-    archetype = {
-      title: "Gece Savaşçısı (Night Crawler)",
-      tagline: "Ay ışığında kod yazan bir efsane",
-      badge: "🌙 NOCTURNAL",
-      desc: "Herkes uyurken sen en çetrefilli bug'ları avladın. Gece sessizliği senin gizli süper gücün.",
-      color: "#a855f7",
-      en: {
-        title: "Night Crawler",
-        tagline: "A legend coding under the moonlight",
-        badge: "🌙 NOCTURNAL",
-        desc: "Hunting the trickiest bugs while the world sleeps. Midnight quiet is your secret superpower.",
-      },
-    };
-  } else if (morningCommits > 0 && morningCommits >= maxP && (morningCommits / Math.max(totalCommits, 1)) > 0.25) {
-    archetype = {
-      title: "Şafak Kodcusu (Early Bird)",
-      tagline: "Güneş doğmadan ilk commit'i atan sabah insanı",
-      badge: "🌅 EARLY BIRD",
-      desc: "Güne erken başlayıp kahvenle birlikte ilk PR'ını açtın. Disiplinin ve odaklanma gücün benzersiz.",
-      color: "#f59e0b",
-      en: {
-        title: "Early Bird",
-        tagline: "The morning person pushing commits before sunrise",
-        badge: "🌅 EARLY BIRD",
-        desc: "Starting your day early and opening your first PR over coffee. Your discipline and focus are unmatched.",
-      },
-    };
-  } else if (longestStreak >= 10) {
-    archetype = {
-      title: "Ateş Koruyucu (Streak Master)",
-      tagline: "Zinciri kırmayan istikrar abidesi",
-      badge: "🔥 UNSTOPPABLE",
-      desc: `${longestStreak} günlük kesintisiz kodlama serisi! Yıl boyunca kararlılığınla harikalar yarattın.`,
-      color: "#ef4444",
-      en: {
-        title: "Streak Master",
-        tagline: "A paragon of consistency who never breaks the chain",
-        badge: "🔥 UNSTOPPABLE",
-        desc: `An unbroken ${longestStreak}-day coding streak! Your determination created wonders throughout the year.`,
-      },
-    };
-  } else if (totalCommits >= 250) {
-    archetype = {
-      title: "Kod Fabrikası (The Code Machine)",
-      tagline: "Terminalin sıcaklığı hiç düşmeyen üretici güç",
-      badge: "⚡ POWERHOUSE",
-      desc: "Yıl boyunca durmaksızın ürettin, klavyen neredeyse hiç soğumadı.",
-      color: "#10b981",
-      en: {
-        title: "The Code Machine",
-        tagline: "An unstoppable productive powerhouse whose terminal never cools down",
-        badge: "⚡ POWERHOUSE",
-        desc: "Producing non-stop all year round, your keyboard barely had a moment to cool off.",
-      },
-    };
-  } else if (totalLinesDeleted > totalLinesAdded * 0.35 && totalLinesDeleted > 500) {
-    archetype = {
-      title: "Refactor Mimarı (The Zen Cleaner)",
-      tagline: "Az kod, çok iş felsefesinin ustası",
-      badge: "🧹 ELEGANT",
-      desc: "Gereksiz karmaşıklığı temizleyip kod tabanını hafif ve sürdürülebilir kıldın.",
-      color: "#06b6d4",
-      en: {
-        title: "The Zen Cleaner",
-        tagline: "Master of the 'less code, more impact' philosophy",
-        badge: "🧹 ELEGANT",
-        desc: "Eliminating unnecessary complexity, keeping the codebase lean and sustainable.",
-      },
-    };
-  }
+  // ── Çalışma kimliği & Arketip (shared with the slide images) ────────
+  const { archetype, identity } = yearPersona({
+    commitDates: commits.map((c) => c.committed_at),
+    totalCommits,
+    longestStreak,
+    activeRepos: activeRepoCount,
+    linesAdded: totalLinesAdded,
+    linesDeleted: totalLinesDeleted,
+  });
 
   // ── Haftalık heatmap verisi ────────────────────────────────────────
   const dateCountMap = new Map(heatmap.map((d) => [d.date, d.commit_count]));
@@ -351,9 +256,10 @@ export default async function WrappedPage({ params }: Props) {
   };
 
   return (
-    <ThemeProvider accent={accent}>
-      <Navbar />
-      <WrappedClient data={wrappedData} isOwner={isOwner} />
-    </ThemeProvider>
+    <AppShell bleed>
+      <ThemeProvider accent={accent}>
+        <WrappedClient data={wrappedData} isOwner={isOwner} />
+      </ThemeProvider>
+    </AppShell>
   );
 }

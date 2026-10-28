@@ -1,308 +1,300 @@
-import { NextRequest, NextResponse } from "next/server";
 import { ImageResponse } from "next/og";
+import type { ReactNode } from "react";
 import { supabaseAdmin } from "@/lib/supabase";
-import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import { calculateStreaks } from "@/lib/streak";
+import { yearPersona } from "@/lib/wrapped";
+import { imagePalette, langHex, quartileLevel, type ImagePalette } from "@/lib/og/palette";
+import { ogFonts, OG_MONO, OG_SANS } from "@/lib/og/fonts";
+import { Mark } from "@/lib/og/parts";
+import { langOf } from "@/lib/og/widget-data";
+import { MONTHS_LONG, MONTHS_SHORT } from "@/lib/ui/format";
 
 export const runtime = "nodejs";
 export const revalidate = 3600;
 
 const W = 1080;
 const H = 1080;
+const DAYS_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+const DAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-const LANG_COLORS: Record<string, string> = {
-  TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572A5",
-  Rust: "#dea584", Go: "#00ADD8", CSS: "#563d7c", HTML: "#e34c26",
-  Java: "#b07219", "C++": "#f34b7d", "C#": "#178600", C: "#555555",
-  Swift: "#F05138", Kotlin: "#7F52FF", Ruby: "#701516",
-};
-
-const MONTH_NAMES = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
-  "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
-
-function Badge({ label, value, ac, ab }: { label: string; value: string; ac: string; ab: string }) {
+function Squares({ p, add, del, n, size }: { p: ImagePalette; add: number; del: number; n: number; size: number }) {
+  const t = add + del;
+  const g = t ? Math.round((add / t) * n) : 0;
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", gap: 4,
-      background: ab, border: `1px solid ${ac}33`,
-      borderRadius: 16, padding: "16px 24px", minWidth: 180, alignItems: "center",
-    }}>
-      <span style={{ color: "#71717a", fontSize: 13, letterSpacing: 2, fontWeight: 700 }}>{label.toUpperCase()}</span>
-      <span style={{ color: ac, fontSize: 36, fontWeight: 900, lineHeight: 1 }}>{value}</span>
+    <div style={{ display: "flex", gap: size / 5 }}>
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} style={{ width: size, height: size, borderRadius: size / 5, background: t === 0 ? p.bg3 : i < g ? p.good : p.bad }} />
+      ))}
     </div>
   );
 }
 
-function Watermark({ username, year }: { username: string; year: number }) {
-  return (
-    <div style={{
-      position: "absolute", bottom: 32, right: 40,
-      color: "#3f3f46", fontSize: 16, display: "flex",
-    }}>
-      devanalytics.app/u/{username}/{year}
-    </div>
-  );
-}
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ username: string; year: string; slide: string }> }
-) {
+export async function GET(req: Request, { params }: { params: Promise<{ username: string; year: string; slide: string }> }) {
   const { username, year, slide } = await params;
   const yearNum = parseInt(year, 10);
-  const slideNum = parseInt(slide, 10);
+  const n = parseInt(slide, 10);
+  if (isNaN(yearNum) || isNaN(n) || n < 0 || n > 9) return new Response("Bad request", { status: 400 });
+  const l = langOf(req);
+  const en = l === "en";
+  const loc = en ? "en-US" : "tr-TR";
+  const T = (tr: string, e: string) => (en ? e : tr);
 
-  if (isNaN(yearNum) || isNaN(slideNum)) {
-    return new NextResponse("Bad request", { status: 400 });
-  }
+  const { data: user } = await supabaseAdmin.from("users").select("id, name, theme_accent").eq("username", username).single();
+  if (!user) return new Response("Not found", { status: 404 });
+  const p = imagePalette(user.theme_accent, new URL(req.url).searchParams);
+  const name = user.name ?? username;
+  const ys = `${yearNum}-01-01`;
+  const ye = `${yearNum}-12-31`;
 
-  const { data: user } = await supabaseAdmin
-    .from("users")
-    .select("id, name, avatar_url, theme_accent")
-    .eq("username", username)
-    .single();
-
-  if (!user) return new NextResponse("Not found", { status: 404 });
-
-  const accent = isValidTheme(user.theme_accent) ? user.theme_accent : DEFAULT_THEME;
-  const theme = THEMES[accent];
-  const ac = theme.accent;
-  const ab = theme.accentBg.replace("0.08", "0.15");
-  const displayName = user.name ?? username;
-
-  const yearStart = `${yearNum}-01-01`;
-  const yearEnd   = `${yearNum}-12-31`;
-
-  const { data: allRepos } = await supabaseAdmin
-    .from("repositories")
-    .select("id, is_fork, created_at, language")
-    .eq("user_id", user.id);
-  const ownRepoIds = (allRepos ?? []).filter((r) => !r.is_fork).map((r) => r.id);
-
-  const [heatmapRes, commitsRes, langsRes] = await Promise.all([
-    supabaseAdmin.from("daily_stats")
-      .select("date, commit_count, lines_added, lines_deleted")
-      .eq("user_id", user.id).gte("date", yearStart).lte("date", yearEnd),
-    supabaseAdmin.from("commits")
-      .select("committed_at, repo_id, message, additions, deletions")
-      .in("repo_id", ownRepoIds)
-      .gte("committed_at", `${yearStart}T00:00:00Z`)
-      .lte("committed_at", `${yearEnd}T23:59:59Z`),
-    supabaseAdmin.from("repo_languages")
-      .select("language, bytes").in("repo_id", ownRepoIds),
+  const { data: repos } = await supabaseAdmin.from("repositories").select("id, name, is_fork, created_at, stars").eq("user_id", user.id);
+  const own = (repos ?? []).filter((r) => !r.is_fork);
+  const ownIds = own.map((r) => r.id);
+  const [daysRes, commitsRes, langsRes, prsRes, fonts] = await Promise.all([
+    supabaseAdmin.from("daily_stats").select("date, commit_count, lines_added, lines_deleted").eq("user_id", user.id).gte("date", ys).lte("date", ye),
+    supabaseAdmin.from("commits").select("committed_at, repo_id, message, additions, deletions").in("repo_id", ownIds).gte("committed_at", `${ys}T00:00:00Z`).lte("committed_at", `${ye}T23:59:59Z`),
+    supabaseAdmin.from("repo_languages").select("language, bytes").in("repo_id", ownIds),
+    supabaseAdmin.from("pull_requests").select("merged").in("repo_id", ownIds).gte("created_at", ys).lte("created_at", `${ye}T23:59:59Z`),
+    ogFonts(),
   ]);
-
-  const heatmap = heatmapRes.data ?? [];
+  const days = daysRes.data ?? [];
   const commits = commitsRes.data ?? [];
-  const langs = langsRes.data ?? [];
-
-  const totalCommits = commits.length;
-  const totalLinesAdded = heatmap.reduce((s, d) => s + (d.lines_added ?? 0), 0);
-  const totalLinesDeleted = heatmap.reduce((s, d) => s + (d.lines_deleted ?? 0), 0);
-  const activeDates = heatmap.filter((d) => d.commit_count > 0).map((d) => d.date);
-  const { longestStreak, totalActiveDays } = calculateStreaks(activeDates);
-
-  const monthCounts = new Array(12).fill(0);
-  for (const d of heatmap) {
-    const m = parseInt(d.date.slice(5, 7), 10) - 1;
-    monthCounts[m] += d.commit_count;
+  const total = commits.length;
+  const added = days.reduce((s, d) => s + (d.lines_added ?? 0), 0);
+  const deleted = days.reduce((s, d) => s + (d.lines_deleted ?? 0), 0);
+  const { longestStreak, totalActiveDays } = calculateStreaks(days.filter((d) => d.commit_count > 0).map((d) => d.date));
+  const months = new Array(12).fill(0);
+  for (const d of days) months[parseInt(d.date.slice(5, 7), 10) - 1] += d.commit_count;
+  const peakM = months.indexOf(Math.max(...months));
+  const dayCounts = new Array(7).fill(0);
+  const hourCounts = new Array(24).fill(0);
+  for (const c of commits) {
+    const dt = new Date(c.committed_at);
+    dayCounts[(dt.getDay() + 6) % 7]++;
+    hourCounts[dt.getHours()]++;
   }
-  const peakMonthIdx = monthCounts.indexOf(Math.max(...monthCounts));
-  const peakMonthCommits = monthCounts[peakMonthIdx];
-
+  const peakD = dayCounts.indexOf(Math.max(...dayCounts));
+  const peakH = hourCounts.indexOf(Math.max(...hourCounts));
   const langMap = new Map<string, number>();
-  for (const row of langs) langMap.set(row.language, (langMap.get(row.language) ?? 0) + row.bytes);
-  const topLangs = Array.from(langMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const totalBytes = topLangs.reduce((s, [, b]) => s + b, 0);
+  for (const r of langsRes.data ?? []) langMap.set(r.language, (langMap.get(r.language) ?? 0) + r.bytes);
+  const langs = [...langMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const langTotal = Math.max(1, langs.reduce((s, [, b]) => s + b, 0));
+  const big = [...commits].sort((a, b) => (b.additions ?? 0) + (b.deletions ?? 0) - ((a.additions ?? 0) + (a.deletions ?? 0)))[0];
+  const activeRepoIds = new Set(commits.map((c) => c.repo_id));
+  const repoCommits = new Map<string, number>();
+  for (const c of commits) repoCommits.set(c.repo_id, (repoCommits.get(c.repo_id) ?? 0) + 1);
+  const topRepoEntry = [...repoCommits.entries()].sort((a, b) => b[1] - a[1])[0];
+  const topRepo = topRepoEntry ? own.find((r) => r.id === topRepoEntry[0]) : null;
+  const created = own.filter((r) => r.created_at?.startsWith(String(yearNum))).length;
+  const merged = (prsRes.data ?? []).filter((x) => x.merged).length;
+  const stars = own.reduce((s, r) => s + (r.stars ?? 0), 0);
+  const { archetype } = yearPersona({ commitDates: commits.map((c) => c.committed_at), totalCommits: total, longestStreak, activeRepos: activeRepoIds.size, linesAdded: added, linesDeleted: deleted });
+  const arch = en ? archetype.en : archetype;
 
-  const biggestCommit = [...commits]
-    .filter((c) => (c.additions ?? 0) + (c.deletions ?? 0) > 0)
-    .sort((a, b) => ((b.additions ?? 0) + (b.deletions ?? 0)) - ((a.additions ?? 0) + (a.deletions ?? 0)))[0] ?? null;
+  const huge = (size: number, color = p.ink1, mono = true) => ({ fontFamily: mono ? OG_MONO : OG_SANS, fontSize: size, fontWeight: 800, letterSpacing: -size * 0.05, lineHeight: 0.9, color }) as const;
+  const lead = { fontSize: 38, fontWeight: 600, lineHeight: 1.25, color: p.ink1 } as const;
+  const kickers = [
+    `devboard wrapped --year ${yearNum}`,
+    T("toplam commit", "total commits"),
+    "git diff --shortstat",
+    T("en yoğun ay", "busiest month"),
+    T("çalışma kimliğin", "how you work"),
+    T("dillerin", "your languages"),
+    T("repolar ve işbirliği", "repos and collaboration"),
+    "git show --stat",
+    T(`${yearNum} katkı haritası`, `${yearNum} contributions`),
+    T("özet", "summary"),
+  ];
 
-  const bg = "#09090b";
-
-  const slides: Record<number, React.ReactNode> = {
-    // 0 — Cover
-    0: (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 48, textAlign: "center" }}>
-        {user.avatar_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={user.avatar_url} width={160} height={160} style={{ borderRadius: "50%", border: `6px solid ${ac}` }} alt={username} />
-        )}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={{ color: "#71717a", fontSize: 22 }}>Devboard Sunuyor</span>
-          <span style={{ color: "#f4f4f5", fontSize: 96, fontWeight: 900, lineHeight: 1 }}>{yearNum}</span>
-          <span style={{ color: ac, fontSize: 80, fontWeight: 900, lineHeight: 1 }}>Wrapped</span>
-        </div>
-        <span style={{ color: "#a1a1aa", fontSize: 24 }}>
-          <span style={{ color: "#f4f4f5", fontWeight: 700 }}>{displayName}</span> için
-        </span>
-      </div>
-    ),
-    // 1 — Total commits
-    1: (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32, textAlign: "center" }}>
-        <span style={{ color: "#71717a", fontSize: 20, letterSpacing: 4, fontWeight: 700 }}>BU YIL TOPLAM</span>
-        <span style={{ color: ac, fontSize: 160, fontWeight: 900, lineHeight: 1 }}>{totalCommits.toLocaleString("tr-TR")}</span>
-        <span style={{ color: "#f4f4f5", fontSize: 48, fontWeight: 700 }}>commit yaptın</span>
-        <span style={{ color: "#71717a", fontSize: 22 }}>
-          {totalActiveDays} aktif gün · {(totalCommits / Math.max(totalActiveDays, 1)).toFixed(1)} commit/gün
-        </span>
-      </div>
-    ),
-    // 2 — Lines
-    2: (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 48, textAlign: "center" }}>
-        <span style={{ color: "#71717a", fontSize: 20, letterSpacing: 4, fontWeight: 700 }}>KOD SATIRLARI</span>
-        <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ color: "#34d399", fontSize: 100, fontWeight: 900, lineHeight: 1 }}>+{totalLinesAdded.toLocaleString("tr-TR")}</span>
-            <span style={{ color: "#71717a", fontSize: 24 }}>satır eklendi</span>
-          </div>
-          <div style={{ width: "100%", height: 2, background: "#27272a" }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ color: "#f87171", fontSize: 100, fontWeight: 900, lineHeight: 1 }}>−{totalLinesDeleted.toLocaleString("tr-TR")}</span>
-            <span style={{ color: "#71717a", fontSize: 24 }}>satır silindi</span>
-          </div>
-        </div>
-      </div>
-    ),
-    // 3 — Peak month
-    3: (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32, textAlign: "center" }}>
-        <span style={{ color: "#71717a", fontSize: 20, letterSpacing: 4, fontWeight: 700 }}>EN AKTİF AYIN</span>
-        <span style={{ color: ac, fontSize: 96, fontWeight: 900, lineHeight: 1 }}>{MONTH_NAMES[peakMonthIdx]}</span>
-        <span style={{ color: "#a1a1aa", fontSize: 28 }}>
-          <span style={{ color: "#f4f4f5", fontWeight: 700, fontSize: 40 }}>{peakMonthCommits}</span> commit ile
-        </span>
-        {/* Mini bar chart */}
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120, width: 600 }}>
-          {monthCounts.map((c, i) => {
-            const max = Math.max(...monthCounts, 1);
-            const h = Math.max((c / max) * 100, c > 0 ? 4 : 2);
-            const isPeak = i === peakMonthIdx;
-            return (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, gap: 4 }}>
-                <div style={{ width: "100%", height: `${h}%`, background: isPeak ? ac : ab, borderRadius: 4, opacity: isPeak ? 1 : 0.6 }} />
-                <span style={{ color: isPeak ? ac : "#52525b", fontSize: 12 }}>{MONTH_NAMES[i].slice(0, 3)}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    ),
-    // 5 — Languages
-    5: (
-      <div style={{ display: "flex", flexDirection: "column", gap: 40, width: 640 }}>
-        <span style={{ color: "#71717a", fontSize: 20, letterSpacing: 4, fontWeight: 700, textAlign: "center" }}>BU YILIN DİLLERİ</span>
-        {topLangs.map(([lang, bytes], i) => {
-          const pct = totalBytes > 0 ? Math.round((bytes / totalBytes) * 100) : 0;
-          const color = LANG_COLORS[lang] ?? "#6b7280";
-          return (
-            <div key={lang} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ color: i === 0 ? ac : "#71717a", fontSize: 20, fontWeight: 700 }}>#{i + 1}</span>
-                  <div style={{ width: 16, height: 16, borderRadius: "50%", background: color }} />
-                  <span style={{ color: i === 0 ? "#f4f4f5" : "#a1a1aa", fontSize: 24, fontWeight: i === 0 ? 700 : 400 }}>{lang}</span>
-                </div>
-                <span style={{ color: "#52525b", fontSize: 20 }}>{pct}%</span>
-              </div>
-              <div style={{ height: 8, background: "#27272a", borderRadius: 4, display: "flex" }}>
-                <div style={{ width: `${pct}%`, background: color, borderRadius: 4, opacity: 0.85 }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    ),
-    // 9 — End
-    9: (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 48, textAlign: "center" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={{ color: "#71717a", fontSize: 22 }}>Harika bir yıldı</span>
-          <span style={{ color: ac, fontSize: 80, fontWeight: 900 }}>{displayName}!</span>
-        </div>
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" as const, justifyContent: "center" }}>
-          <Badge label="Commit" value={totalCommits.toLocaleString("tr-TR")} ac={ac} ab={ab} />
-          <Badge label="Aktif Gün" value={String(totalActiveDays)} ac={ac} ab={ab} />
-          <Badge label="En Uzun Streak" value={`${longestStreak}g`} ac={ac} ab={ab} />
-          <Badge label="En Aktif Ay" value={MONTH_NAMES[peakMonthIdx].slice(0, 3)} ac={ac} ab={ab} />
-          {topLangs[0] && <Badge label="Ana Dil" value={topLangs[0][0]} ac={ac} ab={ab} />}
-        </div>
-        <span style={{ color: "#3f3f46", fontSize: 20 }}>devanalytics.app/u/{username}/{yearNum}</span>
-      </div>
-    ),
+  const mMax = Math.max(...months, 1);
+  const level = quartileLevel(days.map((d) => d.commit_count));
+  const dmap = new Map(days.map((d) => [d.date, d.commit_count]));
+  const yearGrid = () => {
+    const start = new Date(yearNum, 0, 1, 12);
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    const cols: (number | null)[][] = [];
+    const cur = new Date(start);
+    while (cur.getFullYear() <= yearNum && cols.length < 54) {
+      const col: (number | null)[] = [];
+      for (let i = 0; i < 7; i++) {
+        const k = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+        col.push(cur.getFullYear() === yearNum ? level(dmap.get(k) ?? 0) : null);
+        cur.setDate(cur.getDate() + 1);
+      }
+      cols.push(col);
+    }
+    return cols;
   };
 
-  // Generic fallback for slides without custom design
-  const genericSlides: Record<number, { label: string; value: string; sub?: string }> = {
-    4: { label: "EN UZUN STREAK", value: `${longestStreak} gün`, sub: `${totalActiveDays} aktif gün` },
-    6: { label: "REPOLAR", value: `${(allRepos ?? []).filter(r => !r.is_fork && r.created_at?.startsWith(yearNum.toString())).length} yeni`, sub: "bu yıl açıldı" },
-    7: biggestCommit
-      ? { label: "EN BÜYÜK COMMİT", value: `${((biggestCommit.additions ?? 0) + (biggestCommit.deletions ?? 0)).toLocaleString("tr-TR")} satır`, sub: (biggestCommit.message ?? "").slice(0, 60) }
-      : { label: "EN BÜYÜK COMMİT", value: "—" },
-    8: { label: "KONTRIBÜSYON HARİTASI", value: `${totalActiveDays} gün`, sub: `${totalCommits} commit` },
-  };
-
-  let content: React.ReactNode = slides[slideNum];
-
-  if (!content && genericSlides[slideNum]) {
-    const g = genericSlides[slideNum];
-    content = (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32, textAlign: "center" }}>
-        <span style={{ color: "#71717a", fontSize: 20, letterSpacing: 4, fontWeight: 700 }}>{g.label}</span>
-        <span style={{ color: ac, fontSize: 120, fontWeight: 900, lineHeight: 1 }}>{g.value}</span>
-        {g.sub && <span style={{ color: "#a1a1aa", fontSize: 26 }}>{g.sub}</span>}
+  const bodies: ReactNode[] = [
+    <div key={0} style={{ display: "flex", flexDirection: "column" }}>
+      <span style={{ fontFamily: OG_MONO, fontSize: 26, color: p.ink3 }}>
+        <span style={{ color: p.ac }}>$&nbsp;</span>git log --author={username}
+      </span>
+      <span style={{ ...huge(330), marginTop: 30 }}>{yearNum}</span>
+      <span style={{ ...lead, marginTop: 40, maxWidth: 820 }}>{T(`${name} için bir yıl, commit commit.`, `${name}'s year, one commit at a time.`)}</span>
+    </div>,
+    <div key={1} style={{ display: "flex", flexDirection: "column" }}>
+      <span style={huge(Math.min(300, 1600 / Math.max(3, String(total).length)), p.ac)}>{total.toLocaleString(loc)}</span>
+      <span style={{ ...lead, marginTop: 40 }}>{T(`commit, ${totalActiveDays} farklı günde.`, `commits, across ${totalActiveDays} different days.`)}</span>
+      <span style={{ fontSize: 26, color: p.ink3, marginTop: 18 }}>{T(`Aktif bir günde ortalama ${(total / Math.max(1, totalActiveDays)).toFixed(1)} commit.`, `About ${(total / Math.max(1, totalActiveDays)).toFixed(1)} commits on an active day.`)}</span>
+    </div>,
+    <div key={2} style={{ display: "flex", flexDirection: "column" }}>
+      <span style={huge(Math.min(190, 1500 / Math.max(4, `+${added.toLocaleString(loc)}`.length)), p.good)}>+{added.toLocaleString(loc)}</span>
+      <span style={{ ...huge(Math.min(130, 1100 / Math.max(4, `-${deleted.toLocaleString(loc)}`.length)), p.bad), marginTop: 16 }}>−{deleted.toLocaleString(loc)}</span>
+      <div style={{ display: "flex", marginTop: 48 }}>
+        <Squares p={p} add={added} del={deleted} n={20} size={34} />
       </div>
-    );
-  }
+      <span style={{ fontSize: 30, color: p.ink2, marginTop: 36 }}>{T("Net", "Net")} {added >= deleted ? "+" : "−"}{Math.abs(added - deleted).toLocaleString(loc)} {T("satır", "lines")}</span>
+    </div>,
+    <div key={3} style={{ display: "flex", flexDirection: "column" }}>
+      <span style={huge(150, p.ink1, false)}>{MONTHS_LONG[l][peakM]}</span>
+      <span style={{ fontSize: 32, color: p.ink2, marginTop: 20 }}>{T(`${months[peakM].toLocaleString(loc)} commit ile yılın zirvesi.`, `The peak of the year with ${months[peakM].toLocaleString(loc)} commits.`)}</span>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 380, marginTop: 60 }}>
+        {months.map((v, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 12, width: 62, height: 380 }}>
+            <div style={{ width: 62, height: Math.max(6, (v / mMax) * 320), borderRadius: 6, background: i === peakM ? p.ac : p.heat[2] }} />
+            <span style={{ fontFamily: OG_MONO, fontSize: 18, color: i === peakM ? p.ac : p.ink4 }}>{MONTHS_SHORT[l][i]}</span>
+          </div>
+        ))}
+      </div>
+    </div>,
+    <div key={4} style={{ display: "flex", flexDirection: "column" }}>
+      <span style={{ fontFamily: OG_MONO, fontSize: 26, color: p.ac }}>{arch.badge}</span>
+      <span style={{ ...huge(124, p.ink1, false), marginTop: 22, maxWidth: 900 }}>{arch.title}</span>
+      <span style={{ fontSize: 32, lineHeight: 1.4, color: p.ink2, marginTop: 32, maxWidth: 860 }}>{arch.tagline}</span>
+      <div style={{ display: "flex", gap: 70, marginTop: 70 }}>
+        {[
+          [T("en yoğun gün", "busiest day"), (en ? DAYS_EN : DAYS_TR)[peakD]],
+          [T("en yoğun saat", "busiest hour"), `${String(peakH).padStart(2, "0")}:00`],
+          [T("en uzun seri", "longest streak"), `${longestStreak} ${T("gün", "days")}`],
+        ].map(([k, v]) => (
+          <div key={k} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ fontSize: 22, color: p.ink3 }}>{k}</span>
+            <span style={{ fontFamily: OG_MONO, fontSize: 38, fontWeight: 800, color: p.ink1 }}>{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>,
+    <div key={5} style={{ display: "flex", flexDirection: "column" }}>
+      {langs[0] ? (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontFamily: OG_MONO, fontSize: 28, color: p.ink3 }}>#1</span>
+          <span style={huge(Math.min(190, 1500 / Math.max(5, langs[0][0].length)), langHex(langs[0][0], p), false)}>{langs[0][0]}</span>
+          <div style={{ display: "flex", width: 920, height: 22, borderRadius: 11, overflow: "hidden", background: p.bg3, marginTop: 56 }}>
+            {langs.map(([x, b]) => (
+              <div key={x} style={{ width: (b / langTotal) * 920, height: 22, background: langHex(x, p), marginRight: 3 }} />
+            ))}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", width: 920, marginTop: 36, rowGap: 18 }}>
+            {langs.map(([x, b], i) => (
+              <div key={x} style={{ display: "flex", alignItems: "baseline", width: 460, gap: 16 }}>
+                <span style={{ fontFamily: OG_MONO, fontSize: 22, color: p.ink4, width: 30 }}>{i + 1}</span>
+                <span style={{ fontSize: 30, color: p.ink1 }}>{x}</span>
+                <span style={{ fontFamily: OG_MONO, fontSize: 26, color: p.ink3 }}>{Math.round((b / langTotal) * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <span style={lead}>{T("Bu yıl dil verisi yok.", "No language data this year.")}</span>
+      )}
+    </div>,
+    <div key={6} style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", width: 920, rowGap: 64 }}>
+        {[
+          [created, T("yeni repo", "new repos")],
+          [activeRepoIds.size, T("aktif repo", "active repos")],
+          [merged, T("birleşen PR", "merged PRs")],
+          [stars, T("yıldız", "stars")],
+        ].map(([v, k]) => (
+          <div key={k as string} style={{ display: "flex", flexDirection: "column", width: 460, gap: 14 }}>
+            <span style={huge(150)}>{(v as number).toLocaleString(loc)}</span>
+            <span style={{ fontSize: 28, color: p.ink3 }}>{k}</span>
+          </div>
+        ))}
+      </div>
+      {topRepo && (
+        <span style={{ fontSize: 28, color: p.ink2, marginTop: 64, borderTop: `1px solid ${p.line}`, paddingTop: 30 }}>
+          {T("En çok commit:", "Most commits:")}&nbsp;<span style={{ fontFamily: OG_MONO, color: p.ink1 }}>{topRepo.name}</span>&nbsp;·&nbsp;<span style={{ fontFamily: OG_MONO }}>{topRepoEntry![1]}</span>
+        </span>
+      )}
+    </div>,
+    <div key={7} style={{ display: "flex", flexDirection: "column", background: p.bg1, border: `1px solid ${p.line}`, borderRadius: 16, padding: 52 }}>
+      {big ? (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontFamily: OG_MONO, fontSize: 22, color: p.ink3 }}>commit · {new Date(big.committed_at).toLocaleDateString(loc, { day: "numeric", month: "long" })}</span>
+          <span style={{ fontFamily: OG_MONO, fontSize: 44, fontWeight: 600, lineHeight: 1.25, color: p.ink1, marginTop: 30 }}>{(big.message ?? "").split("\n")[0].slice(0, 70) || T("(mesaj yok)", "(no message)")}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 36, marginTop: 56 }}>
+            <span style={huge(84, p.good)}>+{(big.additions ?? 0).toLocaleString(loc)}</span>
+            <span style={huge(84, p.bad)}>−{(big.deletions ?? 0).toLocaleString(loc)}</span>
+          </div>
+          <div style={{ display: "flex", marginTop: 36 }}>
+            <Squares p={p} add={big.additions ?? 0} del={big.deletions ?? 0} n={10} size={30} />
+          </div>
+        </div>
+      ) : (
+        <span style={lead}>{T("Bu yıl satır bilgisi olan commit yok.", "No commits with line stats this year.")}</span>
+      )}
+    </div>,
+    <div key={8} style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", gap: 3 }}>
+        {yearGrid().map((col, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {col.map((lv, j) => (
+              <div key={j} style={{ width: 14.5, height: 14.5, borderRadius: 3, background: lv === null ? "transparent" : p.heat[lv] }} />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 60, marginTop: 56 }}>
+        <span style={{ fontSize: 30, color: p.ink2 }}>
+          <span style={{ fontFamily: OG_MONO, fontSize: 56, fontWeight: 800, color: p.ink1 }}>{totalActiveDays}</span>&nbsp;{T("aktif gün", "active days")}
+        </span>
+        <span style={{ fontSize: 30, color: p.ink2 }}>
+          <span style={{ fontFamily: OG_MONO, fontSize: 56, fontWeight: 800, color: p.ink1 }}>{Math.round((totalActiveDays / 365) * 100)}%</span>&nbsp;{T("yılın", "of the year")}
+        </span>
+      </div>
+    </div>,
+    <div key={9} style={{ display: "flex", flexDirection: "column" }}>
+      <span style={{ fontFamily: OG_MONO, fontSize: 26, color: p.ink3 }}>@{username} · {yearNum}</span>
+      <span style={{ ...huge(110, p.ink1, false), marginTop: 18 }}>{arch.title}</span>
+      <div style={{ display: "flex", flexWrap: "wrap", width: 920, marginTop: 60, border: `1px solid ${p.line}`, borderRadius: 16, overflow: "hidden" }}>
+        {[
+          [total.toLocaleString(loc), "commit"],
+          [`${longestStreak} ${T("gün", "d")}`, T("en uzun seri", "longest streak")],
+          [`+${added.toLocaleString(loc)}`, T("eklenen satır", "lines added")],
+          [langs[0]?.[0] ?? "–", T("ana dil", "top language")],
+          [MONTHS_SHORT[l][peakM], T("zirve ayı", "peak month")],
+          [`${String(peakH).padStart(2, "0")}:00`, T("zirve saati", "peak hour")],
+        ].map(([v, k], i) => (
+          <div key={k} style={{ display: "flex", flexDirection: "column", gap: 8, width: 459, padding: 30, background: p.bg1, borderTop: i > 1 ? `1px solid ${p.line}` : "none", borderLeft: i % 2 ? `1px solid ${p.line}` : "none" }}>
+            <span style={{ fontSize: 22, color: p.ink3 }}>{k}</span>
+            <span style={{ fontFamily: OG_MONO, fontSize: 44, fontWeight: 800, color: p.ink1 }}>{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>,
+  ];
 
-  if (!content) {
-    return new NextResponse("Slide not found", { status: 404 });
-  }
-
-  const imageResponse = new ImageResponse(
+  return new ImageResponse(
     (
-      <div
-        style={{
-          width: W, height: H,
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          background: bg,
-          position: "relative",
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
-        {/* Glow background */}
-        <div style={{
-          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          background: `radial-gradient(ellipse 70% 50% at 50% 0%, ${ac}18 0%, transparent 70%)`,
-          display: "flex",
-        }} />
-        {/* Top accent bar */}
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: ac, display: "flex" }} />
-        {/* Slide number */}
-        <div style={{ position: "absolute", top: 28, left: 40, color: "#3f3f46", fontSize: 18, display: "flex" }}>
-          {slideNum + 1} / 10
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: W, height: H, padding: 80, background: p.bg0, color: p.ink1, fontFamily: OG_SANS }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <Mark p={p} size={26} />
+            <span style={{ fontFamily: OG_MONO, fontSize: 24, color: p.ink3 }}>{kickers[n]}</span>
+          </div>
+          <span style={{ fontFamily: OG_MONO, fontSize: 24, color: p.ink4 }}>
+            {String(n + 1).padStart(2, "0")}/10
+          </span>
         </div>
-        {/* Content */}
-        <div style={{ display: "flex", position: "relative", zIndex: 1 }}>
-          {content}
-        </div>
-        {/* Watermark */}
-        <div style={{ position: "absolute", bottom: 32, right: 40, color: "#3f3f46", fontSize: 18, display: "flex" }}>
-          devanalytics.app/u/{username}/{yearNum}
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" }}>{bodies[n]}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: OG_MONO, fontSize: 22, color: p.ink4 }}>
+          <span>devboard.app/u/{username}/{yearNum}</span>
+          <span>@{username}</span>
         </div>
       </div>
     ),
-    { width: W, height: H }
+    { width: W, height: H, fonts: fonts.length ? fonts : undefined },
   );
-
-  return new NextResponse(imageResponse.body, {
-    headers: {
-      "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=3600",
-    },
-  });
 }

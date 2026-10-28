@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import TimelineClient from "./timeline-client";
+import { daysAgoISO } from "@/lib/ui/format";
 
 export default async function TimelinePage() {
   const session = await auth();
@@ -14,7 +15,7 @@ export default async function TimelinePage() {
 
   if (!dbUser) notFound();
 
-  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  const oneYearAgo = daysAgoISO(365);
 
   // Önce kullanıcının repolarını al
   const { data: userRepos } = await supabaseAdmin

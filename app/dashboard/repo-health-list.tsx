@@ -1,395 +1,251 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { calcRepoHealth, HEALTH_COLORS, type RepoHealth, type HealthStatus } from "@/lib/repo-health";
-import { useThemeColors } from "@/components/theme-provider";
+import { HeartPulse, Search, X, ChevronDown, ExternalLink, ArrowUpDown } from "lucide-react";
+import { calcRepoHealth, type RepoHealth, type HealthStatus } from "@/lib/repo-health";
 import { useLanguage } from "@/lib/i18n";
-import { Search, X, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { Panel, Dot, Track } from "@/components/ui/primitives";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { Ring } from "./goal-tracker";
+import { langColor } from "@/lib/ui/lang-colors";
+import { timeAgo, cn, type Lang } from "@/lib/ui/format";
+import type { RepoHealthRow } from "./types";
 
-type RepoInput = {
-  name: string;
-  full_name: string;
-  language: string | null;
-  stars: number;
-  forks: number;
-  lastCommitDate: string | null;
-  commitCount90d: number;
-  openIssues: number;
-  totalIssues: number;
-  isArchived: boolean;
+export const HEALTH: Record<HealthStatus, { color: string; tr: string; en: string }> = {
+  active: { color: "var(--hue-green)", tr: "aktif", en: "active" },
+  slowing: { color: "var(--hue-yellow)", tr: "yavaşlıyor", en: "slowing" },
+  idle: { color: "var(--ink-3)", tr: "durgun", en: "idle" },
+  archived: { color: "var(--line-2)", tr: "arşiv", en: "archived" },
 };
+const ORDER: HealthStatus[] = ["active", "slowing", "idle", "archived"];
 
-const STATUS_LABELS: Record<HealthStatus, { tr: string; en: string }> = {
-  active: { tr: "Aktif", en: "Active" },
-  slowing: { tr: "Yavaşlıyor", en: "Slowing" },
-  idle: { tr: "Hareketsiz", en: "Idle" },
-  archived: { tr: "Arşiv", en: "Archived" },
-};
+type Row = { repo: RepoHealthRow; health: RepoHealth };
 
-const LANG_COLORS: Record<string, string> = {
-  TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572A5",
-  Rust: "#dea584", Go: "#00ADD8", CSS: "#563d7c", HTML: "#e34c26",
-  Java: "#b07219", "C++": "#f34b7d", "C#": "#178600", C: "#555555",
-};
-
-function ScoreRing({ score, color, size = 40 }: { score: number; color: string; size?: number }) {
-  const r = (size - 6) / 2;
-  const circumference = 2 * Math.PI * r;
-  const offset = circumference - (score / 100) * circumference;
-
+function Score({ v, status }: { v: number; status: HealthStatus }) {
   return (
-    <svg width={size} height={size} className="shrink-0 -rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#27272a" strokeWidth={3} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={3}
-        strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" />
-      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
-        fontSize={size < 44 ? 10 : 12} fontWeight="600" fill={color}
-        transform={`rotate(90, ${size / 2}, ${size / 2})`}>
-        {score}
-      </text>
-    </svg>
+    <span className="inline-flex w-9 justify-center rounded-[4px] py-0.5 font-mono text-[11.5px] font-semibold num" style={{ color: HEALTH[status].color, background: `color-mix(in oklab, ${HEALTH[status].color} 14%, transparent)` }}>
+      {v}
+    </span>
   );
 }
 
-function FactorBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
-  const pct = max > 0 ? (value / max) * 100 : 0;
-  return (
-    <div>
-      <div className="flex justify-between text-xs mb-0.5">
-        <span className="text-zinc-500">{label}</span>
-        <span className="text-zinc-600">{value}/{max}</span>
-      </div>
-      <div className="h-1 w-full rounded-full bg-zinc-800 overflow-hidden">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-      </div>
-    </div>
+export default function RepoHealthList({ repos }: { repos: RepoHealthRow[] }) {
+  const { lang } = useLanguage();
+  const l = lang as Lang;
+  const { shape, w, h } = useWidgetSize();
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<HealthStatus | "all">("all");
+  const [sort, setSort] = useState<"score" | "activity" | "name">("score");
+  const [open, setOpen] = useState<string | null>(null);
+  const title = l === "en" ? "Repo health" : "Repo sağlığı";
+
+  const rows: Row[] = useMemo(
+    () =>
+      repos.map((repo) => ({
+        repo,
+        health: calcRepoHealth({
+          lastCommitDate: repo.lastCommitDate,
+          commitCount90d: repo.commitCount90d,
+          stars: repo.stars,
+          forks: repo.forks,
+          openIssues: repo.openIssues,
+          totalIssues: repo.totalIssues,
+          isArchived: repo.isArchived,
+        }),
+      })),
+    [repos],
   );
-}
+  const by = Object.fromEntries(ORDER.map((s) => [s, rows.filter((r) => r.health.status === s).length])) as Record<HealthStatus, number>;
+  const avg = rows.length ? Math.round(rows.reduce((s, r) => s + r.health.score, 0) / rows.length) : 0;
 
-function RepoRow({ repo, health, lang }: { repo: RepoInput; health: RepoHealth; lang: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const color = HEALTH_COLORS[health.status];
-  const langColor = repo.language ? (LANG_COLORS[repo.language] ?? "#6b7280") : null;
-  const statusLabel = STATUS_LABELS[health.status]?.[lang === "en" ? "en" : "tr"] ?? health.label;
+  const list = useMemo(() => {
+    const f = rows.filter((r) => (status === "all" || r.health.status === status) && (!q || r.repo.name.toLowerCase().includes(q.toLowerCase())));
+    return f.sort((a, b) => (sort === "score" ? b.health.score - a.health.score : sort === "activity" ? b.repo.commitCount90d - a.repo.commitCount90d : a.repo.name.localeCompare(b.repo.name)));
+  }, [rows, status, q, sort]);
 
-  return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 overflow-hidden">
-      <button
-        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-800/50 transition-colors text-left"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <ScoreRing score={health.score} color={color} size={38} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            {langColor && <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: langColor }} />}
-            <span className="text-sm font-medium text-zinc-200 truncate">{repo.name}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-zinc-600">
-            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${color}18`, color }}>
-              {statusLabel}
-            </span>
-            {repo.language && <span>{repo.language}</span>}
-            <span>{repo.stars} star{lang === "en" && repo.stars !== 1 ? "s" : ""}</span>
-          </div>
-        </div>
-        <svg className={`h-4 w-4 text-zinc-600 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+  if (!rows.length) {
+    return (
+      <Panel title={title} icon={HeartPulse}>
+        <p className="text-[12.5px] text-ink-3">{l === "en" ? "No repositories of your own yet." : "Henüz kendine ait repo yok."}</p>
+      </Panel>
+    );
+  }
 
-      {expanded && (
-        <div className="border-t border-zinc-800 px-3 py-2.5 space-y-2">
-          <FactorBar label={lang === "en" ? "Recency" : "Güncellik"} value={health.factors.recency} max={40} color={color} />
-          <FactorBar label={lang === "en" ? "Activity" : "Aktivite"} value={health.factors.activity} max={30} color={color} />
-          <FactorBar label={lang === "en" ? "Community" : "Topluluk"} value={health.factors.community} max={20} color={color} />
-          <FactorBar label="Issue" value={health.factors.issues} max={10} color={color} />
-          <div className="flex gap-3 mt-2 pt-2 border-t border-zinc-800">
-            <Link href={`/dashboard/repos/${repo.name}`} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors" onClick={(e) => e.stopPropagation()}>
-              {lang === "en" ? "Details" : "Detay"}
-            </Link>
-            <a href={`https://github.com/${repo.full_name}`} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors" onClick={(e) => e.stopPropagation()}>
-              GitHub
-            </a>
-          </div>
-        </div>
+  const dist = (height = 8) => (
+    <div className="flex w-full overflow-hidden rounded-full gap-px bg-inset" style={{ height }}>
+      {ORDER.map((s) =>
+        by[s] ? (
+          <button
+            key={s}
+            type="button"
+            title={`${HEALTH[s][l]}: ${by[s]}`}
+            onClick={() => setStatus((c) => (c === s ? "all" : s))}
+            className={cn("h-full transition-opacity", status !== "all" && status !== s && "opacity-30")}
+            style={{ width: `${(by[s] / rows.length) * 100}%`, background: HEALTH[s].color }}
+          />
+        ) : null,
       )}
     </div>
   );
-}
-
-export default function RepoHealthList({ repos }: { repos: RepoInput[] }) {
-  const theme = useThemeColors();
-  const { lang } = useLanguage();
-  const [sortBy, setSortBy] = useState<"score" | "name" | "activity">("score");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<HealthStatus | "all">("all");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(5);
-
-  const withHealth = useMemo(() => {
-    return repos.map((repo) => ({
-      repo,
-      health: calcRepoHealth({
-        lastCommitDate: repo.lastCommitDate,
-        commitCount90d: repo.commitCount90d,
-        stars: repo.stars,
-        forks: repo.forks,
-        openIssues: repo.openIssues,
-        totalIssues: repo.totalIssues,
-        isArchived: repo.isArchived,
-      }),
-    }));
-  }, [repos]);
-
-  const active = withHealth.filter((r) => r.health.status === "active").length;
-  const slowing = withHealth.filter((r) => r.health.status === "slowing").length;
-  const idle = withHealth.filter((r) => r.health.status === "idle").length;
-  const archived = withHealth.filter((r) => r.health.status === "archived").length;
-  const avgScore = withHealth.length > 0 ? Math.round(withHealth.reduce((s, r) => s + r.health.score, 0) / withHealth.length) : 0;
-
-  const sorted = useMemo(() => {
-    return [...withHealth].sort((a, b) => {
-      if (sortBy === "score") return b.health.score - a.health.score;
-      if (sortBy === "name") return a.repo.name.localeCompare(b.repo.name);
-      return b.repo.commitCount90d - a.repo.commitCount90d;
-    });
-  }, [withHealth, sortBy]);
-
-  const filtered = useMemo(() => {
-    return sorted.filter(({ repo, health }) => {
-      if (statusFilter !== "all" && health.status !== statusFilter) return false;
-      if (search.trim() && !repo.name.toLowerCase().includes(search.toLowerCase().trim())) return false;
-      return true;
-    });
-  }, [sorted, statusFilter, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const handleStatusFilter = (st: HealthStatus | "all") => {
-    setStatusFilter((curr) => (curr === st ? "all" : st));
-    setPage(1);
-  };
-
-  const handleSearchChange = (val: string) => {
-    setSearch(val);
-    setPage(1);
-  };
-
-  const handleSortChange = (key: "score" | "name" | "activity") => {
-    setSortBy(key);
-    setPage(1);
-  };
-
-  if (repos.length === 0) return null;
+  const legend = (
+    <div className="flex flex-wrap gap-x-3 gap-y-1">
+      {ORDER.map((s) =>
+        by[s] ? (
+          <button key={s} type="button" onClick={() => setStatus((c) => (c === s ? "all" : s))} className={cn("inline-flex items-center gap-1.5 text-[12px]", status === s ? "text-ink" : "text-ink-3 hover:text-ink")}>
+            <Dot color={HEALTH[s].color} size={7} />
+            {HEALTH[s][l]}
+            <span className="font-mono text-[11px] text-ink-4">{by[s]}</span>
+          </button>
+        ) : null,
+      )}
+    </div>
+  );
+  const ring = (size: number) => (
+    <Ring value={avg} max={100} size={size} stroke={Math.round(size / 10)} color={avg >= 65 ? "var(--hue-green)" : avg >= 35 ? "var(--hue-yellow)" : "var(--ink-3)"}>
+      <div className="text-center">
+        <div className="figure" style={{ fontSize: size * 0.26 }}>{avg}</div>
+      </div>
+    </Ring>
+  );
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
-        <div>
-          <h2 className="text-sm font-medium text-zinc-400">
-            {lang === "en" ? "Repo Health Score" : "Repo Sağlık Skoru"}
-          </h2>
-          <p className="text-xs text-zinc-600">
-            {filtered.length !== repos.length
-              ? (lang === "en" ? `${filtered.length} of ${repos.length} repos` : `${repos.length} repodan ${filtered.length} tanesi`)
-              : `${repos.length} repo`}
-          </p>
+    <Panel title={title} icon={HeartPulse} meta={`${l === "en" ? "avg" : "ort."} ${avg}/100`}>
+      {shape === "glance" && (
+        <div className="flex h-full flex-col">
+          <div className="flex items-center gap-3">
+            {ring(56)}
+            <div className="min-w-0 text-[12px] text-ink-3 leading-snug">
+              <div><span className="font-mono text-ink">{by.active}</span> {HEALTH.active[l]}</div>
+              <div><span className="font-mono text-ink">{by.slowing + by.idle}</span> {l === "en" ? "need care" : "ilgi bekliyor"}</div>
+            </div>
+          </div>
+          <div className="mt-auto">{dist(6)}</div>
         </div>
+      )}
 
-        {/* Sort selector */}
-        <div className="flex items-center gap-1 rounded-lg border border-zinc-800 p-1 self-start">
-          {(["score", "activity", "name"] as const).map((key) => (
+      {shape === "strip" && (
+        <div className="flex h-full items-center gap-5">
+          {ring(76)}
+          <div className="flex-1 min-w-0 flex flex-col gap-2.5">
+            {dist(10)}
+            {legend}
+          </div>
+        </div>
+      )}
+
+      {shape === "column" && (
+        <div className="flex h-full flex-col gap-3">
+          <div className="flex items-center gap-3">
+            {ring(64)}
+            <div className="text-[12px] text-ink-3">{l === "en" ? `${rows.length} repos` : `${rows.length} repo`}</div>
+          </div>
+          {dist(8)}
+          <div className="text-[11px] text-ink-4">{l === "en" ? "Needs attention" : "İlgi bekleyenler"}</div>
+          <ul className="flex flex-col gap-1 overflow-hidden">
+            {[...rows].filter((r) => r.health.status !== "archived").sort((a, b) => a.health.score - b.health.score).slice(0, h >= 3 ? 8 : 4).map(({ repo, health }) => (
+              <li key={repo.name} className="flex items-center gap-2">
+                <Score v={health.score} status={health.status} />
+                <Link href={`/dashboard/repos/${repo.name}`} className="truncate font-mono text-[12px] text-ink-2 hover:text-accent">{repo.name}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {shape === "block" && (
+        <div className="flex h-full flex-col gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative flex-1 min-w-[140px]">
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-4" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={l === "en" ? "Filter repos" : "Repo filtrele"} className="input !h-7 !pl-8 !text-[12.5px] font-mono" aria-label={l === "en" ? "Filter repos" : "Repo filtrele"} />
+              {q && (
+                <button type="button" className="absolute right-1.5 top-1/2 -translate-y-1/2 text-ink-4 hover:text-ink" onClick={() => setQ("")} aria-label={l === "en" ? "Clear" : "Temizle"}>
+                  <X size={13} />
+                </button>
+              )}
+            </label>
             <button
-              key={key}
-              onClick={() => handleSortChange(key)}
-              className="rounded-md px-2.5 py-1 text-xs transition-colors"
-              style={sortBy === key ? { backgroundColor: theme.accentBg, color: theme.accent } : { color: "#71717a" }}
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setSort((s) => (s === "score" ? "activity" : s === "activity" ? "name" : "score"))}
+              title={l === "en" ? "Change sort" : "Sıralamayı değiştir"}
             >
-              {key === "score"
-                ? (lang === "en" ? "Score" : "Skor")
-                : key === "activity"
-                ? (lang === "en" ? "Activity" : "Aktivite")
-                : (lang === "en" ? "Name" : "İsim")}
+              <ArrowUpDown />
+              {sort === "score" ? (l === "en" ? "score" : "skor") : sort === "activity" ? (l === "en" ? "activity" : "aktivite") : l === "en" ? "name" : "isim"}
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Summary health bar with interactive click */}
-      <div className="flex items-center gap-3 my-3 shrink-0">
-        <div className="flex-1 flex h-2.5 rounded-full overflow-hidden gap-px cursor-pointer" title={lang === "en" ? "Click to filter" : "Filtrelemek için tıkla"}>
-          {active > 0 && (
-            <div
-              className={`h-full transition-opacity ${statusFilter === "active" ? "ring-2 ring-emerald-400" : statusFilter !== "all" ? "opacity-30" : ""}`}
-              style={{ width: `${(active / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.active }}
-              onClick={() => handleStatusFilter("active")}
-            />
-          )}
-          {slowing > 0 && (
-            <div
-              className={`h-full transition-opacity ${statusFilter === "slowing" ? "ring-2 ring-amber-400" : statusFilter !== "all" ? "opacity-30" : ""}`}
-              style={{ width: `${(slowing / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.slowing }}
-              onClick={() => handleStatusFilter("slowing")}
-            />
-          )}
-          {idle > 0 && (
-            <div
-              className={`h-full transition-opacity ${statusFilter === "idle" ? "ring-2 ring-orange-400" : statusFilter !== "all" ? "opacity-30" : ""}`}
-              style={{ width: `${(idle / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.idle }}
-              onClick={() => handleStatusFilter("idle")}
-            />
-          )}
-          {archived > 0 && (
-            <div
-              className={`h-full transition-opacity ${statusFilter === "archived" ? "ring-2 ring-zinc-400" : statusFilter !== "all" ? "opacity-30" : ""}`}
-              style={{ width: `${(archived / repos.length) * 100}%`, backgroundColor: HEALTH_COLORS.archived }}
-              onClick={() => handleStatusFilter("archived")}
-            />
-          )}
-        </div>
-        <span className="text-sm text-zinc-500 shrink-0">
-          {lang === "en" ? "Avg." : "Ort."} <span className="font-bold text-base" style={{ color: theme.accent }}>{avgScore}</span>/100
-        </span>
-      </div>
-
-      {/* Filter Chips & Search Bar for Mobile Usability */}
-      <div className="space-y-2 shrink-0 mb-3">
-        {/* Search input */}
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder={lang === "en" ? "Search repos..." : "Repo ara..."}
-            className="w-full bg-zinc-800/60 border border-zinc-800 rounded-lg pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-700"
-          />
-          {search && (
-            <button
-              onClick={() => handleSearchChange("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Status filter buttons */}
-        <div className="flex flex-wrap gap-1.5 text-xs">
-          <button
-            onClick={() => handleStatusFilter("all")}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors"
-            style={
-              statusFilter === "all"
-                ? { backgroundColor: theme.accentBg, color: theme.accent }
-                : { backgroundColor: "rgba(39, 39, 42, 0.6)", color: "#71717a" }
-            }
-          >
-            <span>{lang === "en" ? "All" : "Tümü"}</span>
-            <span className="text-[10px] opacity-75">{repos.length}</span>
-          </button>
-
-          {[
-            { status: "active" as const, label: lang === "en" ? "Active" : "Aktif", count: active },
-            { status: "slowing" as const, label: lang === "en" ? "Slowing" : "Yavaşlıyor", count: slowing },
-            { status: "idle" as const, label: lang === "en" ? "Idle" : "Hareketsiz", count: idle },
-            { status: "archived" as const, label: lang === "en" ? "Archived" : "Arşiv", count: archived },
-          ].map(({ status, label, count }) => count > 0 && (
-            <button
-              key={status}
-              onClick={() => handleStatusFilter(status)}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors"
-              style={
-                statusFilter === status
-                  ? { backgroundColor: `${HEALTH_COLORS[status]}25`, color: HEALTH_COLORS[status], boxShadow: `0 0 0 1px ${HEALTH_COLORS[status]}` }
-                  : { backgroundColor: "rgba(39, 39, 42, 0.6)", color: "#71717a" }
-              }
-            >
-              <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: HEALTH_COLORS[status] }} />
-              <span>{label}</span>
-              <span className="text-[10px] opacity-75">{count}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Repo list (paginated on mobile to prevent endless scrolling) */}
-      <div className="space-y-2 flex-1 min-h-0 overflow-auto custom-scroll">
-        {paginated.length > 0 ? (
-          paginated.map(({ repo, health }) => (
-            <RepoRow key={repo.name} repo={repo} health={health} lang={lang} />
-          ))
-        ) : (
-          <div className="py-8 text-center text-xs text-zinc-500">
-            <p>{lang === "en" ? "No repositories match criteria" : "Kriterlere uygun repo bulunamadı"}</p>
-            {(statusFilter !== "all" || search) && (
-              <button
-                onClick={() => {
-                  setStatusFilter("all");
-                  setSearch("");
-                  setPage(1);
-                }}
-                className="mt-2 text-xs underline text-zinc-400 hover:text-zinc-200"
-              >
-                {lang === "en" ? "Clear filters" : "Filtreleri temizle"}
-              </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">{dist(6)}</div>
+            {w >= 3 && legend}
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto -mx-1">
+            <div className="sticky top-0 z-[1] grid grid-cols-[40px_minmax(0,1fr)_auto] @min-[520px]:grid-cols-[40px_minmax(0,1fr)_88px_86px_48px] gap-3 bg-surface px-1 pb-1.5 text-[11px] text-ink-4 border-b border-line">
+              <span>{l === "en" ? "score" : "skor"}</span>
+              <span>repo</span>
+              <span className="hidden @min-[520px]:block">{l === "en" ? "status" : "durum"}</span>
+              <span className="hidden @min-[520px]:block">{l === "en" ? "last commit" : "son commit"}</span>
+              <span className="text-right">{l === "en" ? "90d" : "90g"}</span>
+            </div>
+            {list.length === 0 ? (
+              <div className="py-6 text-center text-[12.5px] text-ink-3">
+                {l === "en" ? "No repo matches." : "Eşleşen repo yok."}{" "}
+                <button type="button" className="text-accent hover:underline" onClick={() => { setQ(""); setStatus("all"); }}>
+                  {l === "en" ? "Clear filters" : "Filtreleri temizle"}
+                </button>
+              </div>
+            ) : (
+              list.map(({ repo, health }) => {
+                const isOpen = open === repo.name;
+                return (
+                  <div key={repo.name} className="border-b border-line last:border-0">
+                    <button type="button" onClick={() => setOpen(isOpen ? null : repo.name)} className="grid w-full grid-cols-[40px_minmax(0,1fr)_auto] @min-[520px]:grid-cols-[40px_minmax(0,1fr)_88px_86px_48px] items-center gap-3 px-1 py-1.5 text-left hover:bg-raised rounded-[var(--r-control)]" aria-expanded={isOpen}>
+                      <Score v={health.score} status={health.status} />
+                      <span className="flex items-center gap-2 min-w-0">
+                        <Dot color={langColor(repo.language)} size={7} />
+                        <span className="truncate font-mono text-[12.5px] text-ink">{repo.name}</span>
+                        <ChevronDown size={12} className={cn("shrink-0 text-ink-4 transition-transform", isOpen && "rotate-180")} />
+                      </span>
+                      <span className="hidden @min-[520px]:inline-flex items-center gap-1.5 text-[12px]" style={{ color: HEALTH[health.status].color }}>
+                        <Dot color={HEALTH[health.status].color} size={6} />
+                        {HEALTH[health.status][l]}
+                      </span>
+                      <span className="hidden @min-[520px]:block font-mono text-[11.5px] text-ink-3">{timeAgo(repo.lastCommitDate, l)}</span>
+                      <span className="text-right font-mono text-[12px] text-ink-2 num">{repo.commitCount90d}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="grid gap-x-6 gap-y-2 px-1 pb-3 pt-1 @min-[420px]:grid-cols-2 anim-fade">
+                        {(
+                          [
+                            [l === "en" ? "Recency" : "Güncellik", health.factors.recency, 40],
+                            [l === "en" ? "Activity" : "Aktivite", health.factors.activity, 30],
+                            [l === "en" ? "Community" : "Topluluk", health.factors.community, 20],
+                            ["Issue", health.factors.issues, 10],
+                          ] as const
+                        ).map(([k, v, m]) => (
+                          <div key={k}>
+                            <div className="mb-1 flex justify-between text-[11.5px]">
+                              <span className="text-ink-3">{k}</span>
+                              <span className="font-mono text-ink-2">{v}/{m}</span>
+                            </div>
+                            <Track value={v} max={m} color={HEALTH[health.status].color} height={4} />
+                          </div>
+                        ))}
+                        <div className="flex gap-3 @min-[420px]:col-span-2 text-[12px]">
+                          <Link href={`/dashboard/repos/${repo.name}`} className="text-accent hover:underline">{l === "en" ? "Open details" : "Detayları aç"}</Link>
+                          <a href={`https://github.com/${repo.full_name}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-ink-3 hover:text-ink">
+                            GitHub <ExternalLink size={11} />
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
-        )}
-      </div>
-
-      {/* Mobile-friendly Pagination & View Controls */}
-      {filtered.length > pageSize && (
-        <div className="flex items-center justify-between pt-3 mt-2 border-t border-zinc-800 text-xs text-zinc-500 shrink-0">
-          <span className="text-[11px]">
-            {lang === "en"
-              ? `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length}`
-              : `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}`}
-          </span>
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              className="p-1 rounded-md border border-zinc-800 bg-zinc-800/40 text-zinc-300 disabled:opacity-30 disabled:pointer-events-none hover:bg-zinc-800"
-              aria-label="Previous Page"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <span className="px-2 py-0.5 text-[11px] font-medium text-zinc-400">
-              {currentPage} / {totalPages}
-            </span>
-
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="p-1 rounded-md border border-zinc-800 bg-zinc-800/40 text-zinc-300 disabled:opacity-30 disabled:pointer-events-none hover:bg-zinc-800"
-              aria-label="Next Page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setPage(1);
-              }}
-              className="ml-2 bg-zinc-800/80 border border-zinc-700/60 rounded px-1.5 py-0.5 text-[10px] text-zinc-300 focus:outline-none cursor-pointer"
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={filtered.length}>{lang === "en" ? "All" : "Tümü"}</option>
-            </select>
-          </div>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

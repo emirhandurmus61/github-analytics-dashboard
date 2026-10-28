@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
-import { NextRequest } from "next/server";
 
 const GITHUB_API = "https://api.github.com";
 
@@ -45,7 +44,7 @@ async function fetchAllPages<T>(path: string, token: string, perPage = 100): Pro
   return results;
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const session = await auth();
   if (!session?.accessToken || !session.user.username) {
     return new Response("Unauthorized", { status: 401 });

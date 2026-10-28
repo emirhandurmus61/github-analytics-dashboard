@@ -1,150 +1,117 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Share2, Check, ExternalLink } from "lucide-react";
-import { useThemeColors } from "@/components/theme-provider";
+import { Download, Link2, Check, IdCard } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
+import { Panel, Seg } from "@/components/ui/primitives";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { cn, type Lang } from "@/lib/ui/format";
 
 type Format = "og" | "square" | "twitter";
 
-const FORMATS: { id: Format; label: string; size: string }[] = [
-  { id: "og", label: "LinkedIn / OG", size: "1200×630" },
-  { id: "square", label: "Instagram", size: "600×600" },
-  { id: "twitter", label: "Twitter / X", size: "1500×500" },
+const FORMATS: { id: Format; label: string; size: string; ratio: string }[] = [
+  { id: "og", label: "OG", size: "1200×630", ratio: "1200/630" },
+  { id: "square", label: "1:1", size: "600×600", ratio: "1/1" },
+  { id: "twitter", label: "X", size: "1500×500", ratio: "3/1" },
 ];
 
 export default function DeveloperCard({ username }: { username: string }) {
-  const theme = useThemeColors();
   const { lang } = useLanguage();
+  const l = lang as Lang;
+  const { shape } = useWidgetSize();
   const [format, setFormat] = useState<Format>("og");
   const [copied, setCopied] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const url = `/api/card/${username}?format=${format}`;
+  const f = FORMATS.find((x) => x.id === format)!;
 
-  const cardUrl = `/api/card/${username}?format=${format}`;
-  const tweetText = encodeURIComponent(
-    lang === "en"
-      ? `Check out my GitHub analytics! 🚀\nTrack your stats on Devboard`
-      : `GitHub aktivitelerime bakın! 🚀\nDevboard üzerinde istatistiklerinizi görün`
-  );
-  const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(`https://devboard.app/u/${username}`)}`;
-
-  async function handleDownload() {
-    setDownloading(true);
+  async function download() {
+    setBusy(true);
     try {
-      const res = await fetch(cardUrl);
+      const res = await fetch(url);
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `${username}-devcard-${format}.png`;
+      a.download = `${username}-devboard-${format}.png`;
       a.click();
       URL.revokeObjectURL(a.href);
     } finally {
-      setDownloading(false);
+      setBusy(false);
+    }
+  }
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${url}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard blocked */
     }
   }
 
-  async function handleCopy() {
-    await navigator.clipboard.writeText(`${window.location.origin}${cardUrl}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+  const preview = (
+    <div className="relative h-full w-full min-h-[64px] overflow-hidden rounded-[var(--r-control)] border border-line bg-canvas">
+      {loaded !== url && <div className="skel absolute inset-0" />}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img key={url} src={url} alt={l === "en" ? "Developer card preview" : "Developer card önizlemesi"} onLoad={() => setLoaded(url)} className={cn("absolute inset-0 h-full w-full object-contain transition-opacity", loaded === url ? "opacity-100" : "opacity-0")} />
+    </div>
+  );
+
+  const actions = (
+    <div className="flex gap-1.5">
+      <button type="button" className="btn btn-primary btn-sm flex-1" onClick={download} disabled={busy}>
+        <Download /> {busy ? (l === "en" ? "Saving…" : "Kaydediliyor…") : "PNG"}
+      </button>
+      <button type="button" className="btn btn-sm" onClick={copy} aria-label={l === "en" ? "Copy image link" : "Görsel linkini kopyala"}>
+        {copied ? <Check className="text-good" /> : <Link2 />}
+        <span className="hidden @min-[260px]:inline">{copied ? (l === "en" ? "Copied" : "Kopyalandı") : l === "en" ? "Link" : "Link"}</span>
+      </button>
+      <a
+        className="btn btn-sm btn-icon"
+        href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(l === "en" ? "My year in commits, on Devboard" : "Commit yılım, Devboard'da")}&url=${encodeURIComponent(`https://devboard.app/u/${username}`)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={l === "en" ? "Share on X" : "X'te paylaş"}
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.726-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+        </svg>
+      </a>
+    </div>
+  );
+
+  const seg = <Seg size="sm" value={format} onChange={setFormat} options={FORMATS.map((x) => ({ value: x.id, label: <span className="font-mono">{x.label}</span>, title: x.size }))} />;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <Share2 className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-sm font-medium text-zinc-400">Developer Card</h2>
-        </div>
-        <a
-          href={`/u/${username}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg border transition-colors hover:opacity-80"
-          style={{ borderColor: theme.accentBorder, color: theme.accent, backgroundColor: theme.accentBg }}
-        >
-          <ExternalLink className="w-3 h-3" />
-          {lang === "en" ? "Profile" : "Profil"}
-        </a>
-      </div>
-
-      {/* Card preview */}
-      <div className="flex-1 min-h-0 flex flex-col gap-3">
-        {/* Live preview — sabit yükseklik, görsel içine sığar */}
-        <div className="relative w-full rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center" style={{ height: 160 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            key={cardUrl}
-            src={cardUrl}
-            alt="Developer Card"
-            className="max-w-full max-h-full object-contain rounded-lg"
-          />
-        </div>
-
-        {/* Format seçici */}
-        <div className="flex rounded-lg border border-zinc-800 bg-zinc-950 p-0.5 shrink-0">
-          {FORMATS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFormat(f.id)}
-              className={`flex-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors flex flex-col items-center gap-0.5 ${
-                format === f.id
-                  ? "bg-zinc-800 text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <span>{f.label}</span>
-              <span className="text-[9px] text-zinc-600 tabular-nums">{f.size}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Aksiyon butonları */}
-        <div className="flex gap-2 shrink-0">
-          <button
-            onClick={handleDownload}
-            disabled={downloading}
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: theme.accent, color: "#09090b" }}
-          >
-            <Download className="w-3.5 h-3.5" />
-            {downloading
-              ? (lang === "en" ? "Downloading..." : "İndiriliyor...")
-              : (lang === "en" ? "Download PNG" : "PNG İndir")}
-          </button>
-
-          <button
-            onClick={handleCopy}
-            className="flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">{lang === "en" ? "Copied" : "Kopyalandı"}</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-3.5 h-3.5" />
-                {lang === "en" ? "Copy Link" : "Kopyala"}
-              </>
-            )}
+    <Panel title="Developer Card" icon={IdCard} meta={shape === "glance" ? undefined : f.size}>
+      {shape === "glance" && (
+        <div className="flex h-full flex-col gap-2">
+          <div className="flex-1 min-h-0">{preview}</div>
+          <button type="button" className="btn btn-sm w-full" onClick={download} disabled={busy}>
+            <Download /> PNG
           </button>
         </div>
-
-        {/* Twitter paylaş */}
-        <a
-          href={twitterUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-medium border border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.726-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-          </svg>
-          {lang === "en" ? "Share on X" : "Twitter'da Paylaş"}
-        </a>
-      </div>
-    </div>
+      )}
+      {shape === "strip" && (
+        <div className="flex h-full items-center gap-4">
+          <div className="h-full w-[48%] shrink-0">{preview}</div>
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            {seg}
+            {actions}
+          </div>
+        </div>
+      )}
+      {(shape === "column" || shape === "block") && (
+        <div className="flex h-full flex-col gap-2.5">
+          <div className="flex-1 min-h-0">{preview}</div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {seg}
+            <span className="font-mono text-[11px] text-ink-4">{f.size}</span>
+          </div>
+          {actions}
+        </div>
+      )}
+    </Panel>
   );
 }

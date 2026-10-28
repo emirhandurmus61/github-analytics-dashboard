@@ -1,8 +1,10 @@
 "use client";
 
+import { Flame, Trophy, Award, HeartCrack, ExternalLink, X } from "lucide-react";
+import { useState } from "react";
 import { useLanguage } from "@/lib/i18n";
-import { AlertTriangle, HeartCrack, ExternalLink, Trophy, Flame, Award } from "lucide-react";
 import type { Badge } from "@/lib/badges";
+import { cn } from "@/lib/ui/format";
 
 export type StreakStatus = "safe" | "at_risk" | "broken_today" | "record_broken" | "no_streak";
 
@@ -14,139 +16,108 @@ type Props = {
   todayBadges?: Badge[];
 };
 
-export default function StreakGuard({
-  status,
-  currentStreak,
-  brokenStreak,
-  previousRecord,
-  todayBadges = [],
-}: Props) {
+type Notice = {
+  key: string;
+  tone: "good" | "warn" | "bad" | "info";
+  icon: typeof Flame;
+  title: string;
+  body: string;
+  action?: { href: string; label: string };
+};
+
+const TONE: Record<Notice["tone"], string> = {
+  good: "var(--hue-green)",
+  warn: "var(--hue-yellow)",
+  bad: "var(--hue-red)",
+  info: "var(--hue-purple)",
+};
+
+/**
+ * Notices above the grid, styled like editor notifications: a colored rule on
+ * the left, one line of title, one line of detail, an optional action.
+ */
+export default function StreakGuard({ status, currentStreak, brokenStreak, previousRecord, todayBadges = [] }: Props) {
   const { lang } = useLanguage();
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const en = lang === "en";
+  const list: Notice[] = [];
 
-  const isAtRisk = status === "at_risk";
-  const isBroken = status === "broken_today";
-  const isRecordBroken = status === "record_broken";
-  const hasBadges = todayBadges && todayBadges.length > 0;
-
-  // Hiçbir bildirim yoksa null dön
-  if (!isAtRisk && !isBroken && !isRecordBroken && !hasBadges) {
-    return null;
+  if (status === "record_broken") {
+    list.push({
+      key: "record",
+      tone: "good",
+      icon: Trophy,
+      title: en ? `New personal record: ${currentStreak} days in a row` : `Yeni kişisel rekor: ${currentStreak} gün üst üste`,
+      body: en
+        ? `Your previous best was ${previousRecord ?? currentStreak - 1} days. Every commit from here extends the record.`
+        : `Önceki en iyin ${previousRecord ?? currentStreak - 1} gündü. Bundan sonraki her commit rekoru uzatır.`,
+    });
+  }
+  if (todayBadges.length) {
+    list.push({
+      key: "badges",
+      tone: "info",
+      icon: Award,
+      title: en ? `Unlocked today: ${todayBadges.map((b) => b.name).join(", ")}` : `Bugün açıldı: ${todayBadges.map((b) => b.name).join(", ")}`,
+      body: en ? "See the full series in the Badges card." : "Serinin tamamını Rozetler kartında görebilirsin.",
+    });
+  }
+  if (status === "at_risk") {
+    list.push({
+      key: "risk",
+      tone: "warn",
+      icon: Flame,
+      title: en ? `Your ${currentStreak}-day streak ends at midnight` : `${currentStreak} günlük serin gece yarısı bitiyor`,
+      body: en ? "No commit yet today. One push keeps it going." : "Bugün henüz commit yok. Tek bir push seriyi sürdürür.",
+      action: { href: "https://github.com", label: en ? "Open GitHub" : "GitHub'ı aç" },
+    });
+  }
+  if (status === "broken_today") {
+    const n = brokenStreak && brokenStreak > 0 ? brokenStreak : currentStreak;
+    list.push({
+      key: "broken",
+      tone: "bad",
+      icon: HeartCrack,
+      title: en ? `Your ${n}-day streak ended yesterday` : `${n} günlük serin dün sona erdi`,
+      body: en ? "A commit today starts a new one." : "Bugün atacağın bir commit yenisini başlatır.",
+    });
   }
 
-  const effectiveBrokenCount = brokenStreak && brokenStreak > 0 ? brokenStreak : currentStreak;
+  const visible = list.filter((n) => !dismissed.includes(n.key));
+  if (!visible.length) return null;
 
   return (
-    <div className="space-y-3">
-      {/* 1. Yeni Streak Rekoru Kutlaması */}
-      {isRecordBroken && (
-        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 shadow-lg shadow-emerald-950/20">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
-            <Trophy className="w-5 h-5 text-emerald-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-emerald-300 flex items-center gap-1.5">
-              <span>{lang === "en" ? "🎉 New Streak Record!" : "🎉 Yeni Streak Rekoru!"}</span>
-              <Flame className="w-4 h-4 text-orange-400 inline" />
-            </p>
-            <p className="text-xs text-zinc-300 mt-0.5">
-              {lang === "en"
-                ? `You broke your previous record (${previousRecord ?? (currentStreak - 1)} days) with an unbroken ${currentStreak}-day streak! Keep up the momentum!`
-                : `${currentStreak} günlük kesintisiz seri ile kişisel rekorunu (${previousRecord ?? (currentStreak - 1)} gün) kırdın! Muhteşem disiplin!`
-              }
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Bugün Kazanılan Başarılar / Rozetler */}
-      {hasBadges && (
-        <div className="flex items-center gap-3 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3 shadow-lg shadow-purple-950/20">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-500/20 text-purple-300">
-            <Award className="w-5 h-5 text-purple-300" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-purple-200">
-              {lang === "en" ? "🏆 New Achievement Unlocked Today!" : "🏆 Bugün Yeni Başarı Kazanıldı!"}
-            </p>
-            <p className="text-xs text-zinc-300 mt-0.5">
-              {lang === "en"
-                ? `Congratulations! You unlocked: ${todayBadges.map((b) => b.name).join(", ")}`
-                : `Tebrikler! Bugün yeni rozet kazandın: ${todayBadges.map((b) => b.name).join(", ")}`}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Streak Tehlikede Uyarısı */}
-      {isAtRisk && (
-        <div
-          className="flex items-center gap-3 rounded-xl border px-4 py-3"
-          style={{
-            borderColor: "rgba(251,191,36,0.25)",
-            backgroundColor: "rgba(251,191,36,0.04)",
-          }}
-        >
+    <div className="mb-4 flex flex-col gap-2" role="status">
+      {visible.map((n) => {
+        const Icon = n.icon;
+        return (
           <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-            style={{ backgroundColor: "rgba(251,191,36,0.1)" }}
+            key={n.key}
+            className={cn("relative flex items-start gap-3 rounded-panel border border-line bg-surface pl-4 pr-2 py-2.5 overflow-hidden")}
           >
-            <AlertTriangle className="w-4 h-4 text-yellow-400" />
+            <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: TONE[n.tone] }} />
+            <Icon size={16} className="mt-0.5 shrink-0" style={{ color: TONE[n.tone] }} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-ink">{n.title}</p>
+              <p className="text-[12.5px] text-ink-3">{n.body}</p>
+            </div>
+            {n.action && (
+              <a href={n.action.href} target="_blank" rel="noopener noreferrer" className="btn btn-sm shrink-0 self-center">
+                {n.action.label}
+                <ExternalLink />
+              </a>
+            )}
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-icon shrink-0"
+              onClick={() => setDismissed((d) => [...d, n.key])}
+              aria-label={en ? "Dismiss" : "Kapat"}
+            >
+              <X />
+            </button>
           </div>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-yellow-400">
-              {lang === "en" ? `${currentStreak}-day streak is at risk!` : `${currentStreak} günlük streak tehlikede!`}
-            </p>
-            <p className="text-xs text-zinc-500">
-              {lang === "en"
-                ? "You haven't committed yet today. Push at least 1 commit to protect your streak."
-                : "Bugün henüz commit atmadın. Streakini korumak için bugün en az 1 commit at."}
-            </p>
-          </div>
-
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-80"
-            style={{ backgroundColor: "#fbbf24", color: "#09090b" }}
-          >
-            GitHub
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
-      )}
-
-      {/* 4. Streak Kırıldı Uyarısı (Gerçek kırılan gün sayısı baz alınır, rekor değil) */}
-      {isBroken && (
-        <div
-          className="flex items-center gap-3 rounded-xl border px-4 py-3"
-          style={{
-            borderColor: "rgba(248,113,113,0.25)",
-            backgroundColor: "rgba(248,113,113,0.04)",
-          }}
-        >
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-            style={{ backgroundColor: "rgba(248,113,113,0.1)" }}
-          >
-            <HeartCrack className="w-4 h-4 text-red-400" />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-red-400">
-              {lang === "en"
-                ? `${effectiveBrokenCount}-day streak was broken`
-                : `${effectiveBrokenCount} günlük streak kırıldı`}
-            </p>
-            <p className="text-xs text-zinc-500">
-              {lang === "en"
-                ? "Dün commit atılmadığı için seri sonlandı. Bugün yeni bir seri başlatabilirsin!"
-                : "Dün commit atılmadığı için seri sonlandı. Bugün yeni bir seri başlatabilirsin!"}
-            </p>
-          </div>
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }

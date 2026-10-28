@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
-import {
-  Search, Download, CalendarDays, Filter, X,
-  ChevronDown, ChevronRight, GitCommit, Plus, Minus,
-  Clock, FileCode, FolderGit2, Calendar,
-} from "lucide-react";
-import { useThemeColors } from "@/components/theme-provider";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { Search, Download, X, ChevronRight, FolderGit2, ExternalLink, ChevronsUpDown, ChevronsDownUp, CalendarCheck } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-
-/* ─── Tipler ─── */
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, Kbd, Dot, Track } from "@/components/ui/primitives";
+import { DiffSquares } from "@/app/dashboard/code-stats";
+import { langColor } from "@/lib/ui/lang-colors";
+import { MONTHS_SHORT, WEEKDAYS_SHORT, fmtCompact, fmtInt, cn, type Lang } from "@/lib/ui/format";
 
 type Commit = {
   sha: string;
@@ -21,283 +19,116 @@ type Commit = {
   repo_language: string | null;
 };
 
-type DayGroup = {
-  date: string; // YYYY-MM-DD
-  label: string; // "Pazartesi, 9 Haz"
-  commits: Commit[];
+type Day = { date: string; commits: Commit[]; add: number; del: number };
+type Week = { start: string; end: string; days: Day[]; total: number; perDay: number[] };
+
+const TYPES = ["feat", "fix", "refactor", "chore", "docs", "test", "style", "perf", "build", "ci", "revert", "wip", "other"] as const;
+type CType = (typeof TYPES)[number];
+
+const TYPE_COLOR: Record<CType, string> = {
+  feat: "var(--hue-green)",
+  fix: "var(--hue-red)",
+  refactor: "var(--hue-purple)",
+  chore: "var(--ink-3)",
+  docs: "var(--hue-blue)",
+  test: "var(--hue-yellow)",
+  style: "var(--hue-pink)",
+  perf: "var(--hue-orange)",
+  build: "var(--hue-cyan)",
+  ci: "var(--hue-cyan)",
+  revert: "var(--hue-pink)",
+  wip: "var(--hue-orange)",
+  other: "var(--ink-4)",
 };
 
-type WeekGroup = {
-  weekLabel: string; // "9–15 Haz 2025"
-  weekStart: string; // YYYY-MM-DD
-  days: DayGroup[];
-  totalCommits: number;
-};
-
-type Props = {
-  commits: Commit[];
-  repos: string[];
-  languages: string[];
-  username: string;
-};
-
-/* ─── Yardımcılar ─── */
-
-const DAYS_BY_LANG: Record<string, string[]> = {
-  tr: ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"],
-  en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-};
-
-const MONTHS_BY_LANG: Record<string, string[]> = {
-  tr: ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"],
-  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-};
-
-function fmtDate(dateStr: string, lang = "tr") {
-  const d = new Date(dateStr + "T00:00:00");
-  const days = DAYS_BY_LANG[lang] || DAYS_BY_LANG.tr;
-  const months = MONTHS_BY_LANG[lang] || MONTHS_BY_LANG.tr;
-  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
+function typeOf(msg: string): CType {
+  const m = msg.toLowerCase().match(/^(feat|fix|chore|docs|style|refactor|test|perf|build|ci|revert|wip)(\(.+?\))?!?:/);
+  return (m?.[1] as CType) ?? "other";
 }
 
-function fmtWeekRange(start: string, end: string, lang = "tr") {
-  const s = new Date(start + "T00:00:00");
-  const e = new Date(end + "T00:00:00");
-  const months = MONTHS_BY_LANG[lang] || MONTHS_BY_LANG.tr;
-  if (s.getMonth() === e.getMonth()) {
-    return `${s.getDate()}–${e.getDate()} ${months[s.getMonth()]} ${s.getFullYear()}`;
-  }
-  return `${s.getDate()} ${months[s.getMonth()]} – ${e.getDate()} ${months[e.getMonth()]} ${e.getFullYear()}`;
-}
-
-function getCommitType(msg: string): string {
-  const m = msg.toLowerCase().match(/^(feat|fix|chore|docs|style|refactor|test|perf|build|ci|revert|wip)(\(.+?\))?:/);
-  return m ? m[1] : "other";
-}
-
-const TYPE_COLORS: Record<string, string> = {
-  feat: "#4ade80",
-  fix: "#f87171",
-  chore: "#94a3b8",
-  docs: "#60a5fa",
-  style: "#f472b6",
-  refactor: "#a78bfa",
-  test: "#fbbf24",
-  perf: "#34d399",
-  build: "#fb923c",
-  ci: "#22d3ee",
-  revert: "#f43f5e",
-  wip: "#e879f9",
-  other: "#6b7280",
+const localDay = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const TYPE_LABELS: Record<string, Record<string, string>> = {
-  tr: {
-    feat: "Özellik",
-    fix: "Düzeltme",
-    chore: "Bakım",
-    docs: "Dokümantasyon",
-    style: "Stil",
-    refactor: "Refaktör",
-    test: "Test",
-    perf: "Performans",
-    build: "Build",
-    ci: "CI",
-    revert: "Geri Al",
-    wip: "WIP",
-    other: "Diğer",
-  },
-  en: {
-    feat: "Feature",
-    fix: "Fix",
-    chore: "Chore",
-    docs: "Docs",
-    style: "Style",
-    refactor: "Refactor",
-    test: "Test",
-    perf: "Performance",
-    build: "Build",
-    ci: "CI",
-    revert: "Revert",
-    wip: "WIP",
-    other: "Other",
-  },
-};
-
-function groupCommitsByWeek(commits: Commit[], lang = "tr"): WeekGroup[] {
-  const dayMap = new Map<string, DayGroup>();
-
+function group(commits: Commit[]): Week[] {
+  const days = new Map<string, Day>();
   for (const c of commits) {
-    const date = c.committed_at.slice(0, 10);
-    if (!dayMap.has(date)) {
-      dayMap.set(date, { date, label: fmtDate(date, lang), commits: [] });
-    }
-    dayMap.get(date)!.commits.push(c);
+    const k = localDay(c.committed_at);
+    const d = days.get(k) ?? { date: k, commits: [], add: 0, del: 0 };
+    d.commits.push(c);
+    d.add += c.additions;
+    d.del += c.deletions;
+    days.set(k, d);
   }
-
-  const sortedDays = [...dayMap.values()].sort((a, b) => b.date.localeCompare(a.date));
-
-  const weekMap = new Map<string, WeekGroup>();
-  for (const day of sortedDays) {
-    const d = new Date(day.date + "T00:00:00");
-    // Pazartesi başlangıcı
-    const dow = (d.getDay() + 6) % 7;
-    const monday = new Date(d);
-    monday.setDate(d.getDate() - dow);
-    const weekStart = monday.toISOString().slice(0, 10);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    const weekEnd = sunday.toISOString().slice(0, 10);
-
-    if (!weekMap.has(weekStart)) {
-      weekMap.set(weekStart, {
-        weekLabel: fmtWeekRange(weekStart, weekEnd, lang),
-        weekStart,
-        days: [],
-        totalCommits: 0,
-      });
-    }
-    const wg = weekMap.get(weekStart)!;
-    wg.days.push(day);
-    wg.totalCommits += day.commits.length;
+  const weeks = new Map<string, Week>();
+  for (const d of [...days.values()].sort((a, b) => b.date.localeCompare(a.date))) {
+    const dt = new Date(d.date + "T12:00:00");
+    const dow = (dt.getDay() + 6) % 7;
+    const mon = new Date(dt);
+    mon.setDate(dt.getDate() - dow);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const key = localDay(mon.toISOString());
+    const w = weeks.get(key) ?? { start: key, end: localDay(sun.toISOString()), days: [], total: 0, perDay: [0, 0, 0, 0, 0, 0, 0] };
+    w.days.push(d);
+    w.total += d.commits.length;
+    w.perDay[dow] += d.commits.length;
+    weeks.set(key, w);
   }
-
-  return [...weekMap.values()].sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+  return [...weeks.values()].sort((a, b) => b.start.localeCompare(a.start));
 }
 
-/* ─── Bileşenler ─── */
-
-function CommitBadge({ type }: { type: string }) {
-  const color = TYPE_COLORS[type] ?? TYPE_COLORS.other;
-  return (
-    <span
-      className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold"
-      style={{ backgroundColor: `${color}18`, color }}
-    >
-      {type}
-    </span>
-  );
+function weekLabel(w: Week, l: Lang) {
+  const s = new Date(w.start + "T12:00:00");
+  const e = new Date(w.end + "T12:00:00");
+  const M = MONTHS_SHORT[l];
+  return s.getMonth() === e.getMonth() ? `${s.getDate()}–${e.getDate()} ${M[s.getMonth()]} ${s.getFullYear()}` : `${s.getDate()} ${M[s.getMonth()]} – ${e.getDate()} ${M[e.getMonth()]} ${e.getFullYear()}`;
 }
 
-function CommitRow({ commit, theme }: { commit: Commit; theme: ReturnType<typeof useThemeColors> }) {
-  const type = getCommitType(commit.message);
-  const firstLine = commit.message.split("\n")[0];
-  const timeStr = new Date(commit.committed_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-  const net = commit.additions - commit.deletions;
-
-  return (
-    <div
-      className="group flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-150 hover:bg-zinc-800/40"
-    >
-      {/* Timeline nokta */}
-      <div className="relative mt-1.5 shrink-0">
-        <div
-          className="h-2 w-2 rounded-full ring-2 ring-zinc-900"
-          style={{ backgroundColor: TYPE_COLORS[type] ?? TYPE_COLORS.other }}
-        />
-      </div>
-
-      {/* İçerik */}
-      <div className="flex-1 min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-          <CommitBadge type={type} />
-          {commit.repo_name && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-zinc-600">
-              <FolderGit2 size={9} />
-              {commit.repo_name}
-            </span>
-          )}
-        </div>
-        <p className="text-sm text-zinc-300 leading-snug truncate">{firstLine}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2.5 text-[10px] text-zinc-600">
-          <span className="font-mono">{commit.sha.slice(0, 7)}</span>
-          <span className="flex items-center gap-0.5">
-            <Clock size={9} />
-            {timeStr}
-          </span>
-          {commit.additions > 0 && (
-            <span className="flex items-center gap-0.5 text-emerald-600">
-              <Plus size={9} />
-              {commit.additions}
-            </span>
-          )}
-          {commit.deletions > 0 && (
-            <span className="flex items-center gap-0.5 text-red-600">
-              <Minus size={9} />
-              {commit.deletions}
-            </span>
-          )}
-          {(commit.additions > 0 || commit.deletions > 0) && (
-            <span style={{ color: net >= 0 ? "#4ade80" : "#f87171" }} className="font-medium">
-              {net >= 0 ? "+" : ""}{net} net
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+function isoWeekNo(start: string) {
+  const d = new Date(start + "T12:00:00");
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t.getTime() - y.getTime()) / 86400000 + 1) / 7);
 }
 
-function DaySection({
-  day,
-  isExpanded,
-  onToggle,
-  theme,
-  lang = "tr",
-}: {
-  day: DayGroup;
-  isExpanded: boolean;
-  onToggle: () => void;
-  theme: ReturnType<typeof useThemeColors>;
-  lang?: string;
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-  const isToday = day.date === today;
-
+/** A dropdown filter that looks like a button. */
+function Picker({ label, value, options, onChange, all }: { label: string; value: string; options: { v: string; label: string; color?: string }[]; onChange: (v: string) => void; all: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const off = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", off);
+    return () => document.removeEventListener("mousedown", off);
+  }, [open]);
+  const cur = options.find((o) => o.v === value);
   return (
-    <div className="relative">
-      {/* Gün başlığı */}
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 transition-colors hover:bg-zinc-800/30 text-left"
-      >
-        {isToday ? (
-          <ChevronDown
-            size={13}
-            className="shrink-0 text-zinc-500 transition-transform duration-200"
-            style={{ transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)" }}
-          />
-        ) : (
-          <ChevronRight
-            size={13}
-            className="shrink-0 text-zinc-500 transition-transform duration-200"
-            style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
-          />
-        )}
-        <span
-          className="text-xs font-semibold"
-          style={{ color: isToday ? theme.accent : "#a1a1aa" }}
-        >
-          {isToday ? (lang === "tr" ? "Bugün" : "Today") : day.label}
-        </span>
-        {isToday && (
-          <span
-            className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
-            style={{ backgroundColor: `${theme.accent}18`, color: theme.accent }}
-          >
-            {lang === "tr" ? "bugün" : "today"}
-          </span>
-        )}
-        <span className="ml-auto shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">
-          {day.commits.length}
-        </span>
+    <div className="relative" ref={ref}>
+      <button type="button" className={cn("btn btn-sm", value && "!border-accent !text-accent")} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <span className="text-ink-3 font-normal">{label}:</span>
+        {cur?.color && <Dot color={cur.color} size={7} />}
+        <span className="max-w-[12ch] truncate">{cur?.label ?? all}</span>
+        <ChevronsUpDown className="!h-3 !w-3 text-ink-4" />
       </button>
-
-      {/* Commit listesi */}
-      {isExpanded && (
-        <div className="ml-4 border-l border-zinc-800/60 pl-2 mt-1 mb-2">
-          {day.commits.map((c) => (
-            <CommitRow key={c.sha} commit={c} theme={theme} />
+      {open && (
+        <div className="absolute left-0 top-full z-40 mt-1.5 max-h-72 w-56 overflow-y-auto surface-pop p-1 anim-pop">
+          {[{ v: "", label: all } as { v: string; label: string; color?: string }, ...options].map((o) => (
+            <button
+              key={o.v || "__all"}
+              type="button"
+              onClick={() => {
+                onChange(o.v);
+                setOpen(false);
+              }}
+              className={cn("flex h-8 w-full items-center gap-2 rounded-[var(--r-control)] px-2 text-left text-[12.5px]", o.v === value ? "bg-raised text-ink" : "text-ink-2 hover:bg-raised")}
+            >
+              {o.color ? <Dot color={o.color} size={7} /> : <span className="w-[7px]" />}
+              <span className="truncate font-mono">{o.label}</span>
+            </button>
           ))}
         </div>
       )}
@@ -305,426 +136,354 @@ function DaySection({
   );
 }
 
-/* ─── Ana Bileşen ─── */
+function Row({ c, username, l, open, onToggle }: { c: Commit; username: string; l: Lang; open: boolean; onToggle: () => void }) {
+  const t = typeOf(c.message);
+  const [head, ...rest] = c.message.split("\n");
+  const body = rest.join("\n").trim();
+  const m = head.match(/^(\w+)(\(.+?\))?(!)?:\s*(.*)$/);
+  const time = new Date(c.committed_at).toLocaleTimeString(l === "en" ? "en-GB" : "tr-TR", { hour: "2-digit", minute: "2-digit" });
+  return (
+    <li className="relative">
+      <span className="absolute left-[11px] top-0 bottom-0 w-px bg-line" aria-hidden />
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="group relative grid w-full grid-cols-[24px_minmax(0,1fr)] items-start gap-x-2 rounded-[var(--r-control)] py-1.5 pr-2 text-left hover:bg-raised md:grid-cols-[24px_68px_minmax(0,1fr)_auto]"
+      >
+        <span className="relative z-[1] mt-[5px] flex justify-center">
+          <span className="size-[9px] rounded-full ring-[3px] ring-[var(--bg-0)] group-hover:ring-[var(--bg-2)]" style={{ background: TYPE_COLOR[t] }} />
+        </span>
+        <span className="hidden font-mono text-[12px] text-ink-4 md:block">{c.sha.slice(0, 7)}</span>
+        <span className="min-w-0">
+          <span className="block truncate font-mono text-[12.5px] text-ink-2">
+            {m ? (
+              <>
+                <span style={{ color: TYPE_COLOR[t] }}>{m[1]}</span>
+                {m[2] && <span className="text-ink-4">{m[2]}</span>}
+                <span className="text-ink-4">{m[3] ?? ""}: </span>
+                <span className="text-ink">{m[4]}</span>
+              </>
+            ) : (
+              <span className="text-ink">{head || "(no message)"}</span>
+            )}
+          </span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11.5px] text-ink-3 md:hidden">
+            <span className="font-mono text-ink-4">{c.sha.slice(0, 7)}</span>
+            {c.repo_name && <span className="font-mono">{c.repo_name}</span>}
+            <span className="font-mono num"><span className="text-good">+{c.additions}</span> <span className="text-bad">−{c.deletions}</span></span>
+            <span className="font-mono">{time}</span>
+          </span>
+        </span>
+        <span className="hidden items-center gap-3 md:flex">
+          {c.repo_name && (
+            <span className="inline-flex max-w-[16ch] items-center gap-1.5 truncate font-mono text-[11.5px] text-ink-3">
+              <Dot color={langColor(c.repo_language)} size={6} />
+              {c.repo_name}
+            </span>
+          )}
+          <span className="w-[11ch] text-right font-mono text-[11.5px] num">
+            <span className="text-good">+{fmtCompact(c.additions, l)}</span> <span className="text-bad">−{fmtCompact(c.deletions, l)}</span>
+          </span>
+          <span className="w-[5ch] text-right font-mono text-[11.5px] text-ink-4">{time}</span>
+        </span>
+      </button>
+      {open && (
+        <div className="relative ml-[34px] mb-2 mt-0.5 rounded-[var(--r-control)] border border-line bg-surface p-3 anim-fade">
+          <div className="mb-2 flex flex-wrap items-center gap-2 font-mono text-[11.5px] text-ink-3">
+            <span className="text-ink-2">{c.sha}</span>
+            <DiffSquares add={c.additions} del={c.deletions} />
+          </div>
+          {body ? <pre className="whitespace-pre-wrap break-words font-mono text-[12px] leading-relaxed text-ink-2">{body}</pre> : <p className="text-[12px] text-ink-4">{l === "en" ? "No message body." : "Mesaj gövdesi yok."}</p>}
+          {c.repo_name && (
+            <a href={`https://github.com/${username}/${c.repo_name}/commit/${c.sha}`} target="_blank" rel="noopener noreferrer" className="mt-2.5 inline-flex items-center gap-1 text-[12px] text-accent hover:underline">
+              {l === "en" ? "Open on GitHub" : "GitHub'da aç"} <ExternalLink size={11} />
+            </a>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
 
-export default function TimelineClient({ commits, repos, languages, username }: Props) {
-  const theme = useThemeColors();
-  const { lang, t } = useLanguage();
+export default function TimelineClient({ commits, repos, languages, username }: { commits: Commit[]; repos: string[]; languages: string[]; username: string }) {
+  const { lang } = useLanguage();
+  const l = lang as Lang;
+  const [q, setQ] = useState("");
+  const [repo, setRepo] = useState("");
+  const [langF, setLangF] = useState("");
+  const [type, setType] = useState("");
+  const [todayOnly, setTodayOnly] = useState(false);
+  const [openRow, setOpenRow] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [exportOpen, setExportOpen] = useState(false);
+  const [limit, setLimit] = useState(12);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const today = localDay(new Date().toISOString());
+  const T = (tr: string, en: string) => (l === "en" ? en : tr);
 
-  const [search, setSearch] = useState("");
-  const [repoFilter, setRepoFilter] = useState<string>("");
-  const [langFilter, setLangFilter] = useState<string>("");
-  const [typeFilter, setTypeFilter] = useState<string>("");
-  const [showToday, setShowToday] = useState(false);
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return new Set([today]);
-  });
-  const [exportFormat, setExportFormat] = useState<"csv" | "json">("csv");
-  const [showExportMenu, setShowExportMenu] = useState(false);
+  // "/" focuses search while on this page (the palette still opens with ⌘K).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (e.key === "f" && !e.metaKey && !e.ctrlKey && !["INPUT", "TEXTAREA"].includes(el.tagName)) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-  const todayRef = useRef<HTMLDivElement>(null);
-
-  const todayDate = new Date().toISOString().slice(0, 10);
-
-  /* ─── Filtreleme ─── */
   const filtered = useMemo(() => {
-    let out = commits;
+    const s = q.trim().toLowerCase();
+    return commits.filter(
+      (c) =>
+        (!todayOnly || localDay(c.committed_at) === today) &&
+        (!repo || c.repo_name === repo) &&
+        (!langF || c.repo_language === langF) &&
+        (!type || typeOf(c.message) === type) &&
+        (!s || c.message.toLowerCase().includes(s) || c.sha.startsWith(s) || (c.repo_name?.toLowerCase().includes(s) ?? false)),
+    );
+  }, [commits, q, repo, langF, type, todayOnly, today]);
 
-    if (showToday) {
-      out = out.filter((c) => c.committed_at.startsWith(todayDate));
-    }
+  const weeks = useMemo(() => group(filtered), [filtered]);
+  const add = filtered.reduce((s, c) => s + c.additions, 0);
+  const del = filtered.reduce((s, c) => s + c.deletions, 0);
+  const typeCounts = useMemo(() => {
+    const m = new Map<CType, number>();
+    for (const c of filtered) m.set(typeOf(c.message), (m.get(typeOf(c.message)) ?? 0) + 1);
+    return TYPES.map((t) => ({ t, n: m.get(t) ?? 0 })).filter((x) => x.n);
+  }, [filtered]);
+  const repoCounts = useMemo(() => {
+    const m = new Map<string, { n: number; lang: string | null }>();
+    for (const c of filtered) if (c.repo_name) m.set(c.repo_name, { n: (m.get(c.repo_name)?.n ?? 0) + 1, lang: c.repo_language });
+    return [...m.entries()].sort((a, b) => b[1].n - a[1].n);
+  }, [filtered]);
+  const active = [q.trim(), repo, langF, type, todayOnly ? "1" : ""].filter(Boolean).length;
+  const clear = () => {
+    setQ("");
+    setRepo("");
+    setLangF("");
+    setType("");
+    setTodayOnly(false);
+  };
 
-    if (repoFilter) {
-      out = out.filter((c) => c.repo_name === repoFilter);
-    }
-
-    if (langFilter) {
-      out = out.filter((c) => c.repo_language === langFilter);
-    }
-
-    if (typeFilter) {
-      out = out.filter((c) => getCommitType(c.message) === typeFilter);
-    }
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      out = out.filter(
-        (c) =>
-          c.message.toLowerCase().includes(q) ||
-          c.sha.toLowerCase().startsWith(q) ||
-          (c.repo_name?.toLowerCase().includes(q) ?? false)
-      );
-    }
-
-    return out;
-  }, [commits, search, repoFilter, langFilter, typeFilter, showToday, todayDate]);
-
-  const weeks = useMemo(() => groupCommitsByWeek(filtered, lang), [filtered, lang]);
-
-  /* ─── Bugün moduna git ─── */
-  function goToday() {
-    setShowToday(true);
-    setExpandedDays((prev) => new Set([...prev, todayDate]));
-    setTimeout(() => {
-      todayRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
-  }
-
-  /* ─── Gün expand/collapse ─── */
-  const toggleDay = useCallback((date: string) => {
-    setExpandedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(date)) next.delete(date);
-      else next.add(date);
-      return next;
+  const toggleDay = useCallback((d: string) => {
+    setCollapsed((prev) => {
+      const n = new Set(prev);
+      if (n.has(d)) n.delete(d);
+      else n.add(d);
+      return n;
     });
   }, []);
 
-  /* ─── Tümünü aç/kapat ─── */
-  function expandAll() {
-    const allDates = weeks.flatMap((w) => w.days.map((d) => d.date));
-    setExpandedDays(new Set(allDates));
-  }
-  function collapseAll() {
-    setExpandedDays(new Set());
-  }
-
-  /* ─── Export ─── */
-  function doExport() {
-    if (exportFormat === "csv") {
-      const header = "sha,message,committed_at,additions,deletions,repo,language";
-      const rows = filtered.map((c) =>
-        [
-          c.sha,
-          `"${c.message.replace(/"/g, '""').split("\n")[0]}"`,
-          c.committed_at,
-          c.additions,
-          c.deletions,
-          c.repo_name ?? "",
-          c.repo_language ?? "",
-        ].join(",")
-      );
-      const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `commits_${username}_${todayDate}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      const blob = new Blob([JSON.stringify(filtered, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `commits_${username}_${todayDate}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-    setShowExportMenu(false);
+  function download(fmt: "csv" | "json") {
+    const data =
+      fmt === "csv"
+        ? [
+            "sha,message,committed_at,additions,deletions,repo,language",
+            ...filtered.map((c) => [c.sha, `"${c.message.split("\n")[0].replace(/"/g, '""')}"`, c.committed_at, c.additions, c.deletions, c.repo_name ?? "", c.repo_language ?? ""].join(",")),
+          ].join("\n")
+        : JSON.stringify(filtered, null, 2);
+    const blob = new Blob([data], { type: fmt === "csv" ? "text/csv" : "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `commits_${username}_${today}.${fmt}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setExportOpen(false);
   }
 
-  /* ─── Özet istatistikler ─── */
-  const totalAdd = filtered.reduce((s, c) => s + c.additions, 0);
-  const totalDel = filtered.reduce((s, c) => s + c.deletions, 0);
-  const uniqueRepos = new Set(filtered.map((c) => c.repo_name).filter(Boolean)).size;
-
-  const activeFilters = [repoFilter, langFilter, typeFilter, search.trim(), showToday ? "today" : ""].filter(Boolean).length;
-
-  function clearFilters() {
-    setSearch("");
-    setRepoFilter("");
-    setLangFilter("");
-    setTypeFilter("");
-    setShowToday(false);
-  }
-
-  const COMMIT_TYPES = ["feat", "fix", "chore", "docs", "style", "refactor", "test", "perf", "wip", "other"];
+  const flags = [repo && `--repo=${repo}`, type && `--type=${type}`, langF && `--lang=${langF}`, todayOnly && "--today", q.trim() && `--grep="${q.trim()}"`].filter(Boolean).join(" ");
 
   return (
-    <div className="space-y-5">
+    <div>
+      <PageHeader
+        title={T("Zaman çizelgesi", "Timeline")}
+        command={`log --since=1y --graph${flags ? " " + flags : ""}`}
+        subtitle={T(`Son bir yılın ${fmtInt(commits.length, l)} commiti, ${repos.length} repoda`, `${fmtInt(commits.length, l)} commits over the last year, across ${repos.length} repos`)}
+      />
 
-      {/* ── Sayfa başlığı ── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0"
-              style={{ backgroundColor: `${theme.accent}18`, color: theme.accent, boxShadow: `0 0 14px ${theme.accent}25` }}
-            >
-              <CalendarDays size={17} />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-zinc-100">{t.timeline.title}</h1>
-              <p className="text-xs text-zinc-500">
-                {lang === "tr"
-                  ? `Son 365 gün · ${commits.length.toLocaleString("tr-TR")} commit`
-                  : `Last 365 days · ${commits.length.toLocaleString("en-US")} commits`}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Bugün modu */}
-          <button
-            onClick={showToday ? () => { setShowToday(false); } : goToday}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer"
-            style={{
-              borderColor: showToday ? `${theme.accent}40` : "#3f3f46",
-              backgroundColor: showToday ? `${theme.accent}12` : "transparent",
-              color: showToday ? theme.accent : "#a1a1aa",
-            }}
-          >
-            <Calendar size={12} />
-            {t.timeline.today}
+      {/* Toolbar */}
+      <div className="sticky top-0 md:top-11 z-20 -mx-4 mb-4 border-y border-line bg-[color-mix(in_oklab,var(--bg-0)_92%,transparent)] px-4 py-2.5 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 [[data-ui=terminal]_&]:md:top-7 [[data-ui=studio]_&]:md:top-16">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative min-w-[200px] flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-4" />
+            <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder={T("mesaj, sha veya repo", "message, sha or repo")} className="input !h-[26px] !pl-8 !pr-8 font-mono !text-[12.5px]" aria-label={T("Commit ara", "Search commits")} />
+            {q ? (
+              <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-4 hover:text-ink" onClick={() => setQ("")} aria-label={T("Temizle", "Clear")}>
+                <X size={13} />
+              </button>
+            ) : (
+              <Kbd className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex">F</Kbd>
+            )}
+          </label>
+          <Picker label="repo" value={repo} onChange={setRepo} all={T("tümü", "all")} options={repos.map((r) => ({ v: r, label: r }))} />
+          <Picker label={T("dil", "lang")} value={langF} onChange={setLangF} all={T("tümü", "all")} options={languages.map((x) => ({ v: x, label: x, color: langColor(x) }))} />
+          <Picker label={T("tür", "type")} value={type} onChange={setType} all={T("tümü", "all")} options={TYPES.map((t) => ({ v: t, label: t, color: TYPE_COLOR[t] }))} />
+          <button type="button" className={cn("btn btn-sm", todayOnly && "!border-accent !text-accent")} aria-pressed={todayOnly} onClick={() => setTodayOnly((v) => !v)}>
+            <CalendarCheck /> {T("Bugün", "Today")}
           </button>
-
-          {/* Tümünü aç/kapat */}
-          <button
-            onClick={expandAll}
-            className="rounded-lg border border-zinc-800 px-2.5 py-1.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300 cursor-pointer"
-          >
-            {t.timeline.expandAll}
-          </button>
-          <button
-            onClick={collapseAll}
-            className="rounded-lg border border-zinc-800 px-2.5 py-1.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300 cursor-pointer"
-          >
-            {t.timeline.collapseAll}
-          </button>
-
-          {/* Export */}
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-400 transition-all hover:border-zinc-700 hover:text-zinc-200 cursor-pointer"
-            >
-              <Download size={12} />
-              {t.timeline.download}
-              <ChevronDown size={10} />
+          {active > 0 && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={clear}>
+              <X /> {T("Filtreleri temizle", "Clear filters")}
             </button>
-
-            {showExportMenu && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
-                <div className="absolute right-0 top-full z-40 mt-1.5 w-44 rounded-xl border border-zinc-800 bg-zinc-950 py-2 shadow-2xl">
-                  <p className="px-3 pb-1.5 text-[10px] text-zinc-600 uppercase tracking-wider">Format</p>
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setCollapsed(new Set())} title={T("Tümünü aç", "Expand all")} aria-label={T("Tümünü aç", "Expand all")}>
+              <ChevronsUpDown />
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setCollapsed(new Set(weeks.flatMap((w) => w.days.map((d) => d.date))))} title={T("Tümünü kapat", "Collapse all")} aria-label={T("Tümünü kapat", "Collapse all")}>
+              <ChevronsDownUp />
+            </button>
+            <div className="relative">
+              <button type="button" className="btn btn-sm" onClick={() => setExportOpen((v) => !v)} aria-expanded={exportOpen}>
+                <Download /> {T("Dışa aktar", "Export")}
+              </button>
+              {exportOpen && (
+                <div className="absolute right-0 top-full z-40 mt-1.5 w-44 surface-pop p-1 anim-pop">
                   {(["csv", "json"] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setExportFormat(f)}
-                      className="flex w-full items-center justify-between px-3 py-2 text-xs text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-zinc-200 cursor-pointer"
-                    >
-                      {f.toUpperCase()}
-                      {exportFormat === f && (
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{ backgroundColor: theme.accent }}
-                        />
-                      )}
+                    <button key={f} type="button" onClick={() => download(f)} className="flex h-8 w-full items-center justify-between rounded-[var(--r-control)] px-2 text-[12.5px] text-ink-2 hover:bg-raised">
+                      <span className="font-mono">.{f}</span>
+                      <span className="font-mono text-[11px] text-ink-4">{filtered.length}</span>
                     </button>
                   ))}
-                  <div className="my-1 border-t border-zinc-800/60" />
-                  <button
-                    onClick={doExport}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium transition-colors hover:bg-zinc-800/60 cursor-pointer"
-                    style={{ color: theme.accent }}
-                  >
-                    <Download size={11} />
-                    {filtered.length} {t.timeline.downloadCommits}
-                  </button>
                 </div>
-              </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+        {/* Log */}
+        <div className="min-w-0">
+          {weeks.length === 0 ? (
+            <div className="rounded-panel border border-dashed border-line-strong px-6 py-12 text-center">
+              <p className="text-[14px] text-ink-2">{T("Bu filtrelerle eşleşen commit yok.", "No commits match these filters.")}</p>
+              {active > 0 && (
+                <button type="button" className="btn btn-sm mt-3" onClick={clear}>
+                  {T("Filtreleri temizle", "Clear filters")}
+                </button>
+              )}
+            </div>
+          ) : (
+            <ol className="flex flex-col gap-6">
+              {weeks.slice(0, limit).map((w) => {
+                const max = Math.max(...w.perDay, 1);
+                return (
+                  <li key={w.start}>
+                    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-mono text-[12px] font-semibold text-accent">{T("hf", "wk")} {isoWeekNo(w.start)}</span>
+                      <span className="text-[13px] font-semibold text-ink">{weekLabel(w, l)}</span>
+                      <span className="font-mono text-[11.5px] text-ink-3">{w.total} commit</span>
+                      <span className="ml-auto flex items-end gap-[3px] h-4" aria-hidden>
+                        {w.perDay.map((v, i) => (
+                          <span key={i} className="w-2.5 rounded-[2px]" title={`${WEEKDAYS_SHORT[l][i]} ${v}`} style={{ height: `${v ? Math.max(25, (v / max) * 100) : 12}%`, background: v ? "var(--heat-3)" : "var(--bg-3)" }} />
+                        ))}
+                      </span>
+                    </div>
+                    <div className="rounded-panel border border-line bg-surface">
+                      {w.days.map((d, di) => {
+                        const isOpen = !collapsed.has(d.date);
+                        const dt = new Date(d.date + "T12:00:00");
+                        return (
+                          <section key={d.date} className={cn(di > 0 && "border-t border-line")}>
+                            <button type="button" onClick={() => toggleDay(d.date)} aria-expanded={isOpen} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-raised">
+                              <ChevronRight size={13} className={cn("shrink-0 text-ink-4 transition-transform", isOpen && "rotate-90")} />
+                              <span className={cn("text-[12.5px] font-medium", d.date === today ? "text-accent" : "text-ink")}>
+                                {d.date === today ? T("Bugün", "Today") : `${WEEKDAYS_SHORT[l][(dt.getDay() + 6) % 7]}, ${dt.getDate()} ${MONTHS_SHORT[l][dt.getMonth()]}`}
+                              </span>
+                              <span className="font-mono text-[11.5px] text-ink-4">{d.commits.length}</span>
+                              <span className="ml-auto hidden items-center gap-2 font-mono text-[11.5px] num sm:flex">
+                                <span className="text-good">+{fmtCompact(d.add, l)}</span>
+                                <span className="text-bad">−{fmtCompact(d.del, l)}</span>
+                                <DiffSquares add={d.add} del={d.del} size={8} />
+                              </span>
+                            </button>
+                            {isOpen && (
+                              <ul className="px-2 pb-2">
+                                {d.commits.map((c) => (
+                                  <Row key={c.sha} c={c} username={username} l={l} open={openRow === c.sha} onToggle={() => setOpenRow((v) => (v === c.sha ? null : c.sha))} />
+                                ))}
+                              </ul>
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          {weeks.length > limit && (
+            <div className="mt-5 flex justify-center">
+              <button type="button" className="btn" onClick={() => setLimit((n) => n + 12)}>
+                {T(`Daha eski haftalar (${weeks.length - limit})`, `Older weeks (${weeks.length - limit})`)}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Summary */}
+        <aside className="order-first xl:order-none">
+          <div className="xl:sticky xl:top-28 flex flex-col gap-4">
+            <Panel title={T("Özet", "Summary")} meta={active ? T("filtreli", "filtered") : T("1 yıl", "1 year")} className="!h-auto">
+              <div className="grid grid-cols-3 gap-3 xl:grid-cols-1">
+                <div>
+                  <div className="figure text-[26px]">{fmtInt(filtered.length, l)}</div>
+                  <div className="label mt-1">commit</div>
+                </div>
+                <div>
+                  <div className="flex items-baseline gap-2 font-mono text-[15px] font-semibold num">
+                    <span className="text-good">+{fmtCompact(add, l)}</span>
+                    <span className="text-bad">−{fmtCompact(del, l)}</span>
+                  </div>
+                  <div className="label mt-1">{T("satır", "lines")}</div>
+                </div>
+                <div>
+                  <div className="figure text-[20px]">{repoCounts.length}</div>
+                  <div className="label mt-1">repo</div>
+                </div>
+              </div>
+            </Panel>
+            {typeCounts.length > 0 && (
+              <Panel title={T("Türler", "Types")} className="!h-auto hidden sm:flex">
+                <ul className="flex flex-col gap-1.5">
+                  {typeCounts.map(({ t, n }) => (
+                    <li key={t}>
+                      <button type="button" onClick={() => setType((v) => (v === t ? "" : t))} className={cn("w-full text-left", type && type !== t && "opacity-40")}>
+                        <div className="mb-0.5 flex justify-between font-mono text-[11.5px]">
+                          <span style={{ color: TYPE_COLOR[t] }}>{t}</span>
+                          <span className="text-ink-4">{n}</span>
+                        </div>
+                        <Track value={n} max={typeCounts[0] ? Math.max(...typeCounts.map((x) => x.n)) : 1} color={TYPE_COLOR[t]} height={3} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            )}
+            {repoCounts.length > 0 && (
+              <Panel title="Repo" icon={FolderGit2} className="!h-auto hidden xl:flex">
+                <ul className="flex flex-col gap-1">
+                  {repoCounts.slice(0, 8).map(([name, v]) => (
+                    <li key={name}>
+                      <button type="button" onClick={() => setRepo((r) => (r === name ? "" : name))} className={cn("flex w-full items-center gap-2 text-left text-[12.5px]", repo && repo !== name && "opacity-40")}>
+                        <Dot color={langColor(v.lang)} size={7} />
+                        <span className="truncate font-mono text-ink-2">{name}</span>
+                        <span className="ml-auto font-mono text-[11.5px] text-ink-4">{v.n}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
             )}
           </div>
-        </div>
+        </aside>
       </div>
-
-      {/* ── Özet kartlar ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: t.timeline.statCommit, value: filtered.length.toLocaleString(lang === "tr" ? "tr-TR" : "en-US"), icon: <GitCommit size={13} /> },
-          { label: t.timeline.statRepo, value: uniqueRepos.toLocaleString(lang === "tr" ? "tr-TR" : "en-US"), icon: <FolderGit2 size={13} /> },
-          { label: t.timeline.statAdded, value: `+${totalAdd.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}`, icon: <Plus size={13} />, color: "#4ade80" },
-          { label: t.timeline.statDeleted, value: `-${totalDel.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}`, icon: <Minus size={13} />, color: "#f87171" },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-2.5"
-          >
-            <div className="flex items-center gap-1.5 mb-1" style={{ color: s.color ?? "#6b7280" }}>
-              {s.icon}
-              <span className="text-[10px] uppercase tracking-wide text-zinc-500">{s.label}</span>
-            </div>
-            <p className="text-base font-bold" style={{ color: s.color ?? "#e4e4e7" }}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Filtreler ── */}
-      <div
-        className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4"
-        style={{ borderColor: activeFilters > 0 ? `${theme.accentBorder}` : undefined }}
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <Filter size={12} className="text-zinc-500" />
-          <span className="text-xs text-zinc-500 font-medium">{t.timeline.filterLabel}</span>
-          {activeFilters > 0 && (
-            <button
-              onClick={clearFilters}
-              className="ml-auto flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
-            >
-              <X size={10} />
-              {t.timeline.clearFilters} ({activeFilters})
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Arama */}
-          <div className="relative">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t.timeline.searchPlaceholder}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-7 pr-3 text-xs text-zinc-300 placeholder-zinc-700 outline-none transition-colors focus:border-zinc-600"
-            />
-          </div>
-
-          {/* Repo filtresi */}
-          <div className="relative">
-            <FolderGit2 size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <select
-              value={repoFilter}
-              onChange={(e) => setRepoFilter(e.target.value)}
-              className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-7 pr-3 text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600"
-            >
-              <option value="">{t.timeline.allRepos}</option>
-              {repos.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Dil filtresi */}
-          <div className="relative">
-            <FileCode size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <select
-              value={langFilter}
-              onChange={(e) => setLangFilter(e.target.value)}
-              className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-7 pr-3 text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600"
-            >
-              <option value="">{t.timeline.allLanguages}</option>
-              {languages.map((l) => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Commit tipi filtresi */}
-          <div className="relative">
-            <GitCommit size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-7 pr-3 text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600"
-            >
-              <option value="">{t.timeline.allTypes}</option>
-              {COMMIT_TYPES.map((tKey) => (
-                <option key={tKey} value={tKey}>{TYPE_LABELS[lang]?.[tKey] ?? tKey}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Tip hızlı seç */}
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {COMMIT_TYPES.map((tKey) => {
-            const color = TYPE_COLORS[tKey];
-            const active = typeFilter === tKey;
-            return (
-              <button
-                key={tKey}
-                onClick={() => setTypeFilter(active ? "" : tKey)}
-                className="rounded-lg px-2 py-1 text-[10px] font-medium transition-all cursor-pointer"
-                style={{
-                  backgroundColor: active ? `${color}22` : "#18181b",
-                  color: active ? color : "#52525b",
-                  borderWidth: 1,
-                  borderStyle: "solid",
-                  borderColor: active ? `${color}50` : "#27272a",
-                }}
-              >
-                {TYPE_LABELS[lang]?.[tKey] ?? tKey}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Timeline ── */}
-      {weeks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
-          <CalendarDays size={40} className="mb-4 opacity-30" />
-          <p className="text-sm">{t.timeline.noActivity}</p>
-          {activeFilters > 0 && (
-            <button onClick={clearFilters} className="mt-2 text-xs underline underline-offset-2 hover:text-zinc-400 transition-colors cursor-pointer">
-              {t.timeline.clearFilters}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {weeks.map((week) => (
-            <div
-              key={week.weekStart}
-              id={week.weekStart === todayDate ? "today-week" : undefined}
-              ref={week.days.some((d) => d.date === todayDate) ? todayRef : undefined}
-              className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
-            >
-              {/* Hafta başlığı */}
-              <div
-                className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-800/60"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.accent}06 0%, transparent 60%)`,
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <CalendarDays size={13} style={{ color: theme.accent }} />
-                  <span className="text-xs font-semibold text-zinc-300">{week.weekLabel}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-600">
-                    {week.days.length} {lang === "tr" ? "gün aktif" : "days active"}
-                  </span>
-                  <span
-                    className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                    style={{ backgroundColor: `${theme.accent}18`, color: theme.accent }}
-                  >
-                    {week.totalCommits}
-                  </span>
-                </div>
-              </div>
-
-              {/* Günler */}
-              <div className="p-2 space-y-0.5">
-                {week.days.map((day) => (
-                  <DaySection
-                    key={day.date}
-                    day={day}
-                    isExpanded={expandedDays.has(day.date)}
-                    onToggle={() => toggleDay(day.date)}
-                    theme={theme}
-                    lang={lang}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

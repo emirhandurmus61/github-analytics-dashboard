@@ -1,6 +1,9 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
 import { NextRequest, NextResponse } from "next/server";
+import { imagePalette, svgResponse, esc, SVG_MONO, type ImagePalette } from "@/lib/og/palette";
+import { langOf } from "@/lib/og/widget-data";
+import { daysAgoISO } from "@/lib/ui/format";
 
 // Cache 1 saat — badge sık güncellenmez
 export const revalidate = 3600;
@@ -13,13 +16,14 @@ export async function GET(
 
   const { data: user } = await supabaseAdmin
     .from("users")
-    .select("id, last_synced_at")
+    .select("id, last_synced_at, theme_accent")
     .eq("username", username)
     .single();
 
   if (!user || !user.last_synced_at) {
     return new NextResponse("Not found", { status: 404 });
   }
+  const themeAccent = user.theme_accent;
 
   // Bu haftaki commit sayısı
   const now = new Date();
@@ -45,7 +49,7 @@ export async function GET(
     .eq("user_id", user.id)
     .gte(
       "date",
-      new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      daysAgoISO(365).slice(0, 10)
     );
 
   const activeDates = (heatmapData ?? [])
@@ -77,98 +81,31 @@ export async function GET(
     if (sorted.length > 0) topLang = sorted[0][0];
   }
 
-  const svg = buildBadgeSvg({
-    username,
-    streak: currentStreak,
-    weeklyCommits,
-    topLang,
-  });
-
-  return new NextResponse(svg, {
-    headers: {
-      "Content-Type": "image/svg+xml",
-      "Cache-Control": "public, max-age=3600, s-maxage=3600",
-    },
-  });
+  const p = imagePalette(themeAccent, new URL(_req.url).searchParams);
+  const en = langOf(_req) === "en";
+  const svg = buildBadgeSvg({ username, streak: currentStreak, weeklyCommits, topLang, p, en });
+  return svgResponse(svg);
 }
 
-function buildBadgeSvg({
-  username,
-  streak,
-  weeklyCommits,
-  topLang,
-}: {
-  username: string;
-  streak: number;
-  weeklyCommits: number;
-  topLang: string;
-}) {
-  const LANG_COLORS: Record<string, string> = {
-    TypeScript: "#3178c6",
-    JavaScript: "#f1e05a",
-    Python: "#3572A5",
-    Rust: "#dea584",
-    Go: "#00ADD8",
-    CSS: "#563d7c",
-    HTML: "#e34c26",
-    Java: "#b07219",
-    "C++": "#f34b7d",
-    "C#": "#178600",
-    C: "#555555",
-  };
-
-  const langColor = LANG_COLORS[topLang] ?? "#6b7280";
-
-  // Badge genişlikleri: sol (label) + sağ (değer) kutucukları
-  // Sabit genişlik: 380px total, 3 bölüm
-  const W = 380;
-  const H = 28;
-  const labelBg = "#1f1f23";
-  const valueBg = "#27272a";
-
-  // Bölüm genişlikleri
-  const col1 = 115; // streak
-  const col2 = 115; // weekly commits
-  const col3 = W - col1 - col2; // top lang
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" role="img" aria-label="Devboard: ${username}">
-  <title>${username} — Devboard</title>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${labelBg}" stop-opacity="1"/>
-      <stop offset="1" stop-color="${labelBg}" stop-opacity="0.95"/>
-    </linearGradient>
-    <clipPath id="r">
-      <rect width="${W}" height="${H}" rx="6" ry="6"/>
-    </clipPath>
-  </defs>
+/** shields.io-style: [mark devboard | 18d streak · 12 this week · TypeScript] */
+function buildBadgeSvg({ username, streak, weeklyCommits, topLang, p, en }: { username: string; streak: number; weeklyCommits: number; topLang: string; p: ImagePalette; en: boolean }) {
+  const right = `${streak}${en ? "d streak" : "g seri"} · ${weeklyCommits} ${en ? "this wk" : "bu hafta"} · ${topLang}`;
+  const leftW = 82;
+  const rightW = Math.round(right.length * 6.6 + 18);
+  const W = leftW + rightW;
+  const H = 22;
+  const mark = [[1, 2, 4], [2, 4, 2], [4, 2, 0]]
+    .flatMap((row, r) => row.map((lv, c) => `<rect x="${9 + c * 3.6}" y="${5 + r * 3.6}" width="3" height="3" rx="0.6" fill="${p.heat[lv]}"/>`))
+    .join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" role="img" aria-label="devboard: ${esc(right)}">
+  <title>${esc(username)} · devboard: ${esc(right)}</title>
+  <clipPath id="r"><rect width="${W}" height="${H}" rx="4"/></clipPath>
   <g clip-path="url(#r)">
-    <!-- Background -->
-    <rect width="${W}" height="${H}" fill="${labelBg}"/>
-    <!-- Divider lines -->
-    <line x1="${col1}" y1="0" x2="${col1}" y2="${H}" stroke="#3f3f46" stroke-width="1"/>
-    <line x1="${col1 + col2}" y1="0" x2="${col1 + col2}" y2="${H}" stroke="#3f3f46" stroke-width="1"/>
-
-    <!-- Streak section -->
-    <text x="8" y="11" font-family="DejaVu Sans,sans-serif" font-size="8" fill="#71717a">🔥 STREAK</text>
-    <text x="8" y="22" font-family="DejaVu Sans,sans-serif" font-size="10" font-weight="bold" fill="#f4f4f5">${streak} gün</text>
-
-    <!-- Weekly commits section -->
-    <text x="${col1 + 8}" y="11" font-family="DejaVu Sans,sans-serif" font-size="8" fill="#71717a">⚡ BU HAFTA</text>
-    <text x="${col1 + 8}" y="22" font-family="DejaVu Sans,sans-serif" font-size="10" font-weight="bold" fill="#f4f4f5">${weeklyCommits} commit</text>
-
-    <!-- Top lang section -->
-    <circle cx="${col1 + col2 + 11}" cy="${H / 2}" r="4" fill="${langColor}"/>
-    <text x="${col1 + col2 + 20}" y="11" font-family="DejaVu Sans,sans-serif" font-size="8" fill="#71717a">TOP DİL</text>
-    <text x="${col1 + col2 + 20}" y="22" font-family="DejaVu Sans,sans-serif" font-size="10" font-weight="bold" fill="#f4f4f5">${escXml(topLang)}</text>
+    <rect width="${leftW}" height="${H}" fill="${p.bg2}"/>
+    <rect x="${leftW}" width="${rightW}" height="${H}" fill="${p.ac}"/>
   </g>
+  ${mark}
+  <text x="25" y="15" font-family="${SVG_MONO}" font-size="11" font-weight="600" fill="${p.ink1}">devboard</text>
+  <text x="${leftW + 9}" y="15" font-family="${SVG_MONO}" font-size="11" font-weight="600" fill="${p.onAc}">${esc(right)}</text>
 </svg>`;
-}
-
-function escXml(s: string) {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

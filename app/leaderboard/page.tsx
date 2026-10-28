@@ -4,7 +4,8 @@ import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import { calculateStreaks } from "@/lib/streak";
 import { calcBadges } from "@/lib/badges";
 import LeaderboardClient from "./leaderboard-client";
-import Navbar from "@/components/navbar";
+import AppShell from "@/components/shell/app-shell";
+import type { ThemeAccent } from "@/lib/themes";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export type LeaderboardEntry = {
   displayName: string;
   avatarUrl: string | null;
   accentColor: string;
+  accent: ThemeAccent;
   weeklyCommits: number;
   currentStreak: number;
   badgeCount: number;
@@ -277,8 +279,7 @@ export default async function LeaderboardPage() {
 
   if (optInUsers.length === 0) {
     return (
-      <>
-        <Navbar />
+      <AppShell>
         <LeaderboardClient
           weekly={[]}
           streaks={[]}
@@ -286,7 +287,7 @@ export default async function LeaderboardPage() {
           currentUsername={currentUsername}
           isOptedIn={false}
         />
-      </>
+      </AppShell>
     );
   }
 
@@ -308,6 +309,7 @@ export default async function LeaderboardPage() {
           displayName: u.name ?? u.username!,
           avatarUrl: u.avatar_url,
           accentColor: THEMES[accent].accent,
+          accent,
           weeklyCommits: weeklyMap.get(u.id) ?? 0,
           currentStreak: streakMap.get(u.id) ?? 0,
           badgeCount: badgeMap.get(u.id) ?? 0,
@@ -336,8 +338,7 @@ export default async function LeaderboardPage() {
   }
 
   return (
-    <>
-      <Navbar />
+    <AppShell>
       <LeaderboardClient
         weekly={weekly}
         streaks={streaks}
@@ -345,6 +346,6 @@ export default async function LeaderboardPage() {
         currentUsername={currentUsername}
         isOptedIn={isOptedIn}
       />
-    </>
+    </AppShell>
   );
 }

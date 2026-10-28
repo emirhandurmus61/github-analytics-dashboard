@@ -1,8 +1,11 @@
 "use client";
 
-import { useThemeColors } from "@/components/theme-provider";
+import { FileDiff, GitPullRequest, CircleDot, GitCommitHorizontal } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { Plus, Minus, GitCommit, GitPullRequest, CircleDot, ArrowUpDown } from "lucide-react";
+import { Panel } from "@/components/ui/primitives";
+import { KV } from "@/components/ui/glance";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { fmtCompact, fmtInt, cn, type Lang } from "@/lib/ui/format";
 
 type Props = {
   linesAdded: number;
@@ -13,56 +16,103 @@ type Props = {
   closedIssues: number;
 };
 
-function fmt(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return n.toString();
+/** GitHub-style diffstat: five squares split between additions and deletions. */
+export function DiffSquares({ add, del, n = 5, size = 9 }: { add: number; del: number; n?: number; size?: number }) {
+  const t = add + del;
+  const g = t ? Math.round((add / t) * n) : 0;
+  const r = t ? n - g : 0;
+  return (
+    <span className="inline-flex gap-[2px]" aria-hidden>
+      {Array.from({ length: n }).map((_, i) => (
+        <i
+          key={i}
+          className="block rounded-[2px]"
+          style={{ width: size, height: size, background: i < g ? "var(--hue-green)" : i < g + r ? "var(--hue-red)" : "var(--bg-3)" }}
+        />
+      ))}
+    </span>
+  );
 }
 
-export default function CodeStats({
-  linesAdded, linesDeleted, totalCommits, mergedPRs, openIssues, closedIssues,
-}: Props) {
-  const theme = useThemeColors();
+export default function CodeStats(p: Props) {
   const { lang } = useLanguage();
-  const net = linesAdded - linesDeleted;
-  const addPct = linesAdded + linesDeleted > 0
-    ? (linesAdded / (linesAdded + linesDeleted)) * 100
-    : 0;
+  const l = lang as Lang;
+  const { shape } = useWidgetSize();
+  const net = p.linesAdded - p.linesDeleted;
+  const churn = p.linesAdded + p.linesDeleted;
+  const issues = p.openIssues + p.closedIssues;
+  const title = l === "en" ? "Code stats" : "Kod istatistikleri";
+  const diff = (
+    <span className="inline-flex items-center gap-2 font-mono text-[13px] num">
+      <span className="text-good">+{fmtCompact(p.linesAdded, l)}</span>
+      <span className="text-bad">−{fmtCompact(p.linesDeleted, l)}</span>
+      <DiffSquares add={p.linesAdded} del={p.linesDeleted} />
+    </span>
+  );
 
-  const items = [
-    { icon: <Plus className="w-4 h-4" />, value: `+${fmt(linesAdded)}`, label: lang === "en" ? "Added" : "Eklendi", color: theme.accent },
-    { icon: <Minus className="w-4 h-4" />, value: `-${fmt(linesDeleted)}`, label: lang === "en" ? "Deleted" : "Silindi", color: "#f87171" },
-    { icon: <ArrowUpDown className="w-4 h-4" />, value: net >= 0 ? `+${fmt(net)}` : fmt(net), label: "Net", color: net >= 0 ? theme.accentMid : "#fb923c" },
-    { icon: <GitCommit className="w-4 h-4" />, value: totalCommits.toLocaleString(lang === "en" ? "en-US" : "tr-TR"), label: "Commit", color: "#f4f4f5" },
-    { icon: <GitPullRequest className="w-4 h-4" />, value: mergedPRs.toString(), label: "PR", color: "#c084fc" },
-    { icon: <CircleDot className="w-4 h-4" />, value: `${closedIssues}/${openIssues + closedIssues}`, label: "Issue", color: "#fbbf24" },
+  const metrics = [
+    { icon: GitCommitHorizontal, k: "commit", v: fmtInt(p.totalCommits, l) },
+    { icon: GitPullRequest, k: l === "en" ? "PRs merged" : "birleşen PR", v: fmtInt(p.mergedPRs, l) },
+    { icon: CircleDot, k: l === "en" ? "issues closed" : "kapanan issue", v: `${p.closedIssues}/${issues}` },
   ];
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 flex-1">
-        {items.map((item) => (
-          <div key={item.label} className="rounded-xl bg-zinc-800/40 flex flex-col items-center justify-center text-center gap-1 p-2">
-            <div style={{ color: item.color }}>{item.icon}</div>
-            <div className="text-base font-bold tabular-nums" style={{ color: item.color }}>
-              {item.value}
-            </div>
-            <div className="text-[9px] text-zinc-600">{item.label}</div>
+    <Panel title={title} icon={FileDiff} meta={l === "en" ? `${fmtCompact(churn, l)} lines touched` : `${fmtCompact(churn, l)} satır değişti`}>
+      {shape === "glance" && (
+        <div className="flex h-full flex-col">
+          <div className="figure text-[26px] @min-[200px]:text-[30px]" style={{ color: net >= 0 ? "var(--ink-1)" : "var(--hue-orange)" }}>
+            {net >= 0 ? "+" : "−"}
+            {fmtCompact(Math.abs(net), l)}
           </div>
-        ))}
-      </div>
+          <div className="mt-1.5 text-[11.5px] text-ink-3">{l === "en" ? "net lines" : "net satır"}</div>
+          <div className="mt-auto">{diff}</div>
+        </div>
+      )}
 
-      {(linesAdded + linesDeleted) > 0 && (
-        <div className="mt-3 shrink-0">
-          <div className="flex justify-between text-[10px] text-zinc-600 mb-1">
-            <span>{lang === "en" ? "Additions / Deletions" : "Ekleme / Silme"}</span>
-            <span>{lang === "en" ? `${Math.round(addPct)}%` : `%${Math.round(addPct)}`}</span>
+      {shape === "strip" && (
+        <div className="flex h-full items-center gap-6 overflow-hidden">
+          <div className="shrink-0">
+            <div className="flex items-baseline gap-3 font-mono num">
+              <span className="figure text-[28px] !text-good">+{fmtCompact(p.linesAdded, l)}</span>
+              <span className="figure text-[28px] !text-bad">−{fmtCompact(p.linesDeleted, l)}</span>
+            </div>
+            <div className="mt-2 flex items-center gap-2 text-[12px] text-ink-3">
+              <DiffSquares add={p.linesAdded} del={p.linesDeleted} />
+              {l === "en" ? "net" : "net"} <span className="font-mono text-ink num">{net >= 0 ? "+" : "−"}{fmtCompact(Math.abs(net), l)}</span>
+            </div>
           </div>
-          <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-red-900/30">
-            <div className="h-full rounded-full" style={{ width: `${addPct}%`, backgroundColor: theme.accent }} />
+          <div className="ml-auto grid gap-x-6 gap-y-2 grid-cols-1 @min-[480px]:grid-cols-3">
+            {metrics.map((m, i) => {
+              const I = m.icon;
+              return (
+                <div key={m.k} className={cn("min-w-0", i > 0 && "hidden @min-[480px]:block")}>
+                  <div className="flex items-center gap-1.5 text-[11.5px] text-ink-3"><I size={12} />{m.k}</div>
+                  <div className="font-mono text-[18px] font-semibold text-ink num">{m.v}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
-    </div>
+
+      {(shape === "column" || shape === "block") && (
+        <div className="flex h-full flex-col gap-3">
+          <div>
+            <div className="flex flex-wrap items-baseline gap-x-3 font-mono num">
+              <span className="figure text-[30px] !text-good">+{fmtCompact(p.linesAdded, l)}</span>
+              <span className="figure text-[30px] !text-bad">−{fmtCompact(p.linesDeleted, l)}</span>
+            </div>
+            <div className="mt-2 flex items-center gap-2"><DiffSquares add={p.linesAdded} del={p.linesDeleted} n={shape === "block" ? 10 : 7} size={10} /></div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <KV k={l === "en" ? "Net lines" : "Net satır"} v={`${net >= 0 ? "+" : "−"}${fmtInt(Math.abs(net), l)}`} />
+            <KV k={l === "en" ? "Deleted per added" : "Eklenen başına silinen"} v={p.linesAdded ? (p.linesDeleted / p.linesAdded).toFixed(2) : "–"} />
+            {metrics.map((m) => (
+              <KV key={m.k} k={m.k.charAt(0).toLocaleUpperCase(l) + m.k.slice(1)} v={m.v} />
+            ))}
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 
 export type PushState = "unsupported" | "loading" | "denied" | "granted" | "unsubscribed";
 
@@ -19,22 +19,24 @@ async function getSWRegistration(): Promise<ServiceWorkerRegistration> {
   return navigator.serviceWorker.register("/sw.js");
 }
 
+const noop = () => () => {};
+
+/** What the browser allows before any async work: "ok" means ask the SW. */
+function capability(): "unsupported" | "denied" | "ok" {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  return "ok";
+}
+
 export function usePushNotifications() {
-  const [state, setState] = useState<PushState>("loading");
+  const cap = useSyncExternalStore(noop, capability, () => "pending" as const);
+  const [asyncState, setState] = useState<PushState>("loading");
+  const state: PushState = cap === "unsupported" ? "unsupported" : cap === "denied" && asyncState === "loading" ? "denied" : asyncState;
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      setState("unsupported");
-      return;
-    }
-    if (Notification.permission === "denied") {
-      setState("denied");
-      return;
-    }
-
+    if (cap !== "ok") return;
     getSWRegistration()
       .then((reg) => reg.pushManager.getSubscription())
       .then((sub) => {
@@ -42,7 +44,7 @@ export function usePushNotifications() {
         else setState("unsubscribed");
       })
       .catch(() => setState("unsubscribed"));
-  }, []);
+  }, [cap]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
     setError(null);

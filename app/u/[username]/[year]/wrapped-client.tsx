@@ -1,28 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import Image from "next/image";
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
 import Link from "next/link";
-import {
-  Share2,
-  Download,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Play,
-  Pause,
-  RotateCcw,
-  Sparkles,
-  Flame,
-  Copy,
-  Calendar,
-  Clock,
-  Layers,
-  FileText,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Pause, Download, Link2, Check, X, Rows3, Clapperboard, ChevronsUpDown } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
+import { useUIPrefs } from "@/components/ui-prefs";
+import { Kbd, Portal } from "@/components/ui/primitives";
+import { DiffSquares } from "@/app/dashboard/code-stats";
+import { langColor } from "@/lib/ui/lang-colors";
+import { useOrigin, useMediaQuery } from "@/lib/ui/hooks";
+import { MONTHS_LONG, MONTHS_SHORT, fmtCompact, fmtInt, fmtDay, cn, type Lang } from "@/lib/ui/format";
 
 type LangEntry = { lang: string; bytes: number; pct: number; color: string };
 type BigCommit = { message: string; additions: number; deletions: number; date: string };
@@ -52,26 +39,8 @@ type WrappedData = {
   totalPRs: number;
   mergedPRs: number;
   totalStars: number;
-  archetype: {
-    title: string;
-    tagline: string;
-    badge: string;
-    desc: string;
-    color: string;
-    en?: {
-      title: string;
-      tagline: string;
-      badge: string;
-      desc: string;
-    };
-  };
-  identity: {
-    label: string;
-    emoji: string;
-    en?: {
-      label: string;
-    };
-  };
+  archetype: { title: string; tagline: string; badge: string; desc: string; color: string; en?: { title: string; tagline: string; badge: string; desc: string } };
+  identity: { label: string; emoji: string; en?: { label: string } };
   monthlyData: MonthPoint[];
   accentColor: string;
   accentBg: string;
@@ -83,1496 +52,530 @@ type WrappedData = {
   issuesClosed: number;
 };
 
-// Sayı sayma animasyonu hook (React 19 uyumlu)
-function useCountUp(target: number, active: boolean, duration = 1100) {
-  const [value, setValue] = useState(0);
+const TOTAL = 10;
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CURRENT_YEAR - 2022 + 1 }, (_, i) => CURRENT_YEAR - i);
+
+/* Count-up that respects reduced motion and only runs on the visible slide. */
+function useCountUp(target: number, active: boolean, duration = 1000) {
+  const reduce = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const [v, setV] = useState(0);
   useEffect(() => {
-    if (!active) return;
+    if (!active || reduce) return;
     const start = performance.now();
-    let frameId: number;
+    let id = 0;
     const tick = (now: number) => {
       const t = Math.min((now - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(target * ease));
-      if (t < 1) frameId = requestAnimationFrame(tick);
+      setV(Math.round(target * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) id = requestAnimationFrame(tick);
     };
-    frameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameId);
-  }, [target, active, duration]);
-
-  return active ? value : 0;
+    id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [target, active, duration, reduce]);
+  return reduce || !active ? target : v;
 }
 
-function CountUp({
-  value,
-  active,
-  suffix = "",
-  prefix = "",
-}: {
-  value: number;
-  active: boolean;
-  suffix?: string;
-  prefix?: string;
-}) {
-  const v = useCountUp(value, active);
-  return (
-    <>
-      {prefix}
-      {v.toLocaleString("tr-TR")}
-      {suffix}
-    </>
-  );
+function Count({ value, active, l }: { value: number; active: boolean; l: Lang }) {
+  return <>{fmtInt(useCountUp(value, active), l)}</>;
 }
 
-const MONTH_SHORT_TR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-const MONTH_SHORT_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const MONTH_NAMES_TR = [
-  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
-];
-const MONTH_NAMES_EN = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-const DAY_NAMES_TR = [
-  "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"
-];
-const DAY_NAMES_EN = [
-  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
-];
-
-// 12 Aylık dalga formu grafik
-function MonthWaveform({
-  data,
-  accentColor,
-  lang = "tr",
-}: {
-  data: MonthPoint[];
-  accentColor: string;
-  lang?: "tr" | "en";
-}) {
-  const max = Math.max(...data.map((d) => d.commits), 1);
-  const peak = data.reduce(
-    (maxObj, curr, idx) =>
-      curr.commits > maxObj.commits ? { commits: curr.commits, idx } : maxObj,
-    { commits: -1, idx: 0 }
-  ).idx;
-
+/** Slide frame: a small kicker in mono, then the slide's one big idea. */
+function Frame({ n, kicker, children, foot }: { n: number; kicker: string; children: ReactNode; foot?: ReactNode }) {
   return (
-    <div className="flex h-24 w-full items-end gap-1.5 sm:gap-2">
-      {data.map((d, i) => {
-        const h = Math.max((d.commits / max) * 100, d.commits > 0 ? 8 : 4);
-        const isPeak = i === peak;
-        const monthLabel = lang === "en" ? (MONTH_SHORT_EN[i] || d.month) : (MONTH_SHORT_TR[i] || d.month);
-        return (
-          <div key={d.month} className="flex flex-1 flex-col items-center gap-1.5 group">
-            <div
-              className={`w-full rounded-t-md transition-all duration-700 ${
-                isPeak
-                  ? "shadow-[0_0_16px_var(--accent)] ring-1 ring-[var(--accent)]"
-                  : "opacity-40 hover:opacity-80"
-              }`}
-              style={{
-                height: `${h}%`,
-                backgroundColor: isPeak ? accentColor : "#52525b",
-              }}
-            />
-            <span
-              className="text-[10px] font-mono leading-none tracking-tight"
-              style={{
-                color: isPeak ? accentColor : "#71717a",
-                fontWeight: isPeak ? 700 : 400,
-              }}
-            >
-              {monthLabel}
-            </span>
-          </div>
-        );
-      })}
+    <div className="relative flex h-full w-full flex-col justify-between gap-6 p-6 sm:p-10 lg:p-14">
+      <div className="flex items-center justify-between font-mono text-[12px] text-ink-3">
+        <span>{kicker}</span>
+        <span className="num">
+          {String(n + 1).padStart(2, "0")}/{TOTAL}
+        </span>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col justify-center">{children}</div>
+      {foot && <div className="text-[13px] text-ink-3">{foot}</div>}
     </div>
   );
 }
 
-// Geniş katkı matrisi (Heatmap)
-function FullHeatmap({
-  dates,
-  maxCount,
-  accentColor,
-  year,
-}: {
-  dates: Record<string, number>;
-  maxCount: number;
-  accentColor: string;
-  year: number;
-}) {
-  const WEEKS = 53;
-  const yearStart = new Date(`${year}-01-01`);
-  const startOffset = (yearStart.getDay() + 6) % 7;
-
-  const cells: { week: number; day: number; count: number }[] = [];
-  for (let w = 0; w < WEEKS; w++) {
-    for (let d = 0; d < 7; d++) {
-      const dayIndex = w * 7 + d - startOffset;
-      if (dayIndex < 0) continue;
-      const date = new Date(yearStart);
-      date.setDate(date.getDate() + dayIndex);
-      if (date.getFullYear() !== year) continue;
-      const dateStr = date.toISOString().slice(0, 10);
-      cells.push({ week: w, day: d, count: dates[dateStr] ?? 0 });
-    }
-  }
-
-  const CELL = 9;
-  const GAP = 2;
-  const W = WEEKS * (CELL + GAP);
-  const H = 7 * (CELL + GAP);
-
-  function alpha(hex: string, a: number) {
-    const r = parseInt(hex.slice(1, 3) || "34", 16);
-    const g = parseInt(hex.slice(3, 5) || "d3", 16);
-    const b = parseInt(hex.slice(5, 7) || "99", 16);
-    return `rgba(${r},${g},${b},${a})`;
-  }
-
+function Months({ data, peak, l, big }: { data: MonthPoint[]; peak: number; l: Lang; big?: boolean }) {
+  const max = Math.max(...data.map((m) => m.commits), 1);
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block overflow-visible">
-      {cells.map(({ week, day, count }) => (
-        <rect
-          key={`${week}-${day}`}
-          x={week * (CELL + GAP)}
-          y={day * (CELL + GAP)}
-          width={CELL}
-          height={CELL}
-          rx={2}
-          fill={
-            count === 0
-              ? "#18181b"
-              : count / maxCount < 0.25
-              ? alpha(accentColor, 0.25)
-              : count / maxCount < 0.5
-              ? alpha(accentColor, 0.5)
-              : count / maxCount < 0.75
-              ? alpha(accentColor, 0.75)
-              : accentColor
-          }
-        />
+    <div className={cn("grid grid-cols-12 items-end gap-1.5 sm:gap-2.5", big ? "h-56 sm:h-72" : "h-28")}>
+      {data.map((m, i) => (
+        <div key={i} className="flex h-full flex-col items-center justify-end gap-1.5">
+          {big && <span className={cn("font-mono text-[11px] num", i === peak ? "text-accent" : "text-ink-4")}>{m.commits || ""}</span>}
+          <span
+            className="w-full rounded-[3px] transition-[height] duration-700"
+            style={{ height: `${m.commits ? Math.max(3, (m.commits / max) * 100) : 1.5}%`, background: i === peak ? "var(--accent)" : "var(--heat-2)" }}
+          />
+          <span className={cn("font-mono text-[10px] sm:text-[11px]", i === peak ? "text-accent" : "text-ink-4")}>{MONTHS_SHORT[l][i].slice(0, big ? 3 : 1)}</span>
+        </div>
       ))}
-    </svg>
+    </div>
   );
 }
 
-// Available years
-const CURRENT_YEAR = new Date().getFullYear();
-const AVAILABLE_YEARS = Array.from(
-  { length: CURRENT_YEAR - 2022 + 1 },
-  (_, i) => CURRENT_YEAR - i
-);
+function YearGrid({ year, dates, max }: { year: number; dates: Record<string, number>; max: number }) {
+  const weeks = useMemo(() => {
+    const start = new Date(year, 0, 1, 12);
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    const out: { date: string; v: number; inYear: boolean }[][] = [];
+    const cur = new Date(start);
+    while (cur.getFullYear() <= year) {
+      const wk: { date: string; v: number; inYear: boolean }[] = [];
+      for (let i = 0; i < 7; i++) {
+        const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+        wk.push({ date: key, v: dates[key] ?? 0, inYear: cur.getFullYear() === year });
+        cur.setDate(cur.getDate() + 1);
+      }
+      out.push(wk);
+      if (out.length > 54) break;
+    }
+    return out;
+  }, [year, dates]);
+  const lvl = (v: number) => (v <= 0 ? 0 : v / max < 0.25 ? 1 : v / max < 0.5 ? 2 : v / max < 0.75 ? 3 : 4);
+  return (
+    <div className="grid w-full gap-[2px] sm:gap-[3px]" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0,1fr))` }}>
+      {weeks.map((wk, i) => (
+        <div key={i} className="grid grid-rows-7 gap-[2px] sm:gap-[3px]">
+          {wk.map((d) => (
+            <span key={d.date} title={`${d.date} · ${d.v}`} className="aspect-square rounded-[2px]" style={{ background: d.inYear ? `var(--heat-${lvl(d.v)})` : "transparent" }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
-export default function WrappedClient({
-  data,
-}: {
-  data: WrappedData;
-  isOwner?: boolean;
-}) {
-  const { lang, t } = useLanguage();
+export default function WrappedClient({ data }: { data: WrappedData; isOwner?: boolean }) {
+  const { lang } = useLanguage();
+  const l = lang as Lang;
+  const T = (tr: string, en: string) => (l === "en" ? en : tr);
+  const { prefs } = useUIPrefs();
+  const origin = useOrigin();
+  const wide = useMediaQuery("(min-width: 640px)", true);
   const [slide, setSlide] = useState(0);
   const [mode, setMode] = useState<"story" | "poster">("story");
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [sharing, setSharing] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [share, setShare] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const confettiDone = useRef(false);
 
-  const confettiFired = useRef(false);
-  const autoPlayTimer = useRef<NodeJS.Timeout | null>(null);
+  const arch = l === "en" && data.archetype.en ? data.archetype.en : data.archetype;
+  const peakMonthIdx = data.peakMonthIdx ?? data.monthlyData.reduce((a, m, i, arr) => (m.commits > arr[a].commits ? i : a), 0);
+  const peakDayIdx = data.peakDayIdx ?? 0;
+  const perDay = data.activeDays ? data.totalCommits / data.activeDays : 0;
+  const url = `${origin}/u/${data.username}/${data.year}`;
 
-  const ac = data.accentColor;
-  const TOTAL_SLIDES = 10;
+  const go = useCallback((d: number) => setSlide((s) => Math.max(0, Math.min(TOTAL - 1, s + d))), []);
 
-  const archetypeTitle = (lang === "en" && data.archetype.en?.title) ? data.archetype.en.title : data.archetype.title;
-  const archetypeTagline = (lang === "en" && data.archetype.en?.tagline) ? data.archetype.en.tagline : data.archetype.tagline;
-  const archetypeBadge = (lang === "en" && data.archetype.en?.badge) ? data.archetype.en.badge : data.archetype.badge;
-  const archetypeDesc = (lang === "en" && data.archetype.en?.desc) ? data.archetype.en.desc : data.archetype.desc;
-
-  const peakMonthDisplay = (data.peakMonthIdx !== undefined && lang === "en")
-    ? MONTH_NAMES_EN[data.peakMonthIdx]
-    : data.peakMonth;
-
-  const peakDayDisplay = (data.peakDayIdx !== undefined && lang === "en")
-    ? DAY_NAMES_EN[data.peakDayIdx]
-    : data.peakDay;
-
-  const shareUrl =
-    typeof window !== "undefined"
-      ? window.location.href
-      : `https://devboard.app/u/${data.username}/${data.year}`;
-
-  const tweetText =
-    lang === "tr"
-      ? `🚀 ${data.displayName} (@${data.username}) — ${data.year} Devboard Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("tr-TR")} commit\n🔥 ${data.longestStreak} gün kesintisiz seri\n🏆 Rolüm: ${archetypeTitle}\n\nDetaylı yıllık geliştirici özetim:`
-      : `🚀 ${data.displayName} (@${data.username}) — ${data.year} Devboard Wrapped!\n\n💻 ${data.totalCommits.toLocaleString("en-US")} commits\n🔥 ${data.longestStreak}-day unbroken streak\n🏆 Archetype: ${archetypeTitle}\n\nDetailed annual developer summary:`;
-
-  // Confetti trigger
-  const fireConfetti = useCallback(() => {
-    import("canvas-confetti").then(({ default: confetti }) => {
-      confetti({
-        particleCount: 120,
-        spread: 80,
-        origin: { y: 0.5 },
-        colors: [ac, "#38bdf8", "#f43f5e", "#ffffff"],
-      });
-      setTimeout(() => {
-        confetti({
-          particleCount: 60,
-          angle: 60,
-          spread: 60,
-          origin: { x: 0.1, y: 0.65 },
-          colors: [ac, "#f59e0b", "#ffffff"],
-        });
-        confetti({
-          particleCount: 60,
-          angle: 120,
-          spread: 60,
-          origin: { x: 0.9, y: 0.65 },
-          colors: [ac, "#a855f7", "#ffffff"],
-        });
-      }, 250);
-    });
-  }, [ac]);
-
-  // Son slaytta veya poster modunda konfeti
   useEffect(() => {
-    if ((slide === TOTAL_SLIDES - 1 || mode === "poster") && !confettiFired.current) {
-      confettiFired.current = true;
-      fireConfetti();
-    }
-    if (slide !== TOTAL_SLIDES - 1 && mode !== "poster") {
-      confettiFired.current = false;
-    }
-  }, [slide, mode, fireConfetti, TOTAL_SLIDES]);
-
-  // Otomatik Oynatma
-  useEffect(() => {
-    if (isPlaying && mode === "story") {
-      autoPlayTimer.current = setInterval(() => {
-        setSlide((s) => {
-          if (s >= TOTAL_SLIDES - 1) {
-            setIsPlaying(false);
-            return s;
-          }
-          return s + 1;
-        });
-      }, 5500);
-    } else {
-      if (autoPlayTimer.current) clearInterval(autoPlayTimer.current);
-    }
-    return () => {
-      if (autoPlayTimer.current) clearInterval(autoPlayTimer.current);
-    };
-  }, [isPlaying, mode, TOTAL_SLIDES]);
-
-  // Klavye gezintisi
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (shareModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (share || mode !== "story") return;
+      const t = e.target as HTMLElement;
+      if (["INPUT", "TEXTAREA"].includes(t.tagName)) return;
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
-        setSlide((s) => Math.min(TOTAL_SLIDES - 1, s + 1));
+        go(1);
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
-        setSlide((s) => Math.max(0, s - 1));
-      } else if (e.key === "Escape") {
-        setShareModalOpen(false);
-        setYearOpen(false);
+        go(-1);
       }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go, share, mode]);
+
+  useEffect(() => {
+    if (!playing || mode !== "story") return;
+    const t = setInterval(() => setSlide((s) => (s >= TOTAL - 1 ? s : s + 1)), 5200);
+    return () => clearInterval(t);
+  }, [playing, mode]);
+
+  // One burst of confetti on the finale, tinted with the live accent.
+  useEffect(() => {
+    if (slide !== TOTAL - 1 || confettiDone.current) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || prefs.motion === "reduced") return;
+    confettiDone.current = true;
+    const accent = stageRef.current ? getComputedStyle(stageRef.current).getPropertyValue("--accent").trim() : "";
+    import("canvas-confetti").then(({ default: confetti }) => {
+      confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: [accent || "#5fd396", "#ffffff"], disableForReducedMotion: true });
+    });
+  }, [slide, prefs.motion]);
+
+  const touchX = useRef<number | null>(null);
+
+  async function savePng(i = slide) {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/wrapped-slide/${data.username}/${data.year}/${i}`);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${data.username}-${data.year}-wrapped-${i + 1}.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setSaving(false);
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [shareModalOpen, TOTAL_SLIDES]);
-
-  // Dokunmatik Swipe
-  const touchStartX = useRef<number | null>(null);
-  function onTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX;
-  }
-  function onTouchEnd(e: React.TouchEvent) {
-    if (touchStartX.current === null) return;
-    const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-    if (deltaX > 40) {
-      setSlide((s) => Math.min(TOTAL_SLIDES - 1, s + 1));
-    } else if (deltaX < -40) {
-      setSlide((s) => Math.max(0, s - 1));
-    }
-    touchStartX.current = null;
   }
 
-  // Link Kopyalama
-  function handleCopy() {
-    navigator.clipboard.writeText(shareUrl).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2200);
-  }
-
-  // PNG İndirme
-  const downloadSlidePng = useCallback(
-    async (targetSlide = slide) => {
-      setSharing(true);
-      try {
-        const url = `/api/wrapped-slide/${data.username}/${data.year}/${targetSlide}`;
-        const res = await fetch(url);
-        const blob = await res.blob();
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `${data.username}-${data.year}-wrapped-slide-${targetSlide + 1}.png`;
-        link.click();
-        URL.revokeObjectURL(link.href);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setSharing(false);
-      }
+  const slides: { kicker: string; body: (active: boolean) => ReactNode; foot?: ReactNode }[] = [
+    {
+      kicker: `devboard wrapped --year ${data.year}`,
+      body: () => (
+        <div>
+          <p className="font-mono text-[13px] text-ink-3 sm:text-[15px]">
+            <span className="text-accent">❯</span> git log --author={data.username} --since={data.year}-01-01
+          </p>
+          <h1 className="mt-6 font-mono text-[clamp(88px,22vw,280px)] font-[800] leading-[0.82] tracking-[-0.06em] text-ink num">{data.year}</h1>
+          <p className="mt-6 max-w-[34ch] text-[20px] font-semibold leading-snug text-ink sm:text-[26px]">
+            {T(`${data.displayName} için bir yıl, commit commit.`, `${data.displayName}'s year, one commit at a time.`)}
+          </p>
+        </div>
+      ),
+      foot: <span className="inline-flex items-center gap-2">{T("İlerlemek için", "Press")} <Kbd>→</Kbd> {T("ya da kaydır", "or swipe to continue")}</span>,
     },
-    [data.username, data.year, slide]
+    {
+      kicker: T("toplam commit", "total commits"),
+      body: (a) => (
+        <div>
+          <div className="text-[clamp(96px,24vw,300px)] font-[800] leading-[0.85] tracking-[-0.05em] text-accent num">
+            <Count value={data.totalCommits} active={a} l={l} />
+          </div>
+          <p className="mt-6 text-[20px] font-semibold text-ink sm:text-[26px]">{T(`commit, ${data.activeDays} farklı günde.`, `commits, across ${data.activeDays} different days.`)}</p>
+        </div>
+      ),
+      foot: T(`Aktif bir günde ortalama ${perDay.toFixed(1)} commit.`, `About ${perDay.toFixed(1)} commits on an active day.`),
+    },
+    {
+      kicker: "git diff --shortstat",
+      body: (a) => (
+        <div>
+          <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 font-mono font-[800] leading-[0.9] tracking-[-0.05em] num">
+            <span className="text-[clamp(56px,13vw,170px)] text-good">+<Count value={data.totalLinesAdded} active={a} l={l} /></span>
+            <span className="text-[clamp(40px,9vw,120px)] text-bad">−<Count value={data.totalLinesDeleted} active={a} l={l} /></span>
+          </div>
+          <div className="mt-8">
+            <DiffSquares add={data.totalLinesAdded} del={data.totalLinesDeleted} n={20} size={wide ? 18 : 12} />
+          </div>
+          <p className="mt-6 text-[18px] text-ink-2 sm:text-[22px]">
+            {T(`Net ${data.totalLinesAdded >= data.totalLinesDeleted ? "+" : "−"}${fmtInt(Math.abs(data.totalLinesAdded - data.totalLinesDeleted), l)} satır.`, `Net ${data.totalLinesAdded >= data.totalLinesDeleted ? "+" : "−"}${fmtInt(Math.abs(data.totalLinesAdded - data.totalLinesDeleted), l)} lines.`)}
+          </p>
+        </div>
+      ),
+    },
+    {
+      kicker: T("en yoğun ay", "busiest month"),
+      body: () => (
+        <div>
+          <h2 className="text-[clamp(56px,11vw,140px)] font-[800] leading-[0.9] tracking-[-0.04em] text-ink">{MONTHS_LONG[l][peakMonthIdx]}</h2>
+          <p className="mt-3 text-[18px] text-ink-2 sm:text-[22px]">{T(`${fmtInt(data.peakMonthCommits, l)} commit ile yılın zirvesi.`, `The peak of the year with ${fmtInt(data.peakMonthCommits, l)} commits.`)}</p>
+          <div className="mt-10">
+            <Months data={data.monthlyData} peak={peakMonthIdx} l={l} big />
+          </div>
+        </div>
+      ),
+    },
+    {
+      kicker: T("çalışma kimliğin", "how you work"),
+      body: () => (
+        <div>
+          <div className="font-mono text-[13px] text-accent">{arch.badge}</div>
+          <h2 className="mt-3 max-w-[16ch] text-[clamp(48px,9vw,120px)] font-[800] leading-[0.92] tracking-[-0.04em] text-ink">{arch.title}</h2>
+          <p className="mt-5 max-w-[48ch] text-[18px] leading-relaxed text-ink-2 sm:text-[21px]">{arch.tagline}</p>
+          <dl className="mt-10 grid max-w-xl grid-cols-2 gap-6 sm:grid-cols-3">
+            <div>
+              <dt className="text-[13px] text-ink-3">{T("en yoğun gün", "busiest day")}</dt>
+              <dd className="mt-1 text-[24px] font-bold text-ink">{l === "en" ? ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][peakDayIdx] ?? data.peakDay : data.peakDay}</dd>
+            </div>
+            <div>
+              <dt className="text-[13px] text-ink-3">{T("en yoğun saat", "busiest hour")}</dt>
+              <dd className="mt-1 font-mono text-[24px] font-bold text-ink num">{String(data.peakHour).padStart(2, "0")}:00</dd>
+            </div>
+            <div>
+              <dt className="text-[13px] text-ink-3">{T("en uzun seri", "longest streak")}</dt>
+              <dd className="mt-1 text-[24px] font-bold text-ink">
+                {data.longestStreak} <span className="text-[15px] font-normal text-ink-3">{T("gün", "days")}</span>
+              </dd>
+            </div>
+          </dl>
+        </div>
+      ),
+    },
+    {
+      kicker: T("dillerin", "your languages"),
+      body: () => (
+        <div>
+          {data.topLangs[0] ? (
+            <>
+              <div className="font-mono text-[14px] text-ink-3">#1</div>
+              <h2 className="text-[clamp(64px,14vw,180px)] font-[800] leading-[0.88] tracking-[-0.05em]" style={{ color: langColor(data.topLangs[0].lang) }}>
+                {data.topLangs[0].lang}
+              </h2>
+              <div className="mt-8 flex h-4 w-full max-w-3xl overflow-hidden rounded-full gap-[2px] bg-inset">
+                {data.topLangs.map((x) => (
+                  <span key={x.lang} style={{ width: `${x.pct}%`, background: langColor(x.lang) }} />
+                ))}
+              </div>
+              <ol className="mt-6 grid max-w-3xl gap-x-8 gap-y-2 sm:grid-cols-2">
+                {data.topLangs.map((x, i) => (
+                  <li key={x.lang} className="flex items-baseline gap-3 text-[17px]">
+                    <span className="w-6 font-mono text-[13px] text-ink-4">{i + 1}</span>
+                    <span className="text-ink">{x.lang}</span>
+                    <span className="ml-auto font-mono text-ink-3 num">{x.pct}%</span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          ) : (
+            <p className="text-[22px] text-ink-2">{T("Bu yıl dil verisi yok.", "No language data this year.")}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      kicker: T("repolar ve işbirliği", "repos and collaboration"),
+      body: (a) => (
+        <div className="grid max-w-4xl grid-cols-2 gap-x-10 gap-y-10 sm:grid-cols-4">
+          {[
+            [data.reposCreated, T("yeni repo", "new repos")],
+            [data.activeRepos, T("aktif repo", "active repos")],
+            [data.mergedPRs, T("birleşen PR", "merged PRs")],
+            [data.totalStars, T("yıldız", "stars")],
+          ].map(([v, k]) => (
+            <div key={k as string}>
+              <div className="text-[clamp(56px,9vw,112px)] font-[800] leading-none tracking-[-0.05em] text-ink num">
+                <Count value={v as number} active={a} l={l} />
+              </div>
+              <div className="mt-3 text-[16px] text-ink-3">{k}</div>
+            </div>
+          ))}
+          {data.topRepo && (
+            <div className="col-span-2 sm:col-span-4 border-t border-line pt-6 text-[18px] text-ink-2">
+              {T("En çok commit:", "Most commits:")} <span className="font-mono text-ink">{data.topRepo.name}</span> · <span className="font-mono num">{fmtInt(data.topRepo.commits, l)}</span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      kicker: "git show --stat HEAD~big",
+      body: () =>
+        data.biggestCommit ? (
+          <div className="max-w-4xl rounded-panel border border-line bg-surface p-5 font-mono sm:p-8">
+            <div className="text-[13px] text-ink-3">
+              commit · <span className="text-ink-2">{fmtDay(data.biggestCommit.date, l, { day: "numeric", month: "long", year: "numeric" })}</span>
+            </div>
+            <p className="mt-4 text-[clamp(22px,4vw,40px)] font-semibold leading-tight text-ink">{data.biggestCommit.message || T("(mesaj yok)", "(no message)")}</p>
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-[clamp(26px,5vw,52px)] font-[800] num">
+              <span className="text-good">+{fmtInt(data.biggestCommit.additions, l)}</span>
+              <span className="text-bad">−{fmtInt(data.biggestCommit.deletions, l)}</span>
+              <DiffSquares add={data.biggestCommit.additions} del={data.biggestCommit.deletions} n={10} size={14} />
+            </div>
+          </div>
+        ) : (
+          <p className="text-[22px] text-ink-2">{T("Bu yıl satır bilgisi olan commit yok.", "No commits with line stats this year.")}</p>
+        ),
+      foot: T("Tek seferde en çok değişen commit.", "The commit that changed the most at once."),
+    },
+    {
+      kicker: T(`${data.year} katkı haritası`, `${data.year} contributions`),
+      body: () => (
+        <div className="w-full">
+          <YearGrid year={data.year} dates={data.heatmapDates} max={data.maxDayCount} />
+          <div className="mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 text-[17px] text-ink-2">
+            <span>
+              <span className="font-mono text-[28px] font-bold text-ink num">{data.activeDays}</span> {T("aktif gün", "active days")}
+            </span>
+            <span>
+              <span className="font-mono text-[28px] font-bold text-ink num">{Math.round((data.activeDays / 365) * 100)}%</span> {T("yılın", "of the year")}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      kicker: T("özet", "summary"),
+      body: () => (
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
+          <div>
+            <div className="font-mono text-[14px] text-ink-3">@{data.username} · {data.year}</div>
+            <h2 className="mt-3 text-[clamp(48px,8vw,104px)] font-[800] leading-[0.9] tracking-[-0.04em] text-ink">{arch.title}</h2>
+            <div className="mt-8 flex flex-wrap gap-2">
+              <button type="button" className="btn btn-primary btn-lg" onClick={() => setShare(true)}>
+                <Link2 /> {T("Paylaş", "Share")}
+              </button>
+              <button type="button" className="btn btn-lg" onClick={() => savePng(TOTAL - 1)} disabled={saving}>
+                <Download /> PNG
+              </button>
+              <button type="button" className="btn btn-lg btn-ghost" onClick={() => setSlide(0)}>
+                {T("Baştan izle", "Watch again")}
+              </button>
+            </div>
+          </div>
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line">
+            {[
+              [fmtInt(data.totalCommits, l), "commit"],
+              [`${data.longestStreak} ${T("gün", "d")}`, T("en uzun seri", "longest streak")],
+              [`+${fmtCompact(data.totalLinesAdded, l)}`, T("eklenen satır", "lines added")],
+              [data.topLangs[0]?.lang ?? "–", T("ana dil", "top language")],
+              [MONTHS_SHORT[l][peakMonthIdx], T("zirve ayı", "peak month")],
+              [`${String(data.peakHour).padStart(2, "0")}:00`, T("zirve saati", "peak hour")],
+            ].map(([v, k]) => (
+              <div key={k} className="bg-surface p-4">
+                <dt className="text-[12px] text-ink-3">{k}</dt>
+                <dd className="mt-1 truncate font-mono text-[22px] font-bold text-ink num">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ),
+    },
+  ];
+
+  const controls = (
+    <div className="flex items-center gap-1">
+      <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setPlaying((p) => !p)} aria-label={playing ? T("Duraklat", "Pause") : T("Oynat", "Play")} disabled={mode !== "story"}>
+        {playing ? <Pause /> : <Play />}
+      </button>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMode((m) => (m === "story" ? "poster" : "story"))} aria-pressed={mode === "poster"}>
+        {mode === "story" ? <Rows3 /> : <Clapperboard />}
+        <span className="hidden sm:inline">{mode === "story" ? T("Tek sayfa", "One page") : T("Hikâye", "Story")}</span>
+      </button>
+      <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => savePng()} disabled={saving} aria-label={T("Bu slaytı PNG indir", "Download this slide as PNG")}>
+        <Download />
+      </button>
+      <button type="button" className="btn btn-sm" onClick={() => setShare(true)}>
+        <Link2 /> {T("Paylaş", "Share")}
+      </button>
+    </div>
   );
 
   return (
-    <div className="relative flex h-[calc(100dvh-64px)] max-h-[calc(100dvh-64px)] w-full select-none flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-100">
-      {/* ─── ATMOSFERİK ARKA PLAN IŞIKLARI (DİNAMİK SAHNE) ─── */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0 transition-all duration-1000"
-        style={{
-          background:
-            slide === 1
-              ? `radial-gradient(ellipse 900px 500px at 50% 30%, ${ac}25 0%, transparent 70%)`
-              : slide === 2
-              ? `radial-gradient(ellipse 900px 500px at 30% 35%, rgba(16,185,129,0.2) 0%, transparent 60%), radial-gradient(ellipse 900px 500px at 70% 35%, rgba(239,68,68,0.18) 0%, transparent 60%)`
-              : slide === 4
-              ? `radial-gradient(ellipse 900px 500px at 50% 30%, ${data.archetype.color}30 0%, transparent 70%)`
-              : `radial-gradient(ellipse 900px 500px at 50% 25%, ${data.accentBg.replace(
-                  "0.08",
-                  "0.22"
-                )} 0%, transparent 70%)`,
-        }}
-      />
-
-      {/* İnce teknolojik ızgara deseni */}
-      <div className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,#27272a08_1px,transparent_1px),linear-gradient(to_bottom,#27272a08_1px,transparent_1px)] bg-[size:32px_32px] opacity-40" />
-
-      {/* ─── 1. ÜST KONTROL & İLERLEME BARI (HEADER) ─── */}
-      <header className="relative z-20 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-zinc-800/40 px-4 sm:px-8 backdrop-blur-xl">
-        {/* Hikaye İlerleme Çubukları */}
-        {mode === "story" ? (
-          <div className="flex flex-1 items-center gap-1 sm:gap-1.5 min-w-0 max-w-xl">
-            {Array.from({ length: TOTAL_SLIDES }).map((_, i) => {
-              const isPassed = i < slide;
-              const isCurrent = i === slide;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setSlide(i)}
-                  title={lang === "tr" ? `Bölüm ${i + 1}` : `Chapter ${i + 1}`}
-                  className="group relative h-1.5 flex-1 rounded-full bg-zinc-800/80 overflow-hidden transition-all hover:h-2"
-                >
-                  <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      isPassed
-                        ? "w-full"
-                        : isCurrent
-                        ? isPlaying
-                          ? "w-full animate-[progress_5.5s_linear]"
-                          : "w-full"
-                        : "w-0"
-                    }`}
-                    style={{
-                      backgroundColor:
-                        isPassed || isCurrent ? ac : "transparent",
-                    }}
-                  />
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 font-mono text-xs text-zinc-400">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-bold tracking-wider text-zinc-200">
-              DEV POSTER {"//"} {data.year} EDITION
-            </span>
-          </div>
-        )}
-
-        {/* Sağ Kontrol Kümesi */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Görünüm Modu Değiştirici: Story vs Poster */}
-          <div className="flex items-center rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-0.5 backdrop-blur-md">
-            <button
-              type="button"
-              onClick={() => setMode("story")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
-                mode === "story"
-                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <Layers className="h-3.5 w-3.5 text-[var(--accent)]" />
-              <span>{t.wrapped.storyMode}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("poster")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
-                mode === "poster"
-                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <FileText className="h-3.5 w-3.5 text-amber-400" />
-              <span>{t.wrapped.posterMode}</span>
-            </button>
-          </div>
-
-          {/* Oynat / Duraklat (Sadece Story Modunda) */}
-          {mode === "story" && (
-            <button
-              type="button"
-              onClick={() => setIsPlaying((p) => !p)}
-              className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-100 cursor-pointer"
-              title={isPlaying ? t.wrapped.pause : t.wrapped.autoPlay}
-            >
-              {isPlaying ? (
-                <Pause className="h-3.5 w-3.5" />
-              ) : (
-                <Play className="h-3.5 w-3.5" />
-              )}
-            </button>
-          )}
-
-          {/* Yıl Seçici */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setYearOpen((v) => !v)}
-              className="flex h-8 items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/60 px-2.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
-            >
-              <span>{data.year}</span>
-              <ChevronDown
-                className={`h-3 w-3 text-zinc-500 transition-transform ${
-                  yearOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-            {yearOpen && (
-              <div className="absolute right-0 top-full mt-1.5 z-50 w-28 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/95 py-1 shadow-2xl backdrop-blur-xl ring-1 ring-white/5">
-                {AVAILABLE_YEARS.map((y) => (
-                  <Link
-                    key={y}
-                    href={`/u/${data.username}/${y}`}
-                    onClick={() => setYearOpen(false)}
-                    className="block px-3 py-1.5 text-xs transition-colors hover:bg-zinc-800"
-                    style={{
-                      color: y === data.year ? ac : "#a1a1aa",
-                      fontWeight: y === data.year ? 600 : 400,
-                    }}
-                  >
-                    {y} Wrapped
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Paylaş Butonu */}
-          <button
-            type="button"
-            onClick={() => setShareModalOpen(true)}
-            className="flex h-8 items-center gap-1.5 rounded-xl border border-zinc-700/80 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-200 shadow-sm transition-all hover:border-[var(--accent)]/50 hover:bg-zinc-800 hover:text-white cursor-pointer"
-          >
-            <Share2 className="h-3 w-3 text-[var(--accent)]" />
-            <span>{t.common.share}</span>
+    <div ref={stageRef} className="flex flex-col">
+      {/* Top bar: year switcher, progress, controls */}
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-2.5 sm:px-6 lg:px-8">
+        <div className="relative">
+          <button type="button" className="btn btn-sm font-mono" onClick={() => setYearOpen((v) => !v)} aria-expanded={yearOpen}>
+            wrapped/{data.year} <ChevronsUpDown className="!h-3 !w-3 text-ink-4" />
           </button>
+          {yearOpen && (
+            <div className="absolute left-0 top-full z-30 mt-1.5 w-40 surface-pop p-1 anim-pop">
+              {YEARS.map((y) => (
+                <Link key={y} href={`/u/${data.username}/${y}`} className={cn("flex h-8 items-center rounded-[var(--r-control)] px-2 font-mono text-[12.5px]", y === data.year ? "bg-raised text-ink" : "text-ink-2 hover:bg-raised")} onClick={() => setYearOpen(false)}>
+                  {y}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
-      </header>
-
-      {/* ─── 2. MERKEZ SAHNE: BÜTÜNSEL HİKAYE VEYA POSTER ─── */}
-      <main
-        className="relative z-10 flex flex-1 items-center justify-center overflow-hidden p-3 sm:p-6"
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        {mode === "story" ? (
-          /* ──────── BÜTÜNSEL GENİŞ SAHNE (KART KUTUSU OLMADAN) ──────── */
-          <div className="relative flex h-full max-h-[min(620px,calc(100dvh-160px))] w-full max-w-4xl flex-col justify-between overflow-hidden px-2 sm:px-8">
-            {/* Sahne Üst Metadata Şeridi */}
-            <div className="flex items-center justify-between border-b border-zinc-800/40 pb-2.5">
-              <div className="flex items-center gap-2.5">
-                <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-[var(--accent)]">
-                  {"//"} {t.wrapped.chapter} {slide + 1}:
-                </span>
-                <span className="text-xs font-semibold text-zinc-400">
-                  {t.wrapped.slideTitles[slide] || ""}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 font-mono text-[10px] text-zinc-400">
-                  {data.displayName} · @{data.username}
-                </span>
-              </div>
-            </div>
-
-            {/* Sahne Ana İçeriği (Geniş & Güçlü Tipografi) */}
-            <div className="my-auto flex flex-1 flex-col items-center justify-center py-2 text-center">
-              {/* SLAYT 0: GİRİŞ & KAPAK */}
-              {slide === 0 && (
-                <div className="space-y-5 animate-in fade-in zoom-in-95 duration-500 max-w-2xl">
-                  <div className="relative mx-auto flex h-28 w-28 items-center justify-center">
-                    <div
-                      className="absolute inset-0 rounded-full animate-ping opacity-25"
-                      style={{ backgroundColor: ac }}
-                    />
-                    <div
-                      className="absolute -inset-2 rounded-full border border-dashed border-[var(--accent)]/40 animate-[spin_20s_linear_infinite]"
-                    />
-                    {data.avatarUrl ? (
-                      <Image
-                        src={data.avatarUrl}
-                        alt={data.username}
-                        width={112}
-                        height={112}
-                        unoptimized
-                        className="relative rounded-full shadow-2xl ring-4 ring-zinc-900"
-                        style={{ outline: `3px solid ${ac}` }}
-                      />
-                    ) : (
-                      <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-zinc-800 text-4xl font-black text-zinc-100 ring-4 ring-zinc-900">
-                        {data.displayName[0]?.toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <span className="inline-block rounded-full border border-zinc-700/60 bg-zinc-900/80 px-4 py-1 text-xs font-mono font-medium text-zinc-400">
-                      DEVBOARD {"//"} ANNUAL DEVELOPER ARCHIVE
-                    </span>
-                    <h1 className="mt-3 text-5xl sm:text-7xl font-black tracking-tight text-white">
-                      {data.year} <span style={{ color: ac }}>WRAPPED</span>
-                    </h1>
-                    <p className="mt-3 text-sm sm:text-base text-zinc-300 max-w-lg mx-auto">
-                      {lang === "tr"
-                        ? "Bir yıl boyunca klavyenden dökülen her satır kod, çözdüğün her problem ve ulaştığın geliştirici zirveleri hazır."
-                        : "Every line of code poured from your keyboard, every problem solved, and every developer milestone reached this year is ready."}
-                    </p>
-                  </div>
-
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setSlide(1)}
-                      className="inline-flex items-center gap-2 rounded-2xl px-8 py-3.5 text-sm font-bold text-zinc-950 shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                      style={{ backgroundColor: ac }}
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      <span>{lang === "tr" ? "Hikayeyi Keşfet" : "Explore Your Story"}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* SLAYT 1: COMMIT GÜCÜ (DEVASA TİPOGRAFİ) */}
-              {slide === 1 && (
-                <div className="space-y-5 animate-in fade-in duration-500 max-w-3xl w-full">
-                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    {lang === "tr" ? "KOD TABANINA ATTIĞIN İMZA" : "YOUR MARK ON THE CODEBASE"}
-                  </span>
-
-                  <div>
-                    <p
-                      className="text-7xl sm:text-9xl font-black tracking-tight drop-shadow-[0_0_40px_rgba(52,211,153,0.25)]"
-                      style={{ color: ac }}
-                    >
-                      <CountUp value={data.totalCommits} active={slide === 1} />
-                    </p>
-                    <p className="mt-2 text-3xl sm:text-4xl font-extrabold text-white">
-                      {lang === "tr" ? "Commit ile Dünyayı Kodladın!" : "You Coded the World with Commits!"}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 px-5 py-3 text-left">
-                      <span className="block text-[11px] font-mono text-zinc-500">
-                        {lang === "tr" ? "AKTİF GÜN" : "ACTIVE DAYS"}
-                      </span>
-                      <strong className="text-xl font-bold text-zinc-100">
-                        {data.activeDays} {lang === "tr" ? "Gün" : "Days"}
-                      </strong>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 px-5 py-3 text-left">
-                      <span className="block text-[11px] font-mono text-zinc-500">
-                        {lang === "tr" ? "GÜNLÜK TEMPO" : "DAILY PACE"}
-                      </span>
-                      <strong className="text-xl font-bold text-zinc-100">
-                        {(data.totalCommits / Math.max(data.activeDays, 1)).toFixed(1)} {lang === "tr" ? "commit / gün" : "commits / day"}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <p className="text-xs sm:text-sm text-zinc-400 italic max-w-md mx-auto">
-                    {lang === "tr"
-                      ? "“Terminalin ve editörün bu yıl neredeyse hiç soğumadı; projelerin her commit ile bir adım daha ileri taşındı.”"
-                      : "“Your terminal and editor barely cooled down this year; your projects advanced with every single commit.”"}
-                  </p>
-                </div>
-              )}
-
-              {/* SLAYT 2: KOD HACMİ (İKİ KUTUPLU PARLAK DÜELLO) */}
-              {slide === 2 && (
-                <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl w-full">
-                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    {lang === "tr" ? "KOD MATRIXİ VE HACİM DENGESİ" : "CODE MATRIX & VOLUME BALANCE"}
-                  </span>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
-                    <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center backdrop-blur-md shadow-[0_0_30px_rgba(16,185,129,0.15)]">
-                      <span className="font-mono text-xs font-bold text-emerald-400">
-                        {lang === "tr" ? "+ DÜNYAYA EKLENEN KOD" : "+ CODE ADDED TO THE WORLD"}
-                      </span>
-                      <p className="mt-2 text-4xl sm:text-6xl font-black text-emerald-400">
-                        +<CountUp value={data.totalLinesAdded} active={slide === 2} />
-                      </p>
-                      <span className="mt-1 block text-xs text-zinc-400">
-                        {lang === "tr" ? "satır yeni kod üretildi" : "lines of new code written"}
-                      </span>
-                    </div>
-
-                    <div className="rounded-3xl border border-red-500/30 bg-red-500/10 p-6 text-center backdrop-blur-md shadow-[0_0_30px_rgba(239,68,68,0.15)]">
-                      <span className="font-mono text-xs font-bold text-red-400">
-                        {lang === "tr" ? "− REFACTOR EDİLEN KOD" : "− REFACTORED CODE"}
-                      </span>
-                      <p className="mt-2 text-4xl sm:text-6xl font-black text-red-400">
-                        −<CountUp value={data.totalLinesDeleted} active={slide === 2} />
-                      </p>
-                      <span className="mt-1 block text-xs text-zinc-400">
-                        {lang === "tr" ? "satır silindi ve temizlendi" : "lines deleted and cleaned"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 max-w-lg mx-auto">
-                    <p className="text-xs text-zinc-300">
-                      {lang === "tr" ? "Net Kod Katkın: " : "Net Code Contribution: "}
-                      <strong className="text-white font-mono text-sm">
-                        {(data.totalLinesAdded - data.totalLinesDeleted).toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
-                      </strong>{" "}
-                      {lang === "tr" ? "satır" : "lines"}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* SLAYT 3: ZİRVE AY & RİTİM */}
-              {slide === 3 && (
-                <div className="space-y-5 animate-in fade-in duration-500 max-w-3xl w-full">
-                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    {lang === "tr" ? "EN BÜYÜK ÜRETİM PATLAMASI" : "BIGGEST PRODUCTION BURST"}
-                  </span>
-
-                  <div>
-                    <p className="text-5xl sm:text-7xl font-black" style={{ color: ac }}>
-                      {peakMonthDisplay.toUpperCase()}
-                    </p>
-                    <p className="mt-2 text-sm text-zinc-300">
-                      {lang === "tr" ? (
-                        <>Bu ay tam <strong className="text-white font-bold">{data.peakMonthCommits} commit</strong> ile yılın zirvesini yaşadın.</>
-                      ) : (
-                        <>You hit your peak this year with <strong className="text-white font-bold">{data.peakMonthCommits} commits</strong> in this month.</>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/60 p-4 sm:p-6 backdrop-blur-xl">
-                    <MonthWaveform data={data.monthlyData} accentColor={ac} lang={lang} />
-                  </div>
-                </div>
-              )}
-
-              {/* SLAYT 4: GELİŞTİRİCİ ARKETİPİ (HOLOGRAFİK KİMLİK KARTI) */}
-              {slide === 4 && (
-                <div className="space-y-4 animate-in fade-in duration-500 max-w-2xl w-full">
-                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    {lang === "tr" ? "KODLAMA TARZIN VE DNA ROZETİN" : "CODING STYLE & DNA BADGE"}
-                  </span>
-
-                  <div
-                    className="relative overflow-hidden rounded-3xl border p-6 sm:p-8 shadow-2xl text-center backdrop-blur-2xl"
-                    style={{
-                      borderColor: `${data.archetype.color}60`,
-                      background: `linear-gradient(135deg, ${data.archetype.color}20 0%, rgba(24,24,27,0.85) 100%)`,
-                      boxShadow: `0 0 50px ${data.archetype.color}20`,
-                    }}
-                  >
-                    <span
-                      className="inline-block rounded-full px-4 py-1 font-mono text-xs font-bold tracking-wider shadow-inner"
-                      style={{
-                        backgroundColor: `${data.archetype.color}30`,
-                        color: data.archetype.color,
-                        border: `1px solid ${data.archetype.color}60`,
-                      }}
-                    >
-                      {archetypeBadge}
-                    </span>
-
-                    <h2
-                      className="mt-3 text-3xl sm:text-5xl font-black tracking-tight"
-                      style={{ color: data.archetype.color }}
-                    >
-                      {archetypeTitle}
-                    </h2>
-
-                    <p className="mt-2 text-sm font-semibold text-zinc-200">
-                      &ldquo;{archetypeTagline}&rdquo;
-                    </p>
-
-                    <p className="mt-3 text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-lg mx-auto">
-                      {archetypeDesc}
-                    </p>
-
-                    <div className="mt-5 grid grid-cols-2 gap-3 pt-3 border-t border-zinc-800/60">
-                      <div className="flex items-center justify-center gap-2 text-xs">
-                        <Calendar className="h-4 w-4 text-zinc-400" />
-                        <span className="text-zinc-400">{lang === "tr" ? "Zirve Gün:" : "Peak Day:"}</span>
-                        <strong className="text-white">{peakDayDisplay}</strong>
-                      </div>
-                      <div className="flex items-center justify-center gap-2 text-xs">
-                        <Clock className="h-4 w-4 text-zinc-400" />
-                        <span className="text-zinc-400">{lang === "tr" ? "Zirve Saat:" : "Peak Hour:"}</span>
-                        <strong className="text-white">
-                          {String(data.peakHour).padStart(2, "0")}:00
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SLAYT 5: TEKNOLOJİ CEPHANESİ & DİLLER */}
-              {slide === 5 && (
-                <div className="space-y-5 animate-in fade-in duration-500 max-w-2xl w-full">
-                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    {lang === "tr" ? "FAVORİ PROGRAMLAMA DİLLERİN" : "FAVORITE PROGRAMMING LANGUAGES"}
-                  </span>
-
-                  <div>
-                    <span className="text-xs font-mono text-zinc-400">
-                      {lang === "tr" ? "#1 NUMARALI SİLAHIN" : "#1 PRIMARY WEAPON"}
-                    </span>
-                    <p className="text-4xl sm:text-6xl font-black text-white mt-1">
-                      {data.topLangs[0]?.lang ?? "Code"}
-                    </p>
-                    <span className="font-mono text-sm text-[var(--accent)] font-bold">
-                      {lang === "tr"
-                        ? `%{data.topLangs[0]?.pct ?? 0} pay ile zirvede`
-                        : `leading with %${data.topLangs[0]?.pct ?? 0} share`}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3 text-left w-full max-w-lg mx-auto pt-2">
-                    {data.topLangs.map((l, i) => (
-                      <div key={l.lang} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs font-mono">
-                          <div className="flex items-center gap-2">
-                            <span className="text-zinc-500 font-bold">#{i + 1}</span>
-                            <span
-                              className="h-2.5 w-2.5 rounded-full"
-                              style={{ backgroundColor: l.color }}
-                            />
-                            <span className="text-zinc-200 font-semibold">{l.lang}</span>
-                          </div>
-                          <span className="text-zinc-400">%{l.pct}</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-zinc-800/80 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-700"
-                            style={{
-                              width: `${l.pct}%`,
-                              backgroundColor: l.color,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* SLAYT 6: PROJELER & EVREN */}
-              {slide === 6 && (
-                <div className="space-y-5 animate-in fade-in duration-500 max-w-3xl w-full">
-                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    {lang === "tr" ? "REPO & PROJE EVRENİ" : "REPO & PROJECT UNIVERSE"}
-                  </span>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                      <span className="block text-[10px] font-mono text-zinc-500">
-                        {lang === "tr" ? "YENİ REPO" : "NEW REPOS"}
-                      </span>
-                      <strong className="text-3xl font-black" style={{ color: ac }}>
-                        <CountUp value={data.reposCreated} active={slide === 6} />
-                      </strong>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                      <span className="block text-[10px] font-mono text-zinc-500">
-                        {lang === "tr" ? "AKTİF REPO" : "ACTIVE REPOS"}
-                      </span>
-                      <strong className="text-3xl font-black text-white">
-                        <CountUp value={data.activeRepos} active={slide === 6} />
-                      </strong>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                      <span className="block text-[10px] font-mono text-zinc-500">
-                        {lang === "tr" ? "PULL REQUEST" : "PULL REQUESTS"}
-                      </span>
-                      <strong className="text-3xl font-black text-purple-400">
-                        <CountUp value={data.totalPRs} active={slide === 6} />
-                      </strong>
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                      <span className="block text-[10px] font-mono text-zinc-500">
-                        {lang === "tr" ? "YILDIZLAR" : "STARS"}
-                      </span>
-                      <strong className="text-3xl font-black text-amber-400">
-                        <CountUp value={data.totalStars} active={slide === 6} />
-                      </strong>
-                    </div>
-                  </div>
-
-                  {data.topRepo && (
-                    <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-5 text-left max-w-lg mx-auto flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold">
-                          {lang === "tr" ? "YILIN EN ÇOK GELİŞTİRİLEN REPOSU" : "MOST DEVELOPED REPO OF THE YEAR"}
-                        </span>
-                        <h4 className="text-base font-bold text-white mt-0.5">
-                          {data.topRepo.name}
-                        </h4>
-                        <span className="text-xs text-zinc-400">
-                          {data.topRepo.language} · {data.topRepo.stars} star
-                        </span>
-                      </div>
-                      <span className="rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-1 font-mono text-xs font-bold text-zinc-100">
-                        {data.topRepo.commits} {lang === "tr" ? "commit" : "commits"}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SLAYT 7: EFSANEVİ COMMİT */}
-              {slide === 7 && (
-                <div className="space-y-5 animate-in fade-in duration-500 max-w-2xl w-full">
-                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    {lang === "tr" ? "TEK SEFERDE EN BÜYÜK DEĞİŞİKLİK" : "LARGEST SINGLE CHANGE"}
-                  </span>
-
-                  {data.biggestCommit ? (
-                    <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 sm:p-8 text-left space-y-4 shadow-2xl">
-                      <span className="text-4xl text-[var(--accent)] font-serif leading-none">“</span>
-                      <p className="text-lg sm:text-2xl font-bold text-white leading-snug">
-                        {data.biggestCommit.message || (lang === "tr" ? "(mesajsız commit)" : "(commit with no message)")}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-4 text-xs font-mono pt-2 border-t border-zinc-800/60">
-                        <span className="font-bold text-emerald-400">
-                          +{data.biggestCommit.additions.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}{" "}
-                          {lang === "tr" ? "satır eklendi" : "lines added"}
-                        </span>
-                        <span className="font-bold text-red-400">
-                          −{data.biggestCommit.deletions.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}{" "}
-                          {lang === "tr" ? "satır silindi" : "lines deleted"}
-                        </span>
-                        <span className="text-zinc-500">{data.biggestCommit.date}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-zinc-500">
-                      {lang === "tr" ? "Commit verisi bulunamadı." : "No commit data found."}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* SLAYT 8: 365 GÜNLÜK MOZAİK (HEATMAP) */}
-              {slide === 8 && (
-                <div className="space-y-5 animate-in fade-in duration-500 max-w-3xl w-full">
-                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-zinc-500">
-                    {lang === "tr" ? "365 GÜNLÜK KONTRIBÜSYON MATRİKSİ" : "365-DAY CONTRIBUTION MATRIX"}
-                  </span>
-
-                  <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/80 p-4 sm:p-6 backdrop-blur-xl">
-                    <FullHeatmap
-                      dates={data.heatmapDates}
-                      maxCount={data.maxDayCount}
-                      accentColor={ac}
-                      year={data.year}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-center gap-6 text-xs sm:text-sm">
-                    <div className="flex items-center gap-2">
-                      <Flame className="h-5 w-5 text-amber-400" />
-                      <span>
-                        {lang === "tr" ? "En Uzun Seri: " : "Longest Streak: "}
-                        <strong className="text-white text-base">
-                          {data.longestStreak} {lang === "tr" ? "Gün" : "Days"}
-                        </strong>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                      <span>
-                        {lang === "tr" ? "Yıllık Aktiflik Oranı: " : "Annual Activity Rate: "}
-                        <strong className="text-white text-base">
-                          %{Math.round((data.activeDays / 365) * 100)}
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SLAYT 9: BÜYÜK FİNAL */}
-              {slide === 9 && (
-                <div className="space-y-5 animate-in fade-in zoom-in-95 duration-500 max-w-xl">
-                  <div>
-                    <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-mono font-bold text-emerald-400">
-                      🎉 {lang === "tr" ? `${data.year} RESMİ RAPORU TAMAMLANDI!` : `${data.year} OFFICIAL REPORT COMPLETE!`}
-                    </span>
-                    <h2 className="mt-3 text-4xl sm:text-5xl font-black text-white">
-                      {lang === "tr" ? `Harika bir yıldı, ${data.displayName}!` : `It was a fantastic year, ${data.displayName}!`}
-                    </h2>
-                    <p className="mt-2 text-sm text-zinc-300">
-                      {lang === "tr"
-                        ? "Topladığın tüm metrikler, yazdığın kodlar ve kurduğun sistemler seninle gurur duyuyor."
-                        : "Every metric you gathered, every line of code you wrote, and every system you built is proud of you."}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setMode("poster")}
-                      className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-xs sm:text-sm font-bold text-zinc-950 shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer"
-                      style={{ backgroundColor: ac }}
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span>{lang === "tr" ? "Posteri Görüntüle" : "View Poster"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setShareModalOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-800/80 px-5 py-3 text-xs sm:text-sm font-semibold text-zinc-100 transition-colors hover:bg-zinc-700 cursor-pointer"
-                    >
-                      <Share2 className="h-4 w-4 text-[var(--accent)]" />
-                      <span>{lang === "tr" ? "Sosyal Medyada Paylaş" : "Share on Social Media"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={fireConfetti}
-                      className="inline-flex items-center gap-1 rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-xs text-zinc-400 hover:text-white cursor-pointer"
-                      title={lang === "tr" ? "Konfeti patlat" : "Celebrate with confetti"}
-                    >
-                      🎊
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Sahne Alt Bilgisi */}
-            <div className="flex items-center justify-between border-t border-zinc-800/40 pt-2.5 text-[11px] font-mono text-zinc-500">
-              <span>DEVBOARD.APP {"//"} WRAPPED-{data.year}</span>
-              <button
-                type="button"
-                onClick={() => downloadSlidePng(slide)}
-                disabled={sharing}
-                className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                <Download className="h-3 w-3" />
-                <span className="hidden sm:inline">
-                  {lang === "tr" ? "Bu Slaytı İndir (PNG)" : "Download Slide (PNG)"}
-                </span>
+        {mode === "story" && (
+          <div className="order-last flex w-full gap-1 sm:order-none sm:w-auto sm:flex-1" role="tablist" aria-label={T("Slaytlar", "Slides")}>
+            {slides.map((s, i) => (
+              <button key={i} type="button" role="tab" aria-selected={i === slide} aria-label={`${i + 1}. ${s.kicker}`} onClick={() => setSlide(i)} className="group flex-1 py-2">
+                <span className="block h-[3px] rounded-full" style={{ background: i <= slide ? "var(--accent)" : "var(--bg-3)", opacity: i < slide ? 0.55 : 1 }} />
               </button>
-            </div>
+            ))}
           </div>
-        ) : (
-          /* ──────── KULLANICI İÇİN ÖZEL KOLEKSİYON GELİŞTİRİCİ POSTERİ (FESTIVAL/ART POSTER) ──────── */
-          <div className="flex h-full max-h-[min(620px,calc(100dvh-160px))] w-full max-w-2xl flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
-            {/* Poster Tuvali */}
-            <div
-              className="relative flex h-full w-full flex-col justify-between overflow-hidden rounded-3xl border border-zinc-800/90 bg-zinc-950 p-4 sm:p-6 shadow-[0_0_60px_rgba(0,0,0,0.8)] backdrop-blur-2xl ring-1 ring-white/10"
-              style={{
-                boxShadow: `0 0 50px ${ac}18`,
-              }}
-            >
-              {/* Poster Köşe Çapraz İşaretleri (+) */}
-              <span className="absolute top-2 left-2 text-[10px] font-mono text-zinc-700">+</span>
-              <span className="absolute top-2 right-2 text-[10px] font-mono text-zinc-700">+</span>
-              <span className="absolute bottom-2 left-2 text-[10px] font-mono text-zinc-700">+</span>
-              <span className="absolute bottom-2 right-2 text-[10px] font-mono text-zinc-700">+</span>
+        )}
+        <div className="ml-auto">{controls}</div>
+      </div>
 
-              {/* POSTER 1: ÜST MARKA VE BARKOD ALANI */}
-              <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-black tracking-widest text-zinc-100">
-                      DEVBOARD
-                    </span>
-                    <span className="rounded-md border border-zinc-700 bg-zinc-900 px-1.5 py-0.2 font-mono text-[9px] font-bold text-zinc-400">
-                      OFFICIAL ARCHIVE
-                    </span>
-                  </div>
-                  <span className="block font-mono text-[10px] text-zinc-500">
-                    EDITION {data.year} {"//"} RECAP CERTIFICATE
-                  </span>
-                </div>
+      {mode === "story" ? (
+        <div
+          className="relative min-h-[calc(100dvh-180px)] md:min-h-[calc(100dvh-140px)] select-none overflow-hidden"
+          onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+          onTouchEnd={(e) => {
+            if (touchX.current === null) return;
+            const dx = touchX.current - e.changedTouches[0].clientX;
+            if (Math.abs(dx) > 40) go(dx > 0 ? 1 : -1);
+            touchX.current = null;
+          }}
+        >
+          <div key={slide} className="absolute inset-0 pb-14 anim-rise md:pb-0">
+            <Frame n={slide} kicker={slides[slide].kicker} foot={slides[slide].foot}>
+              {slides[slide].body(true)}
+            </Frame>
+          </div>
+          {/* Click zones */}
+          <button type="button" aria-label={T("Önceki", "Previous")} onClick={() => go(-1)} disabled={slide === 0} className="absolute left-0 top-1/2 hidden -translate-y-1/2 p-3 text-ink-4 hover:text-ink disabled:opacity-0 md:block">
+            <ChevronLeft size={28} strokeWidth={1.5} />
+          </button>
+          <button type="button" aria-label={T("Sonraki", "Next")} onClick={() => go(1)} disabled={slide === TOTAL - 1} className="absolute right-0 top-1/2 hidden -translate-y-1/2 p-3 text-ink-4 hover:text-ink disabled:opacity-0 md:block">
+            <ChevronRight size={28} strokeWidth={1.5} />
+          </button>
+          <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2 md:hidden">
+            <button type="button" className="btn btn-sm btn-icon" onClick={() => go(-1)} disabled={slide === 0} aria-label={T("Önceki", "Previous")}>
+              <ChevronLeft />
+            </button>
+            <button type="button" className="btn btn-sm btn-icon" onClick={() => go(1)} disabled={slide === TOTAL - 1} aria-label={T("Sonraki", "Next")}>
+              <ChevronRight />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col">
+          {slides.map((s, i) => (
+            <section key={i} className="min-h-[80vh] border-b border-line">
+              <Frame n={i} kicker={s.kicker} foot={s.foot}>
+                {s.body(true)}
+              </Frame>
+            </section>
+          ))}
+        </div>
+      )}
 
-                {/* Vektör Barkod Görünümü */}
-                <div className="flex items-center gap-0.5 opacity-80" aria-hidden="true">
-                  <span className="h-6 w-1 bg-zinc-300" />
-                  <span className="h-6 w-0.5 bg-zinc-300" />
-                  <span className="h-6 w-1.5 bg-zinc-300" />
-                  <span className="h-6 w-0.5 bg-zinc-300" />
-                  <span className="h-6 w-1 bg-zinc-300" />
-                  <span className="h-6 w-0.5 bg-zinc-300" />
-                  <span className="h-6 w-2 bg-zinc-300" />
-                  <span className="h-6 w-0.5 bg-zinc-300" />
-                  <span className="h-6 w-1 bg-zinc-300" />
-                </div>
+      {share && (
+        <Portal>
+          <div className="fixed inset-0 z-[85] flex items-end justify-center sm:items-center sm:p-4">
+            <div className="absolute inset-0 bg-[var(--scrim)] anim-fade" onClick={() => setShare(false)} />
+            <div role="dialog" aria-modal className="relative w-full max-w-md surface-pop rounded-b-none sm:rounded-b-[calc(var(--r-panel)+2px)] p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] anim-sheet sm:anim-pop">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-[14px] font-semibold text-ink">{T(`${data.year} Wrapped'ini paylaş`, `Share your ${data.year} Wrapped`)}</h3>
+                <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setShare(false)} aria-label={T("Kapat", "Close")}>
+                  <X />
+                </button>
               </div>
-
-              {/* POSTER 2: PROFİL VE MERKEZ KAHRAMAN BÖLÜMÜ */}
-              <div className="flex items-center justify-between py-2">
-                <div className="flex items-center gap-3">
-                  {data.avatarUrl ? (
-                    <Image
-                      src={data.avatarUrl}
-                      alt={data.username}
-                      width={52}
-                      height={52}
-                      unoptimized
-                      className="rounded-full shadow-lg"
-                      style={{ outline: `3px solid ${ac}`, outlineOffset: "2px" }}
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800 text-lg font-black text-white">
-                      {data.displayName[0]?.toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="text-base sm:text-lg font-black text-white leading-tight">
-                      {data.displayName}
-                    </h3>
-                    <span className="font-mono text-xs text-zinc-400">
-                      @{data.username}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span
-                    className="inline-block rounded-full px-3 py-0.5 font-mono text-[10px] font-black uppercase tracking-wider"
-                    style={{
-                      backgroundColor: `${data.archetype.color}25`,
-                      color: data.archetype.color,
-                      border: `1px solid ${data.archetype.color}60`,
-                    }}
-                  >
-                    {archetypeBadge}
-                  </span>
-                  <span className="block mt-0.5 font-mono text-[11px] font-bold text-zinc-300">
-                    {archetypeTitle}
-                  </span>
-                </div>
-              </div>
-
-              {/* POSTER 3: DEV HERO METRİK (COMMIT MANŞETİ) */}
-              <div
-                className="relative rounded-2xl border p-4 text-center overflow-hidden my-1"
-                style={{
-                  borderColor: `${ac}40`,
-                  background: `linear-gradient(135deg, ${ac}15 0%, rgba(24,24,27,0.7) 100%)`,
-                }}
-              >
-                <span className="font-mono text-[10px] font-bold tracking-widest text-zinc-400 uppercase">
-                  TOTAL VERIFIED COMMITS {"//"} {data.year}
-                </span>
-                <p
-                  className="text-5xl sm:text-6xl font-black tracking-tight"
-                  style={{ color: ac }}
+              <div className="flex items-stretch gap-2">
+                <code className="flex-1 truncate rounded-[var(--r-control)] border border-line bg-canvas px-3 py-2 font-mono text-[12px] text-ink-2">{url}</code>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    navigator.clipboard.writeText(url).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1600);
+                    })
+                  }
                 >
-                  {data.totalCommits.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
-                </p>
-                <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-300 mt-1">
-                  <span>
-                    {data.activeDays} {lang === "tr" ? "Aktif Gün" : "Active Days"}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    {lang === "tr"
-                      ? `Ort. ${(data.totalCommits / Math.max(data.activeDays, 1)).toFixed(1)} / gün`
-                      : `Avg. ${(data.totalCommits / Math.max(data.activeDays, 1)).toFixed(1)} / day`}
-                  </span>
-                </div>
+                  {copied ? <Check className="text-good" /> : <Link2 />}
+                  {copied ? T("Kopyalandı", "Copied") : T("Kopyala", "Copy")}
+                </button>
               </div>
-
-              {/* POSTER 4: 4'LÜ EDİTÖRYAL VERİ PANELİ */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-1">
-                {/* Modül: Kod Satırları */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5">
-                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">
-                    {lang === "tr" ? "KOD HACMİ" : "CODE VOLUME"}
-                  </span>
-                  <p className="font-mono text-xs font-bold text-emerald-400">
-                    +{data.totalLinesAdded.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
-                  </p>
-                  <p className="font-mono text-xs font-bold text-red-400">
-                    −{data.totalLinesDeleted.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
-                  </p>
-                </div>
-
-                {/* Modül: Seri (Streak) */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5">
-                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">
-                    {lang === "tr" ? "SERİ (STREAK)" : "STREAK"}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Flame className="h-3.5 w-3.5 text-amber-400" />
-                    <span className="font-mono text-base font-black text-amber-400">
-                      {data.longestStreak} {lang === "tr" ? "Gün" : "Days"}
-                    </span>
-                  </div>
-                  <span className="text-[9px] text-zinc-500">
-                    {lang === "tr" ? "kesintisiz" : "unbroken"}
-                  </span>
-                </div>
-
-                {/* Modül: Ana Dil */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5">
-                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">
-                    {lang === "tr" ? "ANA DİL" : "PRIMARY LANGUAGE"}
-                  </span>
-                  <p className="font-mono text-sm font-bold text-white truncate">
-                    {data.topLangs[0]?.lang ?? "Code"}
-                  </p>
-                  <span className="font-mono text-[9px] text-[var(--accent)] font-semibold">
-                    %{data.topLangs[0]?.pct ?? 0} {lang === "tr" ? "pay" : "share"}
-                  </span>
-                </div>
-
-                {/* Modül: Projeler & Yıldız */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5">
-                  <span className="block font-mono text-[9px] text-zinc-500 uppercase">
-                    {lang === "tr" ? "PROJELER" : "PROJECTS"}
-                  </span>
-                  <p className="font-mono text-xs font-bold text-zinc-100">
-                    {data.activeRepos} {lang === "tr" ? "repo" : "repos"} · {data.totalPRs} PR
-                  </p>
-                  <p className="font-mono text-[9px] text-amber-400 font-semibold">
-                    ★ {data.totalStars} {lang === "tr" ? "star" : "stars"}
-                  </p>
-                </div>
-              </div>
-
-              {/* POSTER 5: MİNİ HEATMAP ŞERİDİ & DOĞRULAMA STAMPI */}
-              <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-2">
-                <FullHeatmap
-                  dates={data.heatmapDates}
-                  maxCount={data.maxDayCount}
-                  accentColor={ac}
-                  year={data.year}
-                />
-              </div>
-
-              {/* POSTER 6: ALT İMZA & WATERMARK */}
-              <div className="flex items-center justify-between border-t border-zinc-800/80 pt-2 text-[10px] font-mono text-zinc-500">
-                <span>VERIFIED BY DEVBOARD.APP</span>
-                <span className="tracking-wider">LAT 41.0082° N, LON 28.9784° E</span>
-              </div>
-            </div>
-
-            {/* Poster Hızlı Eylem Butonları */}
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => downloadSlidePng(9)}
-                disabled={sharing}
-                className="flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span>{lang === "tr" ? "Posteri İndir (PNG)" : "Download Poster (PNG)"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShareModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-zinc-950 shadow-md transition-transform active:scale-95 cursor-pointer"
-                style={{ backgroundColor: ac }}
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                <span>{lang === "tr" ? "Paylaş" : "Share"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
-                title={lang === "tr" ? "Linki kopyala" : "Copy link"}
-              >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* ─── 3. ALT GEZİNME ÇUBUĞU (FOOTER) ─── */}
-      <footer className="relative z-20 flex h-14 shrink-0 items-center justify-between border-t border-zinc-800/40 px-4 sm:px-8 backdrop-blur-xl">
-        {mode === "story" ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setSlide((s) => Math.max(0, s - 1))}
-              disabled={slide === 0}
-              className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span>{lang === "tr" ? "Geri" : "Back"}</span>
-            </button>
-
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-zinc-400 font-semibold">
-                {slide + 1} / {TOTAL_SLIDES}
-              </span>
-              <span className="hidden sm:inline text-[11px] text-zinc-600">
-                {lang === "tr" ? "· Klavye ok tuşları ile gezinebilirsiniz" : "· Navigate with arrow keys"}
-              </span>
-            </div>
-
-            {slide === TOTAL_SLIDES - 1 ? (
-              <button
-                type="button"
-                onClick={() => setMode("poster")}
-                className="flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-md cursor-pointer"
-                style={{ backgroundColor: ac }}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span>{lang === "tr" ? "Posteri Gör" : "View Poster"}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSlide((s) => Math.min(TOTAL_SLIDES - 1, s + 1))}
-                className="flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-md transition-transform active:scale-95 cursor-pointer"
-                style={{ backgroundColor: ac }}
-              >
-                <span>{lang === "tr" ? "İleri" : "Next"}</span>
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            )}
-          </>
-        ) : (
-          <div className="flex w-full items-center justify-between text-xs text-zinc-500 font-mono">
-            <span>{"//"} DEVBOARD ANNUAL DEVELOPER POSTER</span>
-            <button
-              type="button"
-              onClick={() => setMode("story")}
-              className="flex items-center gap-1 text-zinc-300 hover:text-white font-sans text-xs underline cursor-pointer"
-            >
-              <RotateCcw className="h-3 w-3" />
-              <span>{lang === "tr" ? "Hikaye Moduna Dön" : "Back to Story Mode"}</span>
-            </button>
-          </div>
-        )}
-      </footer>
-
-      {/* ─── 4. SOSYAL MEDYA PAYLAŞIM MODALI ─── */}
-      {shareModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-            onClick={() => setShareModalOpen(false)}
-          />
-
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-zinc-800/90 bg-zinc-950/95 p-5 shadow-2xl backdrop-blur-2xl ring-1 ring-white/10 animate-in zoom-in-95 duration-200 space-y-4"
-          >
-            {/* Modal Başlık */}
-            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[var(--accent)]" />
-                <h3 className="text-sm font-bold text-zinc-100">
-                  {lang === "tr" ? `${data.year} Wrapped'ini Paylaş` : `Share Your ${data.year} Wrapped`}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShareModalOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Önizleme Mini Kartı */}
-            <div
-              className="rounded-2xl border p-4 text-center space-y-2"
-              style={{
-                borderColor: `${data.archetype.color}40`,
-                background: `linear-gradient(135deg, ${data.archetype.color}15 0%, rgba(24,24,27,0.8) 100%)`,
-              }}
-            >
-              <span
-                className="rounded-full px-2.5 py-0.5 text-[9px] font-mono font-bold"
-                style={{
-                  backgroundColor: `${data.archetype.color}25`,
-                  color: data.archetype.color,
-                }}
-              >
-                {archetypeBadge}
-              </span>
-              <p
-                className="text-lg font-black"
-                style={{ color: data.archetype.color }}
-              >
-                {archetypeTitle}
-              </p>
-              <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-300 pt-1">
-                <span>
-                  {data.totalCommits.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}{" "}
-                  {lang === "tr" ? "Commit" : "Commits"}
-                </span>
-                <span>·</span>
-                <span>
-                  {data.longestStreak} {lang === "tr" ? "Gün Streak" : "Days Streak"}
-                </span>
-                <span>·</span>
-                <span>{data.topLangs[0]?.lang ?? "Code"}</span>
-              </div>
-            </div>
-
-            {/* 1-Tıkla Sosyal Medya Butonları */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
-                {lang === "tr" ? "Hızlı Paylaşım Kanalları" : "Quick Share Channels"}
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {/* 𝕏 / Twitter */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <a
+                  className="btn"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                    tweetText
-                  )}&url=${encodeURIComponent(shareUrl)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 p-2.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-zinc-700 hover:bg-zinc-800"
+                    T(`${data.year}: ${fmtInt(data.totalCommits, l)} commit, ${data.longestStreak} günlük en uzun seri. Rolüm: ${arch.title}`, `${data.year}: ${fmtInt(data.totalCommits, l)} commits, ${data.longestStreak}-day best streak. Archetype: ${arch.title}`),
+                  )}&url=${encodeURIComponent(url)}`}
                 >
-                  <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.726-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                   </svg>
-                  <span>𝕏 (Twitter)</span>
+                  {T("X'te paylaş", "Post on X")}
                 </a>
-
-                {/* LinkedIn */}
-                <a
-                  href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-                    shareUrl
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 p-2.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-blue-500/50 hover:bg-blue-500/10"
-                >
-                  <svg className="h-3.5 w-3.5 fill-[#0a66c2]" viewBox="0 0 24 24">
-                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
-                  </svg>
-                  <span>LinkedIn</span>
-                </a>
-
-                {/* WhatsApp */}
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    tweetText + " " + shareUrl
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 p-2.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10"
-                >
-                  <span className="text-emerald-400 font-bold">WA</span>
-                  <span>WhatsApp</span>
-                </a>
-
-                {/* Telegram */}
-                <a
-                  href={`https://t.me/share/url?url=${encodeURIComponent(
-                    shareUrl
-                  )}&text=${encodeURIComponent(tweetText)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 p-2.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-sky-500/50 hover:bg-sky-500/10"
-                >
-                  <span className="text-sky-400 font-bold">TG</span>
-                  <span>Telegram</span>
-                </a>
+                <button type="button" className="btn" onClick={() => savePng(slide)} disabled={saving}>
+                  <Download /> {T(`Slayt ${slide + 1} PNG`, `Slide ${slide + 1} PNG`)}
+                </button>
               </div>
-            </div>
-
-            {/* İndirme & Link Kopyalama Butonları */}
-            <div className="pt-2 border-t border-zinc-800/60 space-y-2">
-              <button
-                type="button"
-                onClick={() => downloadSlidePng(9)}
-                disabled={sharing}
-                className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-zinc-950 transition-transform active:scale-95 disabled:opacity-50 cursor-pointer"
-                style={{ backgroundColor: ac }}
-              >
-                {sharing ? (
-                  <div className="h-3.5 w-3.5 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                <span>
-                  {lang === "tr"
-                    ? "1080x1080 Story Görseli İndir (PNG)"
-                    : "Download 1080x1080 Story Image (PNG)"}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 py-2.5 text-xs font-semibold text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white cursor-pointer"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 text-emerald-400" />
-                    <span className="text-emerald-400">{t.wrapped.linkCopied}</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 text-zinc-400" />
-                    <span>{t.wrapped.copyLink}</span>
-                  </>
-                )}
-              </button>
+              <p className="mt-3 text-[12px] text-ink-3">{T("Her slayt paylaşım için ayrı bir görsel olarak indirilebilir.", "Every slide can be downloaded as its own image for sharing.")}</p>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

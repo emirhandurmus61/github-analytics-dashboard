@@ -15,8 +15,9 @@ export async function saveProfileSettings(
 
   const bio = (formData.get("bio") as string | null)?.trim().slice(0, 200) ?? "";
   const pinnedRepo = (formData.get("pinned_repo") as string | null)?.trim() ?? "";
+  // Accent is saved from Appearance (saveAccent); only touch it when the form sends one.
   const themeRaw = formData.get("theme_accent") as string | null;
-  const theme = isValidTheme(themeRaw) ? themeRaw : "emerald";
+  const theme = isValidTheme(themeRaw) ? themeRaw : null;
 
   // Pinned repos (max 3)
   const pinnedReposRaw = formData.get("pinned_repos") as string | null;
@@ -84,7 +85,7 @@ export async function saveProfileSettings(
       pinned_repo_name: pinnedRepo || null,
       public_widgets: widgets,
       widget_order: widgetOrder,
-      theme_accent: theme,
+      ...(theme ? { theme_accent: theme } : {}),
       currently_working_on: currentlyWorkingOn || null,
       yearly_goal: yearlyGoal || null,
       tech_tags: techTags,

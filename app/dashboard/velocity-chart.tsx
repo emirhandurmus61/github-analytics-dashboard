@@ -1,206 +1,181 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid,
-} from "recharts";
-import { useThemeColors } from "@/components/theme-provider";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+import { Gauge, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { TrendingUp, TrendingDown, Minus, Activity } from "lucide-react";
+import { Panel, Spark } from "@/components/ui/primitives";
+import { KV } from "@/components/ui/glance";
+import { ChartMount, ChartTip, axisTick, gridStroke } from "@/components/ui/chart";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { MONTHS_SHORT, fmtPct, type Lang } from "@/lib/ui/format";
+import type { DayCount } from "./types";
 
-type DayData = { date: string; commit_count: number };
-type Props = { data: DayData[] };
+type WeekPoint = { label: string; commits: number; avg: number | null; projection: number | null; current: boolean };
 
-type WeekPoint = { label: string; weekStart: string; commits: number; avg: number | null; projection: number | null; isCurrent: boolean };
-
-const MONTHS_TR = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
-const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-function buildWeeklyData(data: DayData[], lang: string): WeekPoint[] {
+function buildWeeks(data: DayCount[], l: Lang): WeekPoint[] {
   const map = new Map(data.map((d) => [d.date, d.commit_count]));
   const today = new Date();
-  const dow = (today.getDay() + 6) % 7;
-  const thisMonday = new Date(today);
-  thisMonday.setDate(today.getDate() - dow);
-  thisMonday.setHours(0, 0, 0, 0);
-
-  const weeks: { start: Date; commits: number }[] = [];
-  for (let w = 11; w >= 0; w--) {
-    const start = new Date(thisMonday);
-    start.setDate(thisMonday.getDate() - w * 7);
-    let commits = 0;
+  const mon = new Date(today);
+  mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  mon.setHours(12, 0, 0, 0);
+  const weeks = Array.from({ length: 12 }, (_, i) => {
+    const start = new Date(mon);
+    start.setDate(mon.getDate() - (11 - i) * 7);
+    let c = 0;
     for (let d = 0; d < 7; d++) {
       const cur = new Date(start);
       cur.setDate(start.getDate() + d);
-      commits += map.get(cur.toISOString().slice(0, 10)) ?? 0;
+      c += map.get(cur.toISOString().slice(0, 10)) ?? 0;
     }
-    weeks.push({ start, commits });
-  }
-
-  const M = lang === "en" ? MONTHS_EN : MONTHS_TR;
-
-  // Projeksiyon: son 4 tamamlanmış haftanın ortalaması
-  const completedWeeks = weeks.slice(0, -1); // son hafta (bu hafta) hariç
-  const last4 = completedWeeks.slice(-4);
-  const projectedWeekly = last4.length > 0
-    ? Math.round(last4.reduce((s, x) => s + x.commits, 0) / last4.length)
-    : 0;
-
-  return weeks.map((w, i) => {
-    const window = weeks.slice(Math.max(0, i - 2), i + 1);
-    const avg = window.reduce((s, x) => s + x.commits, 0) / window.length;
-    const isCurrent = i === weeks.length - 1;
-    const d = w.start;
+    return { start, c };
+  });
+  const last4 = weeks.slice(-5, -1);
+  const proj = last4.length ? Math.round(last4.reduce((s, x) => s + x.c, 0) / last4.length) : 0;
+  return weeks.map((wk, i) => {
+    const win = weeks.slice(Math.max(0, i - 2), i + 1);
+    const current = i === weeks.length - 1;
     return {
-      label: isCurrent ? (lang === "en" ? "This week" : "Bu hafta") : `${M[d.getMonth()]} ${d.getDate()}`,
-      weekStart: w.start.toISOString().slice(0, 10),
-      commits: isCurrent ? w.commits : w.commits,
-      avg: i >= 2 ? Math.round(avg * 10) / 10 : null,
-      projection: isCurrent ? projectedWeekly : null,
-      isCurrent,
+      label: current ? (l === "en" ? "now" : "şimdi") : `${wk.start.getDate()} ${MONTHS_SHORT[l][wk.start.getMonth()]}`,
+      commits: wk.c,
+      avg: i >= 2 ? Math.round((win.reduce((s, x) => s + x.c, 0) / win.length) * 10) / 10 : null,
+      projection: current ? proj : null,
+      current,
     };
   });
 }
 
-function getTrend(weeks: WeekPoint[], lang: string) {
+function trendOf(weeks: WeekPoint[], l: Lang) {
   const recent = weeks.slice(-4);
   const older = weeks.slice(-8, -4);
-  const rAvg = recent.reduce((s, w) => s + w.commits, 0) / recent.length;
-  const oAvg = older.reduce((s, w) => s + w.commits, 0) / Math.max(older.length, 1);
-  if (oAvg === 0) return { label: lang === "en" ? "Insufficient data" : "Veri yetersiz", color: "#71717a", pct: 0, icon: Minus };
-  const pct = Math.round(((rAvg - oAvg) / oAvg) * 100);
-  if (pct >= 10) return { label: lang === "en" ? "Accelerating" : "Hızlanıyor", color: "#34d399", pct, icon: TrendingUp };
-  if (pct >= -10) return { label: lang === "en" ? "Stable" : "Stabil", color: "#71717a", pct, icon: Minus };
-  return { label: lang === "en" ? "Slowing down" : "Yavaşlıyor", color: "#f87171", pct, icon: TrendingDown };
+  const r = recent.reduce((s, x) => s + x.commits, 0) / recent.length;
+  const o = older.reduce((s, x) => s + x.commits, 0) / Math.max(1, older.length);
+  if (o === 0) return { label: l === "en" ? "Not enough history" : "Geçmiş yetersiz", pct: 0, color: "var(--ink-3)", Icon: Minus };
+  const pct = Math.round(((r - o) / o) * 100);
+  if (pct >= 10) return { label: l === "en" ? "Speeding up" : "Hızlanıyor", pct, color: "var(--hue-green)", Icon: TrendingUp };
+  if (pct > -10) return { label: l === "en" ? "Steady" : "Sabit", pct, color: "var(--ink-2)", Icon: Minus };
+  return { label: l === "en" ? "Slowing down" : "Yavaşlıyor", pct, color: "var(--hue-red)", Icon: TrendingDown };
 }
 
-function CustomTooltip({ active, payload, label, color, lang }: { active?: boolean; payload?: { value: number; name: string }[]; label?: string; color: string; lang: string }) {
-  if (!active || !payload?.length) return null;
-  const commits = payload.find((p) => p.name === "commits")?.value;
-  const avg = payload.find((p) => p.name === "avg")?.value;
-  const projection = payload.find((p) => p.name === "projection")?.value;
-  return (
-    <div className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs shadow-lg">
-      <p className="mb-0.5 font-medium text-zinc-300">{label}</p>
-      {commits !== undefined && <p style={{ color }}>{commits} commit{lang === "en" && commits !== 1 ? "s" : ""}</p>}
-      {avg !== undefined && avg !== null && <p className="text-zinc-500">{lang === "en" ? `3w avg. ${avg}` : `3h ort. ${avg}`}</p>}
-      {projection !== undefined && projection !== null && (
-        <p className="text-zinc-400">
-          {lang === "en" ? `Projection: ${projection} commit${projection !== 1 ? "s" : ""}` : `Projeksiyon: ${projection} commit`}
-        </p>
-      )}
-    </div>
-  );
-}
-
-export default function VelocityChart({ data }: Props) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const theme = useThemeColors();
+export default function VelocityChart({ data }: { data: DayCount[] }) {
   const { lang } = useLanguage();
-  const weeks = buildWeeklyData(data, lang);
-  const trend = getTrend(weeks, lang);
-  const currentWeek = weeks[weeks.length - 1];
-  const projection = currentWeek?.projection ?? 0;
-  const maxVal = Math.max(...weeks.map((w) => w.commits), projection, 1);
-  const TrendIcon = trend.icon;
-  // Tahmini aylık commit: projeksiyon * 4.33 hafta
-  const monthlyProjection = Math.round(projection * 4.33);
+  const l = lang as Lang;
+  const { shape, h } = useWidgetSize();
+  const weeks = buildWeeks(data, l);
+  const trend = trendOf(weeks, l);
+  const cur = weeks[weeks.length - 1];
+  const proj = cur.projection ?? 0;
+  const monthly = Math.round(proj * 4.33);
+  const avg3 = weeks[weeks.length - 1].avg ?? 0;
+  const TrendIcon = trend.Icon;
+  const trendChip = (
+    <span className="inline-flex items-center gap-1 text-[12px] font-medium" style={{ color: trend.color }}>
+      <TrendIcon size={13} />
+      {trend.label}
+      {trend.pct !== 0 && <span className="font-mono text-[11px]">{trend.pct > 0 ? "+" : "−"}{fmtPct(Math.abs(trend.pct), l)}</span>}
+    </span>
+  );
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full min-h-[280px] flex flex-col">
-      {/* Header */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between shrink-0 mb-3">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-sm font-medium text-zinc-400">Commit Velocity</h2>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {monthlyProjection > 0 && (
-            <span className="text-xs text-zinc-600">
-              ~<span className="text-zinc-400 font-medium">{monthlyProjection}</span> {lang === "en" ? "commits/mo est." : "commit/ay tahmini"}
-            </span>
-          )}
-          <div
-            className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1"
-            style={{ borderColor: `${trend.color}30`, backgroundColor: `${trend.color}08` }}
-          >
-            <TrendIcon className="w-3.5 h-3.5" style={{ color: trend.color }} />
-            <span className="text-xs font-medium" style={{ color: trend.color }}>
-              {trend.label}
-              {trend.pct !== 0 && ` (${trend.pct > 0 ? "+" : ""}${trend.pct}%)`}
-            </span>
+    <Panel title={l === "en" ? "Velocity" : "Hız"} icon={Gauge} meta={l === "en" ? "12 weeks" : "12 hafta"}>
+      {shape === "glance" && (
+        <div className="flex h-full flex-col">
+          <div className="flex items-baseline gap-1.5">
+            <span className="figure text-[26px] @min-[200px]:text-[30px]">{cur.commits}</span>
+            <span className="text-[11.5px] text-ink-3">{l === "en" ? `/ ~${proj} wk` : `/ ~${proj} hf`}</span>
+          </div>
+          <div className="mt-1.5">{trendChip}</div>
+          <div className="mt-auto pt-2">
+            <Spark values={weeks.map((w) => w.commits)} height={28} />
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Chart — fills remaining space */}
-      <div className="w-full h-[220px] min-h-[220px] flex-1">
-        {mounted ? (
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={weeks} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-              <defs>
-                <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={theme.accent} stopOpacity={0.2} />
-                  <stop offset="95%" stopColor={theme.accent} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="#1f1f23" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fill: "#3f3f46", fontSize: 10 }} axisLine={false} tickLine={false} interval={1} />
-              <YAxis tick={{ fill: "#3f3f46", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, maxVal + 2]} />
-              <Tooltip content={<CustomTooltip color={theme.accent} lang={lang} />} />
-              <ReferenceLine x={weeks[weeks.length - 1].label} stroke={theme.accentBorder} strokeDasharray="4 4" />
-              <Area
-                type="monotone" dataKey="commits" name="commits"
-                stroke={theme.accent} strokeWidth={2} fill="url(#velocityGrad)"
-                dot={(p) => {
-                  const { cx, cy, index } = p;
-                  if (index === weeks.length - 1) return <circle key={index} cx={cx} cy={cy} r={4} fill={theme.accent} stroke="#09090b" strokeWidth={2} />;
-                  return <circle key={index} cx={cx} cy={cy} r={0} fill="none" />;
-                }}
-                activeDot={{ r: 4, fill: theme.accent, stroke: "#09090b", strokeWidth: 2 }}
-              />
-              <Area
-                type="monotone" dataKey="avg" name="avg"
-                stroke={theme.accentMid} strokeWidth={1.5} strokeDasharray="5 3"
-                fill="none" dot={false} activeDot={false}
-              />
-              <Area
-                type="monotone" dataKey="projection" name="projection"
-                stroke="#71717a" strokeWidth={1.5} strokeDasharray="3 3"
-                fill="none" dot={(p) => {
-                  const { cx, cy, index } = p;
-                  if (index === weeks.length - 1) return <circle key={index} cx={cx} cy={cy} r={3} fill="#71717a" stroke="#09090b" strokeWidth={2} />;
-                  return <circle key={index} cx={cx} cy={cy} r={0} fill="none" />;
-                }} activeDot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="w-full h-[220px] rounded-xl bg-zinc-800/20 animate-pulse" />
-        )}
-      </div>
-
-      {/* Legend */}
-      <div className="mt-2 flex items-center gap-4 justify-end shrink-0 flex-wrap">
-        <div className="flex items-center gap-1">
-          <div className="h-px w-4" style={{ backgroundColor: theme.accent }} />
-          <span className="text-[10px] text-zinc-600">{lang === "en" ? "Weekly" : "Haftalık"}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="h-px w-4 border-t border-dashed" style={{ borderColor: theme.accentMid }} />
-          <span className="text-[10px] text-zinc-600">{lang === "en" ? "3w avg." : "3h ort."}</span>
-        </div>
-        {projection > 0 && (
-          <div className="flex items-center gap-1">
-            <div className="h-px w-4 border-t border-dashed border-zinc-600" />
-            <span className="text-[10px] text-zinc-600">{lang === "en" ? "Projection" : "Projeksiyon"}</span>
+      {shape === "strip" && (
+        <div className="flex h-full gap-5">
+          <div className="flex shrink-0 flex-col justify-center gap-2">
+            {trendChip}
+            <div className="figure text-[30px]">
+              ~{monthly}
+              <span className="text-[13px] font-normal text-ink-3"> {l === "en" ? "/ month" : "/ ay"}</span>
+            </div>
+            <div className="text-[11.5px] text-ink-3">{l === "en" ? `3-week avg ${avg3}` : `3 haftalık ort. ${avg3}`}</div>
           </div>
-        )}
-      </div>
-    </div>
+          <div className="flex-1 min-w-0 flex items-end">
+            <Spark values={weeks.map((w) => w.commits)} height={88} strokeWidth={2} className="!h-full" />
+          </div>
+        </div>
+      )}
+
+      {shape === "column" && (
+        <div className="flex h-full flex-col gap-3">
+          <div>{trendChip}</div>
+          <div className="figure text-[34px]">
+            ~{monthly}
+            <span className="text-[13px] font-normal text-ink-3"> {l === "en" ? "/ mo" : "/ ay"}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <KV k={l === "en" ? "This week" : "Bu hafta"} v={cur.commits} />
+            <KV k={l === "en" ? "Projected" : "Tahmin"} v={`~${proj}`} />
+            <KV k={l === "en" ? "3-week avg" : "3 hf ort."} v={avg3} />
+          </div>
+          <div className="mt-auto">
+            <Spark values={weeks.map((w) => w.commits)} height={h >= 3 ? 120 : 64} strokeWidth={2} />
+          </div>
+        </div>
+      )}
+
+      {shape === "block" && (
+        <div className="flex h-full flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+            {trendChip}
+            <span className="text-[12px] text-ink-3">
+              {l === "en" ? "Projected month" : "Aylık tahmin"} <span className="font-mono text-ink">~{monthly}</span>
+            </span>
+            <span className="text-[12px] text-ink-3">
+              {l === "en" ? "This week" : "Bu hafta"} <span className="font-mono text-ink">{cur.commits}</span>
+              <span className="text-ink-4"> / ~{proj}</span>
+            </span>
+          </div>
+          <ChartMount className="flex-1 min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={weeks} margin={{ top: 8, right: 6, bottom: 0, left: -10 }}>
+                <defs>
+                  <linearGradient id="vel-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={gridStroke} strokeDasharray="2 4" vertical={false} />
+                <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={18} />
+                <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={34} />
+                <Tooltip
+                  cursor={{ stroke: "var(--line-2)" }}
+                  content={({ active, payload, label }) =>
+                    active && payload?.length ? (
+                      <ChartTip
+                        title={label}
+                        rows={[
+                          { label: "commit", value: payload.find((p) => p.dataKey === "commits")?.value as number, color: "var(--accent)" },
+                          ...(payload.find((p) => p.dataKey === "avg")?.value != null
+                            ? [{ label: l === "en" ? "3w avg" : "3h ort.", value: payload.find((p) => p.dataKey === "avg")?.value as number, color: "var(--ink-3)" }]
+                            : []),
+                          ...(payload.find((p) => p.dataKey === "projection")?.value != null
+                            ? [{ label: l === "en" ? "projected" : "tahmin", value: `~${payload.find((p) => p.dataKey === "projection")?.value}`, color: "var(--ink-4)" }]
+                            : []),
+                        ]}
+                      />
+                    ) : null
+                  }
+                />
+                <ReferenceLine x={weeks[weeks.length - 1].label} stroke="var(--line-2)" strokeDasharray="3 3" />
+                <Area isAnimationActive={false} type="monotone" dataKey="commits" stroke="var(--accent)" strokeWidth={2} fill="url(#vel-fill)" dot={false} activeDot={{ r: 4, fill: "var(--accent)", stroke: "var(--bg-1)", strokeWidth: 2 }} />
+                <Area isAnimationActive={false} type="monotone" dataKey="avg" stroke="var(--ink-3)" strokeWidth={1.25} strokeDasharray="4 3" fill="none" dot={false} activeDot={false} />
+                <Area isAnimationActive={false} type="monotone" dataKey="projection" stroke="none" fill="none" dot={{ r: 3.5, fill: "var(--bg-1)", stroke: "var(--ink-3)", strokeWidth: 1.5 }} activeDot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartMount>
+        </div>
+      )}
+    </Panel>
   );
 }

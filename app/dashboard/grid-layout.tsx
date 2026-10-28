@@ -2,19 +2,21 @@
 
 import {
   DndContext,
-  DragEndEvent,
   DragOverlay,
-  DragStartEvent,
+  KeyboardSensor,
   PointerSensor,
   TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   arrayMove,
   rectSortingStrategy,
+  sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -26,345 +28,431 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import {
-  DEFAULT_WIDGET_CONFIGS,
-  CELL_SIZE,
-  GRID_GAP,
-  WidgetConfig,
-  WidgetId,
-  getWidgetLabel,
-} from "@/lib/widget-config";
-import { useLanguage } from "@/lib/i18n";
-import {
-  GripVertical,
-  Pencil,
+  ArrowDown,
+  ArrowUp,
   Check,
-  RotateCcw,
-  Eye,
   EyeOff,
-  Maximize2,
-  ChevronUp,
-  ChevronDown,
+  GripVertical,
+  LayoutTemplate,
+  Plus,
+  RotateCcw,
+  Scaling,
   X,
 } from "lucide-react";
+import {
+  DEFAULT_WIDGET_CONFIGS,
+  MOBILE_DIMS,
+  getWidgetLabel,
+  type MobileSize,
+  type WidgetConfig,
+  type WidgetId,
+} from "@/lib/widget-config";
+import { useLanguage } from "@/lib/i18n";
+import { useUIPrefs } from "@/components/ui-prefs";
+import { DENSITY_GRID } from "@/lib/ui/prefs";
+import { WidgetSlotProvider, shapeOf, type WidgetShape } from "@/components/ui/widget-size";
+import { useShell } from "@/components/shell/shell-context";
+import { cn, type Lang } from "@/lib/ui/format";
+import { useMediaQuery } from "@/lib/ui/hooks";
+import { Kbd } from "@/components/ui/primitives";
 
-/* ─── Context ─────────────────────────────────────────────── */
+/* ── Context ──────────────────────────────────────────────────────────── */
 
 interface GridCtx {
   editing: boolean;
-  isMobile: boolean;
+  compact: boolean;
   configs: WidgetConfig[];
-  setColSpan: (id: WidgetId, v: number) => void;
-  setRowSpan: (id: WidgetId, v: number) => void;
+  order: WidgetId[];
+  setSize: (id: WidgetId, w: number, h: number) => void;
+  setMobile: (id: WidgetId, s: MobileSize) => void;
   toggleVisible: (id: WidgetId) => void;
+  move: (id: WidgetId, dir: -1 | 1) => void;
+  metrics: { cell: number; gap: number };
 }
 
-const GridContext = createContext<GridCtx>({
-  editing: false,
-  isMobile: false,
-  configs: DEFAULT_WIDGET_CONFIGS,
-  setColSpan: () => {},
-  setRowSpan: () => {},
-  toggleVisible: () => {},
-});
+const GridContext = createContext<GridCtx | null>(null);
+const useGrid = () => useContext(GridContext)!;
 
-/* ─── Storage ─────────────────────────────────────────────── */
+/* ── Persistence ─────────────────────────────────────────────────────── */
 
-const KEY = "dashboard_grid_v14";
+const KEY = "dashboard_grid_v15";
+type Saved = {
+  configs: Pick<WidgetConfig, "id" | "colSpan" | "rowSpan" | "visible" | "mobile">[];
+  order: WidgetId[];
+};
 
-function load(): { configs: WidgetConfig[]; order: WidgetId[] } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
+// Layout lives in localStorage, read through useSyncExternalStore so the
+// server render (defaults) and the client (saved layout) never fight.
+const listeners = new Set<() => void>();
+let memRaw: string | null | undefined;
+
+function getRaw(): string | null {
+  if (memRaw === undefined) {
+    try {
+      memRaw = localStorage.getItem(KEY);
+    } catch {
+      memRaw = null;
+    }
   }
+  return memRaw;
 }
 
-function save(configs: WidgetConfig[], order: WidgetId[]) {
+function writeRaw(v: string | null) {
+  memRaw = v;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ configs, order }));
-  } catch {}
+    if (v === null) localStorage.removeItem(KEY);
+    else localStorage.setItem(KEY, v);
+  } catch {
+    /* storage unavailable: the layout lasts for this visit */
+  }
+  listeners.forEach((l) => l());
 }
 
-/* ─── Snap helper ─────────────────────────────────────────── */
-
-function snap(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, Math.round(value)));
+function subscribe(cb: () => void) {
+  listeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === KEY) {
+      memRaw = e.newValue;
+      cb();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(cb);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
-/* ─── Resize Handle ───────────────────────────────────────── */
+function serialize(configs: WidgetConfig[], order: WidgetId[]) {
+  const data: Saved = {
+    configs: configs.map(({ id, colSpan, rowSpan, visible, mobile }) => ({ id, colSpan, rowSpan, visible, mobile })),
+    order,
+  };
+  return JSON.stringify(data);
+}
 
-function ResizeHandle({ id, dir }: { id: WidgetId; dir: "e" | "s" | "se" }) {
-  const { configs, setColSpan, setRowSpan } = useContext(GridContext);
-  const cfg = configs.find((c) => c.id === id)!;
-  const startRef = useRef<{
-    x: number; y: number;
-    col: number; row: number;
-    cellW: number; cellH: number;
-  } | null>(null);
+function resolve(raw: string | null, widgetIds: WidgetId[]): { configs: WidgetConfig[]; order: WidgetId[] } {
+  let saved: Saved | null = null;
+  try {
+    saved = raw ? (JSON.parse(raw) as Saved) : null;
+  } catch {
+    saved = null;
+  }
+  if (!saved) return { configs: DEFAULT_WIDGET_CONFIGS, order: widgetIds };
+  const byId = new Map(saved.configs.map((x) => [x.id, x]));
+  const configs = DEFAULT_WIDGET_CONFIGS.map((d) => {
+    const s = byId.get(d.id);
+    if (!s) return d;
+    return {
+      ...d,
+      colSpan: clamp(s.colSpan ?? d.colSpan, d.minCol, d.maxCol),
+      rowSpan: clamp(s.rowSpan ?? d.rowSpan, d.minRow, d.maxRow),
+      visible: s.visible ?? true,
+      mobile: s.mobile && d.mobileSizes.includes(s.mobile) ? s.mobile : d.mobile,
+    };
+  });
+  const known = new Set(widgetIds);
+  const kept = (saved.order ?? []).filter((id) => known.has(id));
+  return { configs, order: [...kept, ...widgetIds.filter((id) => !kept.includes(id))] };
+}
 
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(v)));
+
+export const SHAPE_NAME: Record<WidgetShape, { tr: string; en: string }> = {
+  glance: { tr: "Bakış", en: "Glance" },
+  strip: { tr: "Şerit", en: "Strip" },
+  column: { tr: "Sütun", en: "Column" },
+  block: { tr: "Tam", en: "Full" },
+};
+
+/* ── Resize handle (desktop) ─────────────────────────────────────────── */
+
+function ResizeHandle({ cfg, dir }: { cfg: WidgetConfig; dir: "e" | "s" | "se" }) {
+  const { setSize, metrics } = useGrid();
+  const start = useRef<{ x: number; y: number; w: number; h: number; colW: number; rowH: number } | null>(null);
+
+  const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const grid = (e.currentTarget as HTMLElement).closest(".widget-grid") as HTMLElement | null;
-    const cellW = grid ? (grid.getBoundingClientRect().width - GRID_GAP * 3) / 4 : 200;
-    startRef.current = {
-      x: e.clientX, y: e.clientY,
-      col: cfg.colSpan, row: cfg.rowSpan,
-      cellW: cellW + GRID_GAP, cellH: CELL_SIZE + GRID_GAP,
-    };
-  }, [cfg]);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const grid = (e.currentTarget as HTMLElement).closest(".dash-grid") as HTMLElement | null;
+    const colW = grid ? (grid.getBoundingClientRect().width - metrics.gap * 3) / 4 : 280;
+    start.current = { x: e.clientX, y: e.clientY, w: cfg.colSpan, h: cfg.rowSpan, colW: colW + metrics.gap, rowH: metrics.cell + metrics.gap };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const s = start.current;
+    if (!s) return;
+    const w = dir === "s" ? s.w : clamp(s.w + (e.clientX - s.x) / s.colW, cfg.minCol, cfg.maxCol);
+    const h = dir === "e" ? s.h : clamp(s.h + (e.clientY - s.y) / s.rowH, cfg.minRow, cfg.maxRow);
+    if (w !== cfg.colSpan || h !== cfg.rowSpan) setSize(cfg.id, w, h);
+  };
+  const end = () => (start.current = null);
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!startRef.current) return;
-    const { x, y, col, row, cellW, cellH } = startRef.current;
-    if (dir !== "s") {
-      const newCol = snap(col + (e.clientX - x) / cellW, cfg.minCol, cfg.maxCol);
-      if (newCol !== cfg.colSpan) setColSpan(id, newCol);
-    }
-    if (dir !== "e") {
-      const newRow = snap(row + (e.clientY - y) / cellH, cfg.minRow, cfg.maxRow);
-      if (newRow !== cfg.rowSpan) setRowSpan(id, newRow);
-    }
-  }, [dir, cfg, id, setColSpan, setRowSpan]);
+  const common = {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp: end,
+    onPointerCancel: end,
+  };
 
-  const onPointerUp = useCallback(() => { startRef.current = null; }, []);
-
-  if (dir === "e") return (
-    <div
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-      className="absolute z-30 right-0 top-0 bottom-0 w-4 flex items-center justify-center group/h cursor-ew-resize"
-    >
-      <div className="w-1 h-8 rounded-full bg-zinc-600 group-hover/h:bg-[var(--accent)] transition-colors" />
+  if (dir === "e")
+    return (
+      <div {...common} className="group/h absolute right-[-5px] top-6 bottom-6 z-30 w-[10px] cursor-ew-resize flex items-center justify-center" aria-hidden>
+        <span className="h-10 w-[3px] rounded-full bg-line-strong group-hover/h:bg-accent transition-colors" />
+      </div>
+    );
+  if (dir === "s")
+    return (
+      <div {...common} className="group/h absolute bottom-[-5px] left-6 right-6 z-30 h-[10px] cursor-ns-resize flex items-center justify-center" aria-hidden>
+        <span className="w-10 h-[3px] rounded-full bg-line-strong group-hover/h:bg-accent transition-colors" />
+      </div>
+    );
+  return (
+    <div {...common} className="group/h absolute right-[-4px] bottom-[-4px] z-30 size-5 cursor-nwse-resize" aria-hidden>
+      <span className="absolute right-[4px] bottom-[4px] size-2.5 border-r-2 border-b-2 border-line-strong group-hover/h:border-accent rounded-br-[3px] transition-colors" />
     </div>
   );
+}
 
-  if (dir === "s") return (
-    <div
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-      className="absolute z-30 bottom-0 left-0 right-0 h-4 flex items-center justify-center group/h cursor-ns-resize"
-    >
-      <div className="h-1 w-8 rounded-full bg-zinc-600 group-hover/h:bg-[var(--accent)] transition-colors" />
-    </div>
-  );
+/* ── Size picker: a matrix like "insert table" ───────────────────────── */
+
+function SizePicker({ cfg, lang, open, setOpen }: { cfg: WidgetConfig; lang: Lang; open: boolean; setOpen: (v: boolean | ((p: boolean) => boolean)) => void }) {
+  const { setSize } = useGrid();
+  const [hover, setHover] = useState<{ w: number; h: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const off = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", off);
+    return () => document.removeEventListener("mousedown", off);
+  }, [open, setOpen]);
+
+  const cur = hover ?? { w: cfg.colSpan, h: cfg.rowSpan };
+  const shape = shapeOf(cur.w, cur.h);
 
   return (
-    <div
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-      className="absolute z-30 right-0 bottom-0 w-7 h-7 flex items-center justify-center group/h cursor-nwse-resize"
-    >
-      <Maximize2 className="w-4 h-4 text-zinc-600 group-hover/h:text-[var(--accent)] transition-colors rotate-90" />
+    <div className="relative" ref={ref} onPointerDown={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="btn btn-sm surface-pop !h-7 !px-2 gap-1.5"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        title={lang === "en" ? "Choose size" : "Boyut seç"}
+      >
+        <Scaling size={13} />
+        <span className="font-mono text-[11.5px]">
+          {cfg.colSpan}×{cfg.rowSpan}
+        </span>
+        <span className="hidden text-[11px] font-normal text-ink-3 @min-[260px]:inline">{SHAPE_NAME[shapeOf(cfg.colSpan, cfg.rowSpan)][lang]}</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-40 surface-pop p-2.5 anim-pop w-[176px]" role="dialog">
+          <div className="grid gap-[3px]" style={{ gridTemplateColumns: "repeat(4, 1fr)" }} onMouseLeave={() => setHover(null)}>
+            {Array.from({ length: 4 * 4 }).map((_, i) => {
+              const c = (i % 4) + 1;
+              const r = Math.floor(i / 4) + 1;
+              const allowed = c >= cfg.minCol && c <= cfg.maxCol && r >= cfg.minRow && r <= cfg.maxRow;
+              const inSel = c <= cur.w && r <= cur.h;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  disabled={!allowed}
+                  onMouseEnter={() => allowed && setHover({ w: c, h: r })}
+                  onFocus={() => allowed && setHover({ w: c, h: r })}
+                  onClick={() => {
+                    setSize(cfg.id, c, r);
+                    setOpen(false);
+                  }}
+                  aria-label={`${c}×${r}`}
+                  className={cn(
+                    "aspect-[1.6] rounded-[3px] border transition-colors",
+                    !allowed && "opacity-25 cursor-not-allowed border-line",
+                    allowed && (inSel ? "bg-accent border-accent" : "bg-inset border-line-strong hover:border-accent"),
+                  )}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11.5px]">
+            <span className="font-mono text-ink">
+              {cur.w}×{cur.h}
+            </span>
+            <span className="text-ink-3">{SHAPE_NAME[shape][lang]}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ─── SortableWidget ──────────────────────────────────────── */
+/* ── SortableWidget ──────────────────────────────────────────────────── */
 
-interface SortableWidgetProps {
-  id: WidgetId;
-  children: React.ReactNode;
-  "data-widget-id"?: string;
-}
-
-export function SortableWidget({ id, children }: SortableWidgetProps) {
+export function SortableWidget({ id, children }: { id: WidgetId; children: React.ReactNode; "data-widget-id"?: string }) {
   const { lang } = useLanguage();
-  const { editing, isMobile, configs } = useContext(GridContext);
-  const cfg = configs.find((c) => c.id === id);
+  const l = lang as Lang;
+  const g = useGrid();
+  const cfg = g.configs.find((c) => c.id === id);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: !g.editing || g.compact,
+  });
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id, disabled: !editing || isMobile });
+  const [picker, setPicker] = useState(false);
 
   if (!cfg || !cfg.visible) return null;
 
-  // Mobilde span yok — her kart tam genişlikte, doğal yükseklikte
-  const desktopStyle = isMobile
-    ? {}
-    : {
-        gridColumn: `span ${cfg.colSpan}`,
-        gridRow: `span ${cfg.rowSpan}`,
-      };
+  const m = MOBILE_DIMS[cfg.mobile];
+  const w = g.compact ? m.w : cfg.colSpan;
+  const h = g.compact ? m.h : cfg.rowSpan;
+  const label = getWidgetLabel(id, l);
+  const idx = g.order.indexOf(id);
 
   return (
     <div
       ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        ...desktopStyle,
-      }}
-      className={`
-        relative rounded-2xl overflow-hidden
-        ${isDragging ? "opacity-20 z-50 scale-[0.98]" : ""}
-        transition-[opacity,transform] duration-150
-      `}
+      className={cn("gi relative min-w-0 @container", isDragging && "opacity-30", picker && "z-40")}
+      style={
+        {
+          "--wd": cfg.colSpan,
+          "--hd": cfg.rowSpan,
+          "--wm": m.w,
+          "--hm": m.h,
+          transform: CSS.Transform.toString(transform),
+          transition,
+        } as React.CSSProperties
+      }
+      data-widget={id}
     >
-      {/* Edit overlay — sadece desktop */}
-      {editing && !isMobile && (
+      <WidgetSlotProvider value={{ w, h, mobile: g.compact }}>
+        <div className={cn("h-full", g.editing && "pointer-events-none select-none")} aria-hidden={g.editing || undefined}>
+          {children}
+        </div>
+      </WidgetSlotProvider>
+
+      {g.editing && !g.compact && (
         <>
           <div
             {...attributes}
             {...listeners}
-            className="absolute inset-0 z-20 cursor-grab active:cursor-grabbing rounded-2xl
-              border-2 border-dashed border-zinc-600/40 hover:border-[var(--accent)]/50
-              bg-zinc-900/60 backdrop-blur-[2px]
-              flex items-center justify-center transition-colors"
+            className="absolute inset-0 z-20 cursor-grab active:cursor-grabbing rounded-panel outline-1 outline-dashed outline-offset-[-1px] outline-line-strong hover:outline-accent focus-visible:outline-accent bg-[color-mix(in_oklab,var(--bg-0)_14%,transparent)] transition-[outline-color]"
+            aria-label={`${label}, ${cfg.colSpan}×${cfg.rowSpan}`}
           >
-            <div className="flex items-center gap-2 rounded-xl bg-zinc-900/95 backdrop-blur-sm px-4 py-2 shadow-xl border border-zinc-700/60 select-none pointer-events-none">
-              <GripVertical className="w-4 h-4 text-zinc-400" />
-              <span className="text-sm font-medium text-zinc-200">{getWidgetLabel(cfg.id, lang)}</span>
-              <span className="text-xs font-mono text-zinc-500 bg-zinc-800 rounded-md px-2 py-0.5 ml-1">
-                {cfg.colSpan}x{cfg.rowSpan}
-              </span>
+            <div className="absolute left-2 top-2 flex items-center gap-1.5 surface-pop h-7 pl-1.5 pr-2 text-[12px] text-ink pointer-events-none max-w-[calc(100%-110px)]">
+              <GripVertical size={13} className="text-ink-3 shrink-0" />
+              <span className="truncate font-medium">{label}</span>
+            </div>
+            <div className="absolute right-2 top-2 flex items-center gap-1">
+              <SizePicker cfg={cfg} lang={l} open={picker} setOpen={setPicker} />
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => g.toggleVisible(id)}
+                className="btn btn-sm btn-icon surface-pop !h-7 !w-7"
+                title={lang === "en" ? "Hide card" : "Kartı gizle"}
+                aria-label={lang === "en" ? `Hide ${label}` : `${label} kartını gizle`}
+              >
+                <EyeOff size={13} />
+              </button>
             </div>
           </div>
-          <ResizeHandle id={id} dir="e" />
-          <ResizeHandle id={id} dir="s" />
-          <ResizeHandle id={id} dir="se" />
+          {cfg.maxCol > cfg.minCol && <ResizeHandle cfg={cfg} dir="e" />}
+          {cfg.maxRow > cfg.minRow && <ResizeHandle cfg={cfg} dir="s" />}
+          <ResizeHandle cfg={cfg} dir="se" />
         </>
       )}
 
-      {/* Content:
-          - Desktop: h-full → grid hücresini doldur
-          - Mobil: h-auto → kart kendi içeriği kadar büyür, boşluk yok */}
-      <div className={isMobile ? "w-full flex flex-col" : "w-full h-full overflow-hidden"}>
-        {children}
-      </div>
+      {g.editing && g.compact && (
+        <div className="absolute inset-0 z-20 rounded-panel outline-1 outline-dashed outline-offset-[-1px] outline-line-strong bg-[color-mix(in_oklab,var(--bg-0)_40%,transparent)] flex flex-col justify-between p-1.5">
+          <div className="flex items-center gap-1">
+            <button type="button" className="btn btn-sm btn-icon surface-pop" disabled={idx <= 0} onClick={() => g.move(id, -1)} aria-label={lang === "en" ? "Move up" : "Yukarı taşı"}>
+              <ArrowUp size={13} />
+            </button>
+            <button type="button" className="btn btn-sm btn-icon surface-pop" disabled={idx >= g.order.length - 1} onClick={() => g.move(id, 1)} aria-label={lang === "en" ? "Move down" : "Aşağı taşı"}>
+              <ArrowDown size={13} />
+            </button>
+            <button type="button" className="btn btn-sm btn-icon surface-pop ml-auto" onClick={() => g.toggleVisible(id)} aria-label={lang === "en" ? `Hide ${label}` : `${label} kartını gizle`}>
+              <EyeOff size={13} />
+            </button>
+          </div>
+          <div className="text-center text-[12px] font-semibold text-ink px-1 truncate">{label}</div>
+          <div className="seg w-full !bg-surface [&>button]:flex-1 [&>button]:justify-center [&>button]:font-mono [&>button]:!px-0" role="group" aria-label={lang === "en" ? "Size" : "Boyut"}>
+            {cfg.mobileSizes.map((s) => (
+              <button key={s} type="button" aria-pressed={cfg.mobile === s} onClick={() => g.setMobile(id, s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* Mobilde her kart tipi için makul minimum yükseklik */
-function getMobileMinHeight(id: WidgetId): number {
-  const tall: WidgetId[] = [
-    "heatmap", "lang-evolution", "velocity", "rhythm",
-    "commit-quality", "hour-heatmap", "repo-list", "repo-health",
-    "month-compare", "badges",
-  ];
-  const medium: WidgetId[] = [
-    "goal", "streak", "code-stats", "insights", "activity-bar", "lang-dist",
-    "profile-views",
-  ];
-  if (tall.includes(id)) return 320;
-  if (medium.includes(id)) return 220;
-  return 160;
-}
+/* ── Toolbar shown while editing ─────────────────────────────────────── */
 
-/* ─── Grid Background (edit mode, desktop only) ───────────── */
-
-function GridBackground({ totalRows }: { totalRows: number }) {
-  const cells = 4 * Math.max(totalRows, 10);
-  return (
-    <div className="absolute inset-0 pointer-events-none z-0">
-      <div
-        className="h-full w-full"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gridAutoRows: CELL_SIZE,
-          gap: GRID_GAP,
-        }}
-      >
-        {Array.from({ length: cells }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-dashed border-zinc-800/50" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Sticky Edit Toolbar ─────────────────────────────────── */
-
-function EditToolbar({
-  configs,
-  onToggle,
-  onReset,
-  onDone,
-}: {
-  configs: WidgetConfig[];
-  onToggle: (id: WidgetId) => void;
-  onReset: () => void;
-  onDone: () => void;
-}) {
+function EditToolbar({ onReset }: { onReset: () => void }) {
   const { lang } = useLanguage();
-  const [expanded, setExpanded] = useState(false);
-  const visible = configs.filter((c) => c.visible).length;
+  const l = lang as Lang;
+  const { configs, toggleVisible, compact } = useGrid();
+  const { setEditing } = useShell();
+  const [tray, setTray] = useState(false);
+  const hidden = configs.filter((c) => !c.visible);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
-      <div
-        className="pointer-events-auto w-full max-w-3xl mx-4 mb-4 rounded-2xl border border-zinc-700/50 bg-zinc-900/85 backdrop-blur-xl shadow-2xl shadow-black/40"
-        style={{ boxShadow: "0 -4px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(63,63,70,0.3)" }}
-      >
-        {expanded && (
-          <div className="px-4 pt-4 pb-2 border-b border-zinc-800/60">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest">
-                {lang === "en" ? `Widgets (${visible}/${configs.length})` : `Widgetlar (${visible}/${configs.length})`}
-              </p>
-              <button
-                onClick={() => setExpanded(false)}
-                className="text-zinc-600 hover:text-zinc-400 transition-colors p-1 rounded-lg hover:bg-zinc-800/50"
-              >
-                <X className="w-3.5 h-3.5" />
+    <div className={cn("fixed inset-x-0 z-50 flex justify-center px-3 pointer-events-none", compact ? "bottom-[calc(env(safe-area-inset-bottom)+12px)]" : "bottom-10")}>
+      <div className="pointer-events-auto surface-pop w-full max-w-2xl anim-pop">
+        {tray && (
+          <div className="border-b border-line p-2.5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[12px] font-medium text-ink-2">
+                {l === "en" ? `Hidden cards (${hidden.length})` : `Gizli kartlar (${hidden.length})`}
+              </span>
+              <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setTray(false)} aria-label={l === "en" ? "Close" : "Kapat"}>
+                <X />
               </button>
             </div>
-            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-auto custom-scroll pb-1">
-              {configs.map((cfg) => (
-                <button
-                  key={cfg.id}
-                  onClick={() => onToggle(cfg.id)}
-                  className={`
-                    flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium
-                    transition-all border
-                    ${cfg.visible
-                      ? "border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]"
-                      : "border-zinc-800 bg-zinc-800/50 text-zinc-600 hover:text-zinc-400"
-                    }
-                  `}
-                >
-                  {cfg.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {getWidgetLabel(cfg.id, lang)}
-                </button>
-              ))}
-            </div>
+            {hidden.length === 0 ? (
+              <p className="text-[12px] text-ink-3 py-2">{l === "en" ? "Every card is on the board." : "Tüm kartlar panoda."}</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 max-h-40 overflow-auto">
+                {hidden.map((c) => (
+                  <button key={c.id} type="button" className="btn btn-sm" onClick={() => toggleVisible(c.id)}>
+                    <Plus /> {getWidgetLabel(c.id, l)}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
-
-        <div className="flex items-center gap-3 px-4 py-3">
-          <button
-            onClick={onDone}
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium
-              bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/20
-              hover:brightness-110 transition-all select-none shrink-0"
-          >
-            <Check className="w-4 h-4" />
-            {lang === "en" ? "Done" : "Bitti"}
+        <div className="flex items-center gap-2 p-2">
+          <button type="button" className="btn btn-primary" onClick={() => setEditing(false)}>
+            <Check /> {l === "en" ? "Done" : "Bitti"}
           </button>
-
-          <span className="text-xs text-zinc-500 hidden sm:block flex-1 min-w-0">
-            {lang === "en" ? "Drag cards to reorder, resize from edges and corners" : "Kartları sürükle, kenar ve köşelerden boyutlandır"}
+          <span className="hidden sm:flex items-center gap-1.5 text-[12px] text-ink-3 min-w-0 truncate">
+            {compact
+              ? l === "en"
+                ? "Pick S/M/L/XL, move with arrows"
+                : "S/M/L/XL seç, oklarla taşı"
+              : l === "en"
+                ? "Drag to move · pull an edge to resize"
+                : "Sürükle taşı · kenarı çek boyutlandır"}
+            {!compact && (
+              <>
+                <Kbd>Esc</Kbd>
+              </>
+            )}
           </span>
-
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium
-              text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors border border-zinc-800"
-          >
-            {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-            {lang === "en" ? "Widgets" : "Widgetlar"}
+          <button type="button" className="btn btn-sm ml-auto" onClick={() => setTray((v) => !v)} aria-expanded={tray}>
+            <LayoutTemplate /> {l === "en" ? "Hidden" : "Gizli"}
+            <span className="font-mono text-ink-3">{hidden.length}</span>
           </button>
-
-          <button
-            onClick={onReset}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400
-              transition-colors rounded-lg px-3 py-1.5 hover:bg-zinc-800/50 shrink-0"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            {lang === "en" ? "Reset" : "Sıfırla"}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onReset} title={l === "en" ? "Restore the default layout" : "Varsayılan düzene dön"}>
+            <RotateCcw /> <span className="hidden sm:inline">{l === "en" ? "Reset" : "Sıfırla"}</span>
           </button>
         </div>
       </div>
@@ -372,208 +460,135 @@ function EditToolbar({
   );
 }
 
-/* ─── GridLayout (main) ───────────────────────────────────── */
+/* ── GridLayout ──────────────────────────────────────────────────────── */
 
-interface GridLayoutProps {
-  children: React.ReactNode;
-  widgetIds: WidgetId[];
+function useCompact(initial: boolean) {
+  return useMediaQuery("(max-width: 1023px)", initial);
 }
 
-export default function GridLayout({ children, widgetIds }: GridLayoutProps) {
+export default function GridLayout({
+  children,
+  widgetIds,
+  initialCompact = false,
+}: {
+  children: React.ReactNode;
+  widgetIds: WidgetId[];
+  initialCompact?: boolean;
+}) {
+  const { prefs } = useUIPrefs();
   const { lang } = useLanguage();
-  const [configs, setConfigs] = useState(DEFAULT_WIDGET_CONFIGS);
-  const [editing, setEditing] = useState(false);
+  const { editing, setEditing, setEditable } = useShell();
+  const compact = useCompact(initialCompact);
+  const raw = useSyncExternalStore(subscribe, getRaw, () => null);
+  const { configs, order } = useMemo(() => resolve(raw, widgetIds), [raw, widgetIds]);
   const [activeId, setActiveId] = useState<WidgetId | null>(null);
-  const [order, setOrder] = useState(widgetIds);
-  const [hydrated, setHydrated] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const metrics = DENSITY_GRID[prefs.density];
 
   useEffect(() => {
-    // Mobil tespiti
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+    setEditable(true);
+    return () => {
+      setEditable(false);
+      setEditing(false);
+    };
+  }, [setEditable, setEditing]);
 
-  useEffect(() => {
-    const saved = load();
-    if (saved) {
-      const savedMap = new Map(saved.configs.map((c: WidgetConfig) => [c.id, c]));
-      const merged: WidgetConfig[] = [];
-      for (const s of saved.configs) {
-        const def = DEFAULT_WIDGET_CONFIGS.find((d) => d.id === s.id);
-        if (def) merged.push({ ...def, colSpan: s.colSpan, rowSpan: s.rowSpan, visible: s.visible });
-      }
-      for (const def of DEFAULT_WIDGET_CONFIGS) {
-        if (!savedMap.has(def.id)) merged.push(def);
-      }
-      setConfigs(merged);
-
-      const known = new Set(widgetIds);
-      const savedOrder = saved.order.filter((id: WidgetId) => known.has(id));
-      const newIds = widgetIds.filter((id) => !savedOrder.includes(id));
-      setOrder([...savedOrder, ...newIds]);
-    }
-    setHydrated(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const orderRef = useRef(order);
-  orderRef.current = order;
-
-  const setColSpan = useCallback((id: WidgetId, v: number) => {
-    setConfigs((prev) => {
-      const next = prev.map((c) => (c.id === id ? { ...c, colSpan: v } : c));
-      save(next, orderRef.current);
-      return next;
-    });
-  }, []);
-
-  const setRowSpan = useCallback((id: WidgetId, v: number) => {
-    setConfigs((prev) => {
-      const next = prev.map((c) => (c.id === id ? { ...c, rowSpan: v } : c));
-      save(next, orderRef.current);
-      return next;
-    });
-  }, []);
-
-  const toggleVisible = useCallback((id: WidgetId) => {
-    setConfigs((prev) => {
-      const next = prev.map((c) => (c.id === id ? { ...c, visible: !c.visible } : c));
-      save(next, orderRef.current);
-      return next;
-    });
-  }, []);
-
-  const handleReset = useCallback(() => {
-    setConfigs(DEFAULT_WIDGET_CONFIGS);
-    setOrder(widgetIds);
-    try { localStorage.removeItem(KEY); } catch {}
-  }, [widgetIds]);
-
-  const totalRows = useMemo(() => {
-    let rows = 0;
-    let colUsed = 0;
-    for (const id of order) {
-      const cfg = configs.find((c) => c.id === id);
-      if (!cfg || !cfg.visible) continue;
-      if (colUsed + cfg.colSpan > 4) { rows += 1; colUsed = 0; }
-      colUsed += cfg.colSpan;
-      rows = Math.max(rows, cfg.rowSpan);
-    }
-    return rows + 4;
-  }, [configs, order]);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
+  // Every mutation reads the latest snapshot, so rapid resizes never lose a step.
+  const mutate = useCallback(
+    (fn: (s: { configs: WidgetConfig[]; order: WidgetId[] }) => { configs: WidgetConfig[]; order: WidgetId[] }) => {
+      const next = fn(resolve(getRaw(), widgetIds));
+      writeRaw(serialize(next.configs, next.order));
+    },
+    [widgetIds],
+  );
+  const update = useCallback(
+    (fn: (c: WidgetConfig) => WidgetConfig, id: WidgetId) => mutate((s) => ({ ...s, configs: s.configs.map((c) => (c.id === id ? fn(c) : c)) })),
+    [mutate],
   );
 
-  function handleDragStart(e: DragStartEvent) {
-    setActiveId(e.active.id as WidgetId);
-  }
+  const setSize = useCallback((id: WidgetId, w: number, h: number) => update((c) => ({ ...c, colSpan: w, rowSpan: h }), id), [update]);
+  const setMobile = useCallback((id: WidgetId, s: MobileSize) => update((c) => ({ ...c, mobile: s }), id), [update]);
+  const toggleVisible = useCallback((id: WidgetId) => update((c) => ({ ...c, visible: !c.visible }), id), [update]);
+  const move = useCallback(
+    (id: WidgetId, dir: -1 | 1) =>
+      mutate((s) => {
+        const visible = s.order.filter((x) => s.configs.find((c) => c.id === x)?.visible);
+        const target = visible[visible.indexOf(id) + dir];
+        if (!target) return s;
+        return { ...s, order: arrayMove(s.order, s.order.indexOf(id), s.order.indexOf(target)) };
+      }),
+    [mutate],
+  );
 
-  function handleDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
+  const reset = useCallback(() => writeRaw(null), []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const onDragStart = (e: DragStartEvent) => setActiveId(e.active.id as WidgetId);
+  const onDragEnd = (e: DragEndEvent) => {
     setActiveId(null);
+    const { active, over } = e;
     if (!over || active.id === over.id) return;
-    setOrder((prev) => {
-      const next = arrayMove(prev, prev.indexOf(active.id as WidgetId), prev.indexOf(over.id as WidgetId));
-      save(configs, next);
-      return next;
+    mutate((s) => ({ ...s, order: arrayMove(s.order, s.order.indexOf(active.id as WidgetId), s.order.indexOf(over.id as WidgetId)) }));
+  };
+
+  const byId = useMemo(() => {
+    const map = new Map<string, React.ReactNode>();
+    React.Children.forEach(children, (child) => {
+      if (React.isValidElement(child)) {
+        const id = (child.props as { id?: string }).id;
+        if (id) map.set(id, child);
+      }
     });
-  }
+    return map;
+  }, [children]);
 
-  // SSR / hydration öncesi: mobil-safe tek kolon
-  if (!hydrated) {
-    return (
-      <div className="flex flex-col gap-3 md:widget-grid md:grid md:grid-cols-4" style={{ gap: GRID_GAP }}>
-        {children}
-      </div>
-    );
-  }
+  const ctx: GridCtx = { editing, compact, configs, order, setSize, setMobile, toggleVisible, move, metrics };
+  const activeCfg = activeId ? configs.find((c) => c.id === activeId) : null;
 
-  // Mobil: sürükle/bırak yok, edit yok, tek kolon, auto yükseklik
-  if (isMobile) {
-    return (
-      <GridContext.Provider value={{ editing: false, isMobile: true, configs, setColSpan, setRowSpan, toggleVisible }}>
-        <div className="flex flex-col" style={{ gap: GRID_GAP }}>
-          {order.map((id) => {
-            let match: React.ReactNode = null;
-            React.Children.forEach(children, (child) => {
-              if (React.isValidElement(child) && (child.props as Record<string, unknown>).id === id) {
-                match = child;
-              }
-            });
-            return match;
-          })}
-        </div>
-      </GridContext.Provider>
-    );
-  }
-
-  // Desktop: tam grid sistemi
   return (
-    <GridContext.Provider value={{ editing, isMobile: false, configs, setColSpan, setRowSpan, toggleVisible }}>
-      {!editing && (
-        <div className="flex items-center mb-4">
-          <button
-            onClick={() => setEditing(true)}
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium
-              bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800
-              transition-all duration-200 select-none"
-          >
-            <Pencil className="w-4 h-4" />
-            {lang === "en" ? "Customize" : "Düzenle"}
-          </button>
-        </div>
-      )}
-
-      {editing && (
-        <EditToolbar
-          configs={configs}
-          onToggle={toggleVisible}
-          onReset={handleReset}
-          onDone={() => setEditing(false)}
-        />
-      )}
-
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
+    <GridContext.Provider value={ctx}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <SortableContext items={order} strategy={rectSortingStrategy}>
-          <div className="relative" style={editing ? { paddingBottom: 80 } : undefined}>
-            {editing && <GridBackground totalRows={totalRows} />}
-
+          <div className={cn("@container relative", editing && "pb-28")}>
+            {editing && !compact && <GridBackdrop />}
             <div
-              className="widget-grid relative z-10 grid grid-cols-4"
-              style={{ gap: GRID_GAP, gridAutoRows: CELL_SIZE }}
+              className="dash-grid relative z-10"
+              style={{ ["--cell" as string]: `${metrics.cell}px`, ["--gap" as string]: `${metrics.gap}px` }}
             >
-              {order.map((id) => {
-                let match: React.ReactNode = null;
-                React.Children.forEach(children, (child) => {
-                  if (React.isValidElement(child) && (child.props as Record<string, unknown>).id === id) {
-                    match = child;
-                  }
-                });
-                return match;
-              })}
+              {order.map((id) => byId.get(id) ?? null)}
             </div>
           </div>
         </SortableContext>
-
         <DragOverlay dropAnimation={null}>
-          {activeId ? (
+          {activeCfg ? (
             <div
-              className="rounded-2xl border-2 border-[var(--accent)]/50 bg-zinc-900/60 backdrop-blur-sm shadow-2xl"
-              style={{ height: CELL_SIZE }}
-            />
+              className="rounded-panel border-2 border-accent bg-[color-mix(in_oklab,var(--accent)_10%,var(--bg-1))] shadow-2xl grid place-items-center text-[13px] font-medium text-ink"
+              style={{ height: metrics.cell }}
+            >
+              {getWidgetLabel(activeCfg.id, lang as Lang)}
+            </div>
           ) : null}
         </DragOverlay>
       </DndContext>
+      {editing && <EditToolbar onReset={reset} />}
     </GridContext.Provider>
+  );
+}
+
+/* Cell guides behind the cards while editing (desktop). */
+function GridBackdrop() {
+  const { metrics } = useGrid();
+  return (
+    <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden hidden lg:block" aria-hidden>
+      <div className="grid grid-cols-4" style={{ gap: metrics.gap, gridAutoRows: metrics.cell }}>
+        {Array.from({ length: 4 * 40 }).map((_, i) => (
+          <div key={i} className="rounded-panel border border-dashed border-line" />
+        ))}
+      </div>
+    </div>
   );
 }

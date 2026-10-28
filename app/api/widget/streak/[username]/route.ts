@@ -1,102 +1,56 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
-import { calculateStreaks } from "@/lib/streak";
-import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
+import { findUser, yearDays, langOf } from "@/lib/og/widget-data";
+import { imagePalette, svgPanel, svgResponse, SVG_MONO, SVG_SANS } from "@/lib/og/palette";
 
 export const revalidate = 3600;
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ username: string }> }
-) {
+export async function GET(req: Request, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
+  const user = await findUser(username);
+  if (!user) return new Response("Not found", { status: 404 });
+  const p = imagePalette(user.theme_accent, new URL(req.url).searchParams);
+  const en = langOf(req) === "en";
+  const { days, streak } = await yearDays(user.id);
+  const map = new Map(days.map((d) => [d.date, d.commit_count]));
+  const today = new Date().toISOString().slice(0, 10);
+  const hasToday = (map.get(today) ?? 0) > 0;
+  const cur = streak.currentStreak;
 
-  const { data: user } = await supabaseAdmin
-    .from("users")
-    .select("id, theme_accent")
-    .eq("username", username)
-    .single();
-
-  if (!user) return new NextResponse("Not found", { status: 404 });
-
-  const accent = isValidTheme(user.theme_accent) ? user.theme_accent : DEFAULT_THEME;
-  const theme = THEMES[accent];
-  const ac = theme.accent;
-
-  const { data: stats } = await supabaseAdmin
-    .from("daily_stats")
-    .select("date, commit_count")
-    .eq("user_id", user.id)
-    .gte("date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
-    .order("date", { ascending: true });
-
-  const activeDates = (stats ?? []).filter((d) => d.commit_count > 0).map((d) => d.date);
-  const { currentStreak, longestStreak } = calculateStreaks(activeDates);
-
-  const W = 320; const H = 90;
-  const bg = "#18181b";
-  const border = "#27272a";
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const hasToday = activeDates.includes(todayStr);
-  const statusColor = currentStreak > 0 ? (hasToday ? ac : "#f59e0b") : "#52525b";
-  const statusLabel = currentStreak > 0 ? (hasToday ? "Aktif" : "Risk altında") : "Streak yok";
-
-  // Mini sparkline — son 14 gün
-  const last14 = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(Date.now() - (13 - i) * 86400000).toISOString().slice(0, 10);
-    return (stats ?? []).find((s) => s.date === d)?.commit_count ?? 0;
+  // Last 21 days; the running streak is painted in the accent.
+  const N = 21;
+  const end = hasToday ? 0 : 1;
+  const cells = Array.from({ length: N }, (_, i) => {
+    const back = N - 1 - i;
+    const date = new Date(Date.now() - back * 86400000).toISOString().slice(0, 10);
+    const v = map.get(date) ?? 0;
+    const inStreak = cur > 0 && back >= end && back < end + cur;
+    return { v, inStreak, today: back === 0 };
   });
-  const maxC = Math.max(...last14, 1);
-  const barW = 12; const barGap = 3; const totalBarsW = 14 * (barW + barGap) - barGap;
-  const barsX = W - totalBarsW - 16;
-  const barsY = H / 2 - 18;
-  const barsH = 36;
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" role="img" aria-label="${username} streak">
-  <title>${username} — Streak</title>
-  <defs>
-    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${ac}" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="${ac}" stop-opacity="0.3"/>
-    </linearGradient>
-    <clipPath id="card"><rect width="${W}" height="${H}" rx="10" ry="10"/></clipPath>
-  </defs>
-  <g clip-path="url(#card)">
-    <!-- Card bg -->
-    <rect width="${W}" height="${H}" fill="${bg}"/>
-    <rect width="${W}" height="${H}" rx="10" ry="10" fill="none" stroke="${border}" stroke-width="1"/>
-    <!-- Accent top border -->
-    <rect width="${W}" height="2" fill="${ac}" opacity="0.8"/>
+  const W = 380;
+  const H = 132;
+  const gap = 3;
+  const cell = (W - 28 - gap * (N - 1)) / N;
+  const status = hasToday
+    ? { c: p.good, t: en ? "committed today" : "bugün commit var" }
+    : cur > 0
+      ? { c: p.warn, t: en ? "no commit yet today" : "bugün henüz commit yok" }
+      : { c: p.ink4, t: en ? "no active streak" : "aktif seri yok" };
+  const numW = String(cur).length * 25;
 
-    <!-- Streak number -->
-    <text x="18" y="38" font-family="system-ui,sans-serif" font-size="32" font-weight="800" fill="${ac}" letter-spacing="-1">${currentStreak}</text>
-    <text x="18" y="54" font-family="system-ui,sans-serif" font-size="10" fill="#71717a" letter-spacing="1">GÜNLÜK STREAK</text>
+  const body = `
+    <text x="14" y="48" font-family="${SVG_MONO}" font-size="40" font-weight="800" fill="${cur > 0 ? p.ac : p.ink2}" letter-spacing="-1.5">${cur}</text>
+    <text x="${14 + numW + 6}" y="48" font-family="${SVG_SANS}" font-size="12" fill="${p.ink3}">${en ? (cur === 1 ? "day streak" : "day streak") : "günlük seri"}</text>
+    <circle cx="${W - 14 - status.t.length * 6.3 - 9}" cy="27" r="3" fill="${status.c}"/>
+    <text x="${W - 14}" y="31" font-family="${SVG_SANS}" font-size="11.5" fill="${p.ink2}" text-anchor="end">${status.t}</text>
+    <text x="${W - 14}" y="48" font-family="${SVG_MONO}" font-size="10.5" fill="${p.ink3}" text-anchor="end">${en ? "best" : "en iyi"} <tspan fill="${p.ink1}">${streak.longestStreak}</tspan> · ${en ? "active" : "aktif"} <tspan fill="${p.ink1}">${streak.totalActiveDays}</tspan></text>
+    <text x="14" y="72" font-family="${SVG_MONO}" font-size="9.5" fill="${p.ink4}">${en ? "last 21 days" : "son 21 gün"}</text>
+    ${cells
+      .map((c, i) => {
+        const x = 14 + i * (cell + gap);
+        const fill = c.inStreak ? p.ac : c.v > 0 ? p.heat[2] : p.bg3;
+        return `<rect x="${x.toFixed(1)}" y="80" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}" rx="2.5" fill="${fill}"${c.today ? ` stroke="${p.ink2}" stroke-width="1"` : ""}/>`;
+      })
+      .join("")}`;
 
-    <!-- Status badge -->
-    <rect x="16" y="62" width="${statusLabel.length * 6.5 + 12}" height="16" rx="4" fill="${statusColor}20"/>
-    <text x="22" y="73.5" font-family="system-ui,sans-serif" font-size="8.5" font-weight="600" fill="${statusColor}">${statusLabel}</text>
-
-    <!-- Longest streak -->
-    <text x="16" y="${H - 8}" font-family="system-ui,sans-serif" font-size="8" fill="#3f3f46">En uzun: ${longestStreak} gün</text>
-
-    <!-- Mini bar chart (last 14 days) -->
-    ${last14.map((count, i) => {
-      const barH = count > 0 ? Math.max((count / maxC) * barsH, 4) : 2;
-      const x = barsX + i * (barW + barGap);
-      const y = barsY + barsH - barH;
-      return `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="${count > 0 ? "url(#barGrad)" : "#27272a"}"/>`;
-    }).join("\n    ")}
-
-    <!-- "14g" label -->
-    <text x="${barsX}" y="${barsY + barsH + 12}" font-family="system-ui,sans-serif" font-size="8" fill="#3f3f46">son 14 gün</text>
-  </g>
-</svg>`;
-
-  return new NextResponse(svg, {
-    headers: {
-      "Content-Type": "image/svg+xml",
-      "Cache-Control": "public, max-age=3600, s-maxage=3600",
-    },
-  });
+  return svgResponse(svgPanel({ w: W, h: H, title: en ? "Streak" : "Seri", meta: `@${username}`, body, p, label: `${username} streak: ${cur}` }));
 }

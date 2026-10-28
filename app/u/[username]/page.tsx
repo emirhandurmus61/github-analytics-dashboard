@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import { calculateStreaks } from "@/lib/streak";
 import { ThemeProvider } from "@/components/theme-provider";
-import { THEMES, isValidTheme, DEFAULT_THEME } from "@/lib/themes";
+import { isValidTheme, DEFAULT_THEME } from "@/lib/themes";
 import { WIDGET_KEYS, type WidgetKey } from "@/lib/widgets";
 import { calcBadges } from "@/lib/badges";
 import { calcDeveloperDNA } from "@/lib/developer-dna";
@@ -12,7 +12,8 @@ import type { Language } from "@/lib/i18n";
 import ProfileClient from "./profile-client";
 import { recordProfileView } from "./actions";
 import { auth } from "@/lib/auth";
-import Navbar from "@/components/navbar";
+import AppShell from "@/components/shell/app-shell";
+import { daysAgoISO } from "@/lib/ui/format";
 
 type Props = { params: Promise<{ username: string }> };
 
@@ -108,7 +109,6 @@ export default async function PublicProfilePage({ params }: Props) {
       : DEFAULT_ORDER;
 
   const accent = isValidTheme(user.theme_accent) ? user.theme_accent : DEFAULT_THEME;
-  const theme = THEMES[accent];
   const techTags: string[] = Array.isArray(user.tech_tags) ? user.tech_tags : [];
 
   // Repos
@@ -120,7 +120,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const ids = (repoRows ?? []).map((r) => r.id);
   const ownIds = (repoRows ?? []).filter((r) => !r.is_fork).map((r) => r.id);
 
-  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  const oneYearAgo = daysAgoISO(365);
 
   const [reposRes, commitsRes, langsRes, heatmapRes, badgeCommitsRes, dnaCommitsRes] = await Promise.all([
     supabaseAdmin.from("repositories").select("count", { count: "exact", head: true }).eq("user_id", user.id),
@@ -269,8 +269,8 @@ export default async function PublicProfilePage({ params }: Props) {
     .map((r) => ({ name: r.name, full_name: r.full_name, language: r.language, stars: r.stars, forks: r.forks, description: r.description }));
 
   return (
+    <AppShell>
     <ThemeProvider accent={accent}>
-      <Navbar />
       <ProfileClient
         username={username}
         userId={user.id}
@@ -299,5 +299,6 @@ export default async function PublicProfilePage({ params }: Props) {
         recordView={recordProfileView}
       />
     </ThemeProvider>
+    </AppShell>
   );
 }

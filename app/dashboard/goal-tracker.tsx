@@ -1,189 +1,251 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useThemeColors } from "@/components/theme-provider";
+import { Target, Pencil, Check, X } from "lucide-react";
 import { saveWeeklyGoal } from "@/app/dashboard/settings/actions";
 import { useLanguage } from "@/lib/i18n";
-import { Target, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { Panel } from "@/components/ui/primitives";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { MONTHS_SHORT, WEEKDAYS_MIN, cn, type Lang } from "@/lib/ui/format";
 
-const GOALS = [5, 10, 20, 30, 50];
-
+const PRESETS = [5, 10, 20, 30, 50];
 type WeekHistory = { week_start: string; goal: number; actual: number };
-type Props = { thisWeek: number; initialGoal: number; history: WeekHistory[] };
 
-const MS_TR = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
-const MS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-function formatWeek(s: string, lang: string) {
-  const d = new Date(s);
-  if (lang === "en") {
-    return `${MS_EN[d.getMonth()]} ${d.getDate()}`;
-  }
-  return `${d.getDate()} ${MS_TR[d.getMonth()]}`;
+export function Ring({ value, max, size = 64, stroke = 6, children, color = "var(--accent)" }: { value: number; max: number; size?: number; stroke?: number; children?: React.ReactNode; color?: string }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const p = Math.min(1, max > 0 ? value / max : 0);
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90" aria-hidden>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--bg-3)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${(c * p).toFixed(2)} ${c.toFixed(2)}`}
+          style={{ transition: "stroke-dasharray .6s cubic-bezier(.2,.8,.2,1)" }}
+        />
+      </svg>
+      <div className="absolute inset-0 grid place-items-center">{children}</div>
+    </div>
+  );
 }
 
-export default function GoalTracker({ thisWeek, initialGoal, history }: Props) {
-  const theme = useThemeColors();
+export default function GoalTracker({
+  thisWeek,
+  initialGoal,
+  history,
+  weekDays,
+}: {
+  thisWeek: number;
+  initialGoal: number;
+  history: WeekHistory[];
+  weekDays: number[];
+}) {
   const { lang } = useLanguage();
+  const l = lang as Lang;
+  const { shape, w, h } = useWidgetSize();
   const [goal, setGoal] = useState(initialGoal);
   const [editing, setEditing] = useState(false);
-  const [input, setInput] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [input, setInput] = useState(String(initialGoal));
+  const [pending, start] = useTransition();
 
-  function handleSave(v: number) {
-    const clamped = Math.max(1, Math.min(500, v));
-    setGoal(clamped);
+  const save = (v: number) => {
+    const g = Math.max(1, Math.min(500, Math.round(v)));
+    setGoal(g);
     setEditing(false);
-    startTransition(async () => { await saveWeeklyGoal(clamped); });
-  }
+    start(async () => {
+      await saveWeeklyGoal(g);
+    });
+  };
 
-  const pct = Math.min(Math.round((thisWeek / goal) * 100), 100);
+  const pct = Math.min(100, Math.round((thisWeek / goal) * 100));
   const done = thisWeek >= goal;
-  const barColor = done ? theme.accent : pct >= 70 ? theme.accentMid : "#3f3f46";
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  const daysLeft = 7 - todayIdx;
+  const remaining = Math.max(0, goal - thisWeek);
+  const perDay = Math.ceil(remaining / daysLeft);
 
-  const historyWithCurrent = (() => {
-    const today = new Date();
-    const dow = (today.getDay() + 6) % 7;
-    const mon = new Date(today);
-    mon.setDate(today.getDate() - dow);
+  const hist = (() => {
+    const mon = new Date();
+    mon.setDate(mon.getDate() - todayIdx);
     const ws = mon.toISOString().slice(0, 10);
-    const hasThis = history.some((h) => h.week_start === ws);
-    const base = hasThis
-      ? history.map((h) => h.week_start === ws ? { ...h, actual: thisWeek, goal } : h)
+    const base = history.some((x) => x.week_start === ws)
+      ? history.map((x) => (x.week_start === ws ? { ...x, actual: thisWeek, goal } : x))
       : [{ week_start: ws, actual: thisWeek, goal }, ...history];
     return base.slice(0, 12).reverse();
   })();
+  const hit = hist.filter((x) => x.actual >= x.goal).length;
 
-  const histMax = Math.max(...historyWithCurrent.map((h) => Math.max(h.actual, h.goal)), 1);
+  const status = done
+    ? l === "en"
+      ? `Goal met${thisWeek > goal ? `, +${thisWeek - goal} over` : ""}`
+      : `Hedef tamam${thisWeek > goal ? `, +${thisWeek - goal} fazla` : ""}`
+    : l === "en"
+      ? `~${perDay}/day for the next ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`
+      : `${daysLeft} gün boyunca günde ~${perDay}`;
 
-  return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className="flex items-center gap-2">
-          <Target className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
-            {lang === "en" ? "Weekly Goal" : "Haftalık Hedef"}
-          </h2>
-        </div>
-        <div className="flex items-center gap-2">
-          {history.length > 0 && (
-            <button
-              onClick={() => setShowHistory((v) => !v)}
-              className="flex items-center gap-0.5 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
-            >
-              {showHistory ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {showHistory
-                ? (lang === "en" ? "Hide" : "Gizle")
-                : (lang === "en" ? "History" : "Geçmiş")}
-            </button>
-          )}
-          <button
-            onClick={() => { setEditing(!editing); setInput(String(goal)); }}
-            className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
-          >
-            {editing
-              ? (lang === "en" ? "Cancel" : "İptal")
-              : (lang === "en" ? "Edit" : "Düzenle")}
+  const editBtn = (
+    <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditing((v) => !v)} aria-label={l === "en" ? "Change goal" : "Hedefi değiştir"} aria-expanded={editing}>
+      {editing ? <X /> : <Pencil />}
+    </button>
+  );
+
+  const editor = (
+    <div className="flex h-full flex-col justify-center gap-2.5">
+      <div className="text-[12px] text-ink-3">{l === "en" ? "Commits per week" : "Haftalık commit hedefi"}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {PRESETS.map((p) => (
+          <button key={p} type="button" className={cn("btn btn-sm font-mono", p === goal && "btn-primary")} onClick={() => save(p)}>
+            {p}
           </button>
-        </div>
+        ))}
       </div>
-
-      {editing ? (
-        <div className="space-y-3 flex-1 min-h-0">
-          <div className="flex flex-wrap gap-1.5">
-            {GOALS.map((g) => (
-              <button
-                key={g}
-                onClick={() => handleSave(g)}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer"
-                style={g === goal ? { backgroundColor: theme.accent, color: "#09090b" } : { color: "#71717a" }}
-              >
-                {g}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1.5">
-            <input
-              type="number"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={lang === "en" ? "Custom..." : "Özel..."}
-              className="w-24 rounded-lg bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500"
-            />
-            <button
-              onClick={() => { const v = parseInt(input); if (v > 0) handleSave(v); }}
-              disabled={isPending}
-              className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-600 disabled:opacity-50 cursor-pointer"
-            >
-              {isPending ? "..." : (lang === "en" ? "Save" : "Kaydet")}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 flex flex-col justify-center gap-3">
-          <div className="flex items-end justify-between">
-            <div>
-              <span className="text-3xl font-bold tabular-nums" style={{ color: done ? theme.accent : "#f4f4f5" }}>
-                {thisWeek}
-              </span>
-              <span className="ml-1.5 text-sm text-zinc-600">/ {goal}</span>
-            </div>
-            {done && (
-              <span className="flex items-center gap-1 text-xs font-medium" style={{ color: theme.accent }}>
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {lang === "en" ? "Completed" : "Tamamlandı"}
-              </span>
-            )}
-          </div>
-
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-800">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${pct}%`, backgroundColor: barColor }}
-            />
-          </div>
-
-          <p className="text-xs text-zinc-600">
-            {done
-              ? (lang === "en" ? `${thisWeek - goal} extra` : `${thisWeek - goal} fazla`)
-              : (lang === "en" ? `${goal - thisWeek} commits remaining` : `${goal - thisWeek} commit kaldı`)}
-          </p>
-        </div>
-      )}
-
-      {showHistory && historyWithCurrent.length > 1 && (
-        <div className="border-t border-zinc-800 pt-3 mt-3 space-y-2 shrink-0">
-          <p className="text-[10px] text-zinc-600">
-            {lang === "en"
-              ? `Last ${historyWithCurrent.length} Weeks`
-              : `Son ${historyWithCurrent.length} Hafta`}
-          </p>
-          <div className="flex items-end gap-0.5 h-14">
-            {historyWithCurrent.map((h, i) => {
-              const isLast = i === historyWithCurrent.length - 1;
-              const pctH = (h.actual / histMax) * 100;
-              const achieved = h.actual >= h.goal;
-              return (
-                <div key={h.week_start} className="flex-1" title={`${formatWeek(h.week_start, lang)}: ${h.actual}/${h.goal}`}>
-                  <div className="w-full flex flex-col justify-end h-14">
-                    <div
-                      className="w-full rounded-t-sm transition-all"
-                      style={{
-                        height: `${Math.max(pctH, h.actual > 0 ? 6 : 2)}%`,
-                        backgroundColor: achieved
-                          ? isLast ? theme.accent : theme.accentMid
-                          : isLast ? "#52525b" : "#3f3f46",
-                        opacity: isLast ? 1 : 0.7,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <form
+        className="flex gap-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const v = parseInt(input, 10);
+          if (v > 0) save(v);
+        }}
+      >
+        <input className="input !h-[26px] !w-20 font-mono" inputMode="numeric" value={input} onChange={(e) => setInput(e.target.value.replace(/\D/g, ""))} aria-label={l === "en" ? "Custom goal" : "Özel hedef"} />
+        <button type="submit" className="btn btn-sm" disabled={pending}>
+          <Check /> {l === "en" ? "Save" : "Kaydet"}
+        </button>
+      </form>
     </div>
   );
+
+  const center = (
+    <div className="text-center leading-none">
+      <div className="figure text-[15px]">{fmtPctShort(pct)}</div>
+    </div>
+  );
+
+  const histMax = Math.max(...hist.map((x) => Math.max(x.actual, x.goal)), 1);
+  const histChart = (height: number | "fill") => (
+    <div className={cn(height === "fill" && "flex h-full flex-col")}>
+      <div className={cn("flex items-end gap-[3px]", height === "fill" && "flex-1 min-h-0")} style={height === "fill" ? undefined : { height }}>
+        {hist.map((x, i) => {
+          const last = i === hist.length - 1;
+          const ok = x.actual >= x.goal;
+          return (
+            <div key={x.week_start} className="relative flex h-full flex-1 items-end" title={`${x.week_start}: ${x.actual}/${x.goal}`}>
+              <span className="absolute inset-x-0 border-t border-dashed border-ink-4" style={{ bottom: `${(x.goal / histMax) * 100}%` }} />
+              <span
+                className="w-full rounded-[2px]"
+                style={{
+                  height: `${x.actual ? Math.max(4, (x.actual / histMax) * 100) : 2}%`,
+                  background: ok ? (last ? "var(--accent)" : "var(--accent-mid)") : last ? "var(--ink-3)" : "var(--line-2)",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 flex justify-between font-mono text-[10px] text-ink-4">
+        <span>{labelWeek(hist[0]?.week_start, l)}</span>
+        <span>{l === "en" ? `${hit}/${hist.length} weeks met` : `${hit}/${hist.length} hafta tuttu`}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <Panel title={l === "en" ? "Weekly goal" : "Haftalık hedef"} icon={Target} meta={`${thisWeek}/${goal}`} actions={shape !== "glance" ? editBtn : undefined}>
+      {editing && shape !== "glance" ? (
+        editor
+      ) : (
+        <>
+          {shape === "glance" && (
+            <button type="button" className="flex h-full w-full items-center gap-3 text-left" onClick={() => setEditing((v) => !v)} title={l === "en" ? "Click to change the goal" : "Hedefi değiştirmek için tıkla"}>
+              {editing ? (
+                <div className="w-full">{editor}</div>
+              ) : (
+                <>
+                  <Ring value={thisWeek} max={goal} size={62} stroke={6}>{center}</Ring>
+                  <div className="min-w-0">
+                    <div className="figure text-[24px] @min-[200px]:text-[28px]">
+                      {thisWeek}
+                      <span className="text-ink-4 text-[15px] font-normal"> /{goal}</span>
+                    </div>
+                    <div className={cn("mt-1.5 text-[11.5px] leading-snug", done ? "text-good" : "text-ink-3")}>{done ? (l === "en" ? "Goal met" : "Hedef tamam") : `${remaining} ${l === "en" ? "to go" : "kaldı"}`}</div>
+                  </div>
+                </>
+              )}
+            </button>
+          )}
+
+          {shape === "strip" && (
+            <div className="flex h-full items-center gap-5">
+              <Ring value={thisWeek} max={goal} size={88} stroke={8}>
+                <div className="figure text-[20px]">{fmtPctShort(pct)}</div>
+              </Ring>
+              <div className="min-w-0 flex-1">
+                <div className="figure text-[30px]">
+                  {thisWeek}
+                  <span className="text-ink-4 text-[17px] font-normal"> / {goal}</span>
+                </div>
+                <div className={cn("mt-2 text-[12.5px]", done ? "text-good" : "text-ink-3")}>{status}</div>
+                
+              </div>
+              {w >= 2 && <div className="hidden @min-[520px]:block w-[38%]">{histChart(64)}</div>}
+            </div>
+          )}
+
+          {(shape === "column" || shape === "block") && (
+            <div className="flex h-full flex-col gap-3">
+              <div className="flex items-center gap-4">
+                <Ring value={thisWeek} max={goal} size={shape === "block" && h >= 2 ? 104 : 84} stroke={9}>
+                  <div className="text-center">
+                    <div className="figure text-[22px]">{thisWeek}</div>
+                    <div className="font-mono text-[10.5px] text-ink-4 mt-0.5">/ {goal}</div>
+                  </div>
+                </Ring>
+                <div className="min-w-0">
+                  <div className={cn("text-[13px] font-medium", done ? "text-good" : "text-ink")}>{done ? (l === "en" ? "Goal met" : "Hedef tamam") : `${remaining} ${l === "en" ? "commits to go" : "commit kaldı"}`}</div>
+                  <div className="mt-1 text-[12px] text-ink-3">{status}</div>
+                </div>
+              </div>
+              {shape === "block" && <MiniWeek days={weekDays} today={todayIdx} labels={WEEKDAYS_MIN[l]} />}
+              <div className="flex-1 min-h-[56px]">{histChart("fill")}</div>
+            </div>
+          )}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function MiniWeek({ days, today, labels }: { days: number[]; today: number; labels: string[] }) {
+  return (
+    <div className="grid grid-cols-7 gap-1.5">
+      {days.map((d, i) => (
+        <div key={i} className="flex flex-col items-center gap-1">
+          <span
+            className={cn("grid h-7 w-full place-items-center rounded-[var(--r-control)] font-mono text-[11px] num", i === today && "ring-1 ring-accent")}
+            style={{ background: i > today ? "transparent" : d ? `color-mix(in oklab, var(--accent) ${Math.min(80, 25 + d * 8)}%, var(--bg-3))` : "var(--bg-3)", color: i > today ? "var(--ink-4)" : d ? "var(--ink-1)" : "var(--ink-4)", border: i > today ? "1px dashed var(--line-2)" : undefined }}
+          >
+            {i > today ? "" : d}
+          </span>
+          <span className={cn("font-mono text-[10px]", i === today ? "text-accent" : "text-ink-4")}>{labels[i]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function fmtPctShort(p: number) {
+  return `${p}%`;
+}
+
+function labelWeek(ws: string | undefined, l: Lang) {
+  if (!ws) return "";
+  const d = new Date(ws + "T00:00:00");
+  return l === "en" ? `${MONTHS_SHORT.en[d.getMonth()]} ${d.getDate()}` : `${d.getDate()} ${MONTHS_SHORT.tr[d.getMonth()]}`;
 }

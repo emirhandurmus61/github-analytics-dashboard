@@ -1,201 +1,206 @@
 "use client";
 
-import { useThemeColors } from "@/components/theme-provider";
+import { MessageSquareCode } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { MessageSquare, CheckCheck, AlertCircle } from "lucide-react";
+import { Panel, Track, Dot } from "@/components/ui/primitives";
+import { KV } from "@/components/ui/glance";
+import { useWidgetSize } from "@/components/ui/widget-size";
+import { Ring } from "./goal-tracker";
+import { fmtCompact, fmtDay, fmtPct, type Lang } from "@/lib/ui/format";
+import type { CommitQualityData } from "./types";
 
-type BigCommit = { message: string; additions: number; deletions: number; date: string };
-
-type Props = {
-  avgMsgLength: number;
-  multiLinePct: number;
-  conventionalPct: number;
-  typeDist: { type: string; count: number }[];
-  biggestCommits: BigCommit[];
-  totalAnalyzed: number;
+export const TYPE_COLOR: Record<string, string> = {
+  feat: "var(--hue-green)",
+  fix: "var(--hue-red)",
+  refactor: "var(--hue-purple)",
+  chore: "var(--ink-3)",
+  docs: "var(--hue-blue)",
+  test: "var(--hue-yellow)",
+  style: "var(--hue-pink)",
+  perf: "var(--hue-orange)",
+  build: "var(--hue-cyan)",
+  ci: "var(--hue-cyan)",
+  revert: "var(--hue-pink)",
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  feat: "#34d399", fix: "#f87171", refactor: "#818cf8", chore: "#71717a",
-  docs: "#60a5fa", test: "#fbbf24", style: "#f472b6", perf: "#fb923c",
-  build: "#a3e635", ci: "#22d3ee", revert: "#e879f9",
-};
-
-const TYPE_LABELS: Record<string, { tr: string; en: string }> = {
-  feat: { tr: "Özellik", en: "Feature" },
-  fix: { tr: "Düzeltme", en: "Bugfix" },
-  refactor: { tr: "Refactor", en: "Refactor" },
-  chore: { tr: "Chore", en: "Chore" },
-  docs: { tr: "Doküman", en: "Docs" },
-  test: { tr: "Test", en: "Test" },
-  style: { tr: "Stil", en: "Style" },
-  perf: { tr: "Perf", en: "Perf" },
-  build: { tr: "Build", en: "Build" },
-  ci: { tr: "CI", en: "CI" },
-  revert: { tr: "Geri Al", en: "Revert" },
-};
-
-function getMsgQ(avg: number, lang: string) {
-  if (avg >= 50) return { label: lang === "en" ? "Descriptive" : "Açıklayıcı", color: "#34d399" };
-  if (avg >= 20) return { label: lang === "en" ? "Adequate" : "Yeterli", color: "#fb923c" };
-  return { label: lang === "en" ? "Short" : "Kısa", color: "#f87171" };
+function grade(pct: number, l: Lang) {
+  if (pct >= 80) return { label: l === "en" ? "Consistent" : "Tutarlı", color: "var(--hue-green)" };
+  if (pct >= 40) return { label: l === "en" ? "Getting there" : "Gelişiyor", color: "var(--hue-yellow)" };
+  if (pct >= 10) return { label: l === "en" ? "Occasional" : "Ara sıra", color: "var(--hue-orange)" };
+  return { label: l === "en" ? "Free-form" : "Serbest", color: "var(--ink-3)" };
 }
 
-function getConvQ(pct: number, lang: string) {
-  if (pct >= 80) return { label: lang === "en" ? "Excellent" : "Mükemmel", color: "#34d399" };
-  if (pct >= 40) return { label: lang === "en" ? "Developing" : "Gelişiyor", color: "#fb923c" };
-  if (pct >= 10) return { label: lang === "en" ? "Low" : "Az", color: "#71717a" };
-  return { label: lang === "en" ? "None" : "Yok", color: "#52525b" };
+function TypeBar({ dist, height = 8 }: { dist: { type: string; count: number }[]; height?: number }) {
+  const total = Math.max(1, dist.reduce((s, x) => s + x.count, 0));
+  return (
+    <div className="flex w-full overflow-hidden rounded-full bg-inset gap-px" style={{ height }}>
+      {dist.map((x) => (
+        <span key={x.type} title={`${x.type}: ${x.count}`} style={{ width: `${(x.count / total) * 100}%`, background: TYPE_COLOR[x.type] ?? "var(--accent)" }} />
+      ))}
+    </div>
+  );
 }
 
-export default function CommitQuality({
-  avgMsgLength, multiLinePct, conventionalPct, typeDist, biggestCommits, totalAnalyzed,
-}: Props) {
-  const theme = useThemeColors();
+/** `git log --shortstat` flavored list. */
+function GitLog({ commits, l, max }: { commits: CommitQualityData["biggestCommits"]; l: Lang; max: number }) {
+  return (
+    <ul className="flex flex-col font-mono text-[11.5px] leading-[1.45]">
+      {commits.slice(0, max).map((c, i) => {
+        const m = c.message.match(/^(\w+)(\(.+?\))?!?:\s*(.*)$/);
+        return (
+          <li key={i} className="flex items-baseline gap-2 border-b border-dashed border-line py-1 last:border-0 min-w-0">
+            <span className="shrink-0 w-[4.5ch] text-right text-good num">+{fmtCompact(c.additions, l)}</span>
+            <span className="shrink-0 w-[4.5ch] text-right text-bad num">−{fmtCompact(c.deletions, l)}</span>
+            <span className="min-w-0 flex-1 truncate text-ink-2">
+              {m ? (
+                <>
+                  <span style={{ color: TYPE_COLOR[m[1].toLowerCase()] ?? "var(--ink-2)" }}>{m[1]}</span>
+                  {m[2] && <span className="text-ink-4">{m[2]}</span>}
+                  <span className="text-ink-4">: </span>
+                  {m[3]}
+                </>
+              ) : (
+                c.message || (l === "en" ? "(no message)" : "(mesaj yok)")
+              )}
+            </span>
+            <span className="shrink-0 text-ink-4 hidden @min-[360px]:inline">{fmtDay(c.date, l)}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export default function CommitQuality({ data }: { data: CommitQualityData | null }) {
   const { lang } = useLanguage();
-  const locale = lang === "en" ? "en-US" : "tr-TR";
-  const msgQ = getMsgQ(avgMsgLength, lang);
-  const convQ = getConvQ(conventionalPct, lang);
-  const maxType = Math.max(...typeDist.map((t) => t.count), 1);
+  const l = lang as Lang;
+  const { shape, w, h } = useWidgetSize();
+  const title = l === "en" ? "Commit quality" : "Commit kalitesi";
+
+  if (!data) {
+    return (
+      <Panel title={title} icon={MessageSquareCode}>
+        <p className="text-[12.5px] text-ink-3">{l === "en" ? "No commits in this range to analyze." : "Bu aralıkta incelenecek commit yok."}</p>
+      </Panel>
+    );
+  }
+
+  const g = grade(data.conventionalPct, l);
+  const msgLabel = data.avgMsgLength >= 50 ? (l === "en" ? "descriptive" : "açıklayıcı") : data.avgMsgLength >= 20 ? (l === "en" ? "adequate" : "yeterli") : l === "en" ? "terse" : "kısa";
+  const types = data.typeDist.slice(0, 6);
+  const typeLegend = (
+    <div className="flex flex-wrap gap-x-3 gap-y-1">
+      {types.map((x) => (
+        <span key={x.type} className="inline-flex items-center gap-1.5 font-mono text-[11.5px] text-ink-2">
+          <Dot color={TYPE_COLOR[x.type] ?? "var(--accent)"} size={7} />
+          {x.type}
+          <span className="text-ink-4">{x.count}</span>
+        </span>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 h-full flex flex-col">
-      {/* Header */}
-      <div className="mb-3 shrink-0">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-sm font-medium text-zinc-400">
-            {lang === "en" ? "Commit Quality" : "Commit Kalitesi"}
-          </h2>
-        </div>
-        <p className="text-xs text-zinc-600 mt-0.5 ml-6">
-          {totalAnalyzed.toLocaleString(locale)} commit{lang === "en" && totalAnalyzed !== 1 ? "s" : ""}
-        </p>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 gap-3 sm:grid-cols-2 overflow-auto custom-scroll">
-        {/* Left column */}
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-              <p className="text-[10px] text-zinc-600 mb-1">
-                {lang === "en" ? "Avg. Message" : "Ort. Mesaj"}
-              </p>
-              <p className="text-xl font-bold tabular-nums" style={{ color: msgQ.color }}>
-                {avgMsgLength}<span className="text-xs font-normal text-zinc-600 ml-0.5">{lang === "en" ? "chars" : "kr"}</span>
-              </p>
-              <p className="text-[10px] mt-0.5" style={{ color: msgQ.color }}>{msgQ.label}</p>
-            </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-              <p className="text-[10px] text-zinc-600 mb-1">
-                {lang === "en" ? "Detailed" : "Detaylı"}
-              </p>
-              <p className="text-xl font-bold tabular-nums" style={{ color: theme.accent }}>
-                {lang === "en" ? `${multiLinePct}%` : `%${multiLinePct}`}
-              </p>
-              <p className="text-[10px] text-zinc-600 mt-0.5">
-                {lang === "en" ? "multi-line" : "çok satırlı"}
-              </p>
-            </div>
+    <Panel title={title} icon={MessageSquareCode} meta={`${data.totalAnalyzed} commit`}>
+      {shape === "glance" && (
+        <div className="flex h-full items-center gap-3">
+          <Ring value={data.conventionalPct} max={100} size={64} stroke={6} color={g.color}>
+            <span className="figure text-[15px]">{data.conventionalPct}%</span>
+          </Ring>
+          <div className="min-w-0">
+            <div className="text-[14px] font-semibold" style={{ color: g.color }}>{g.label}</div>
+            <div className="mt-1 text-[11.5px] text-ink-3 leading-snug">{l === "en" ? "conventional commits" : "conventional commit"}</div>
+            <div className="mt-1 font-mono text-[11px] text-ink-4">{l === "en" ? `avg ${data.avgMsgLength} chars` : `ort. ${data.avgMsgLength} kr`}</div>
           </div>
+        </div>
+      )}
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-3">
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1">
-                <CheckCheck className="w-3 h-3 text-zinc-600" />
-                <p className="text-[10px] text-zinc-600">Conventional</p>
-              </div>
-              <span className="text-[10px] font-medium" style={{ color: convQ.color }}>{convQ.label}</span>
+      {shape === "strip" && (
+        <div className="flex h-full flex-col justify-center gap-3">
+          <div className="flex flex-wrap gap-x-7 gap-y-2">
+            <Metric v={fmtPct(data.conventionalPct, l)} k="conventional" color={g.color} />
+            <Metric v={`${data.avgMsgLength}`} k={l === "en" ? `chars, ${msgLabel}` : `karakter, ${msgLabel}`} />
+            <Metric v={fmtPct(data.multiLinePct, l)} k={l === "en" ? "with a body" : "gövdeli"} />
+          </div>
+          {types.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <TypeBar dist={types} />
+              {w >= 3 && typeLegend}
             </div>
-            <div className="flex items-end gap-2">
-              <p className="text-xl font-bold tabular-nums" style={{ color: convQ.color }}>
-                {lang === "en" ? `${conventionalPct}%` : `%${conventionalPct}`}
-              </p>
-              <div className="flex-1 mb-1.5">
-                <div className="h-1.5 rounded-full bg-zinc-700 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${conventionalPct}%`, backgroundColor: convQ.color }} />
+          )}
+        </div>
+      )}
+
+      {shape === "column" && (
+        <div className="flex h-full flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <Ring value={data.conventionalPct} max={100} size={70} stroke={7} color={g.color}>
+              <span className="figure text-[16px]">{data.conventionalPct}%</span>
+            </Ring>
+            <div className="text-[13px] font-semibold" style={{ color: g.color }}>{g.label}</div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <KV k={l === "en" ? "Avg message" : "Ort. mesaj"} v={`${data.avgMsgLength}`} />
+            <KV k={l === "en" ? "With body" : "Gövdeli"} v={fmtPct(data.multiLinePct, l)} />
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {types.map((x) => (
+              <li key={x.type}>
+                <div className="mb-0.5 flex justify-between font-mono text-[11.5px]">
+                  <span style={{ color: TYPE_COLOR[x.type] ?? "var(--accent)" }}>{x.type}</span>
+                  <span className="text-ink-4">{x.count}</span>
                 </div>
+                <Track value={x.count} max={types[0].count} color={TYPE_COLOR[x.type]} height={3} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {shape === "block" && (
+        <div className="grid h-full gap-5 @min-[520px]:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
+          <div className="flex min-h-0 flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <Ring value={data.conventionalPct} max={100} size={76} stroke={7} color={g.color}>
+                <span className="figure text-[17px]">{data.conventionalPct}%</span>
+              </Ring>
+              <div>
+                <div className="text-[14px] font-semibold" style={{ color: g.color }}>{g.label}</div>
+                <div className="text-[12px] text-ink-3">conventional commits</div>
               </div>
             </div>
+            <div className="flex flex-col gap-1">
+              <KV k={l === "en" ? "Avg message length" : "Ort. mesaj uzunluğu"} v={`${data.avgMsgLength} ${l === "en" ? "chars" : "kr"}`} />
+              <KV k={l === "en" ? "Messages with a body" : "Gövdesi olan mesaj"} v={fmtPct(data.multiLinePct, l)} />
+            </div>
+            {types.length > 0 && (
+              <div className="mt-auto flex flex-col gap-2">
+                <TypeBar dist={types} />
+                {typeLegend}
+              </div>
+            )}
           </div>
-
-          {typeDist.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] text-zinc-600">
-                {lang === "en" ? "Type Distribution" : "Tip Dağılımı"}
-              </p>
-              {typeDist.slice(0, 5).map(({ type, count }) => {
-                const color = TYPE_COLORS[type] ?? theme.accent;
-                const pct = Math.round((count / maxType) * 100);
-                const typeLabel = TYPE_LABELS[type]?.[lang === "en" ? "en" : "tr"] ?? type;
-                return (
-                  <div key={type}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-                        <span className="text-xs text-zinc-300">{typeLabel}</span>
-                      </div>
-                      <span className="text-[10px] text-zinc-600 tabular-nums">{count}</span>
-                    </div>
-                    <div className="h-1 rounded-full bg-zinc-800 overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <div className="min-h-0 flex flex-col @max-[519px]:hidden">
+            <div className="mb-1 text-[11px] text-ink-4">{l === "en" ? "Largest commits" : "En büyük commitler"}</div>
+            {data.biggestCommits.length ? (
+              <GitLog commits={data.biggestCommits} l={l} max={h >= 3 ? 8 : w >= 3 ? 5 : 5} />
+            ) : (
+              <p className="text-[12px] text-ink-3">{l === "en" ? "No line stats for these commits." : "Bu commitlerde satır bilgisi yok."}</p>
+            )}
+          </div>
         </div>
+      )}
+    </Panel>
+  );
+}
 
-        {/* Right column */}
-        <div className="space-y-2">
-          <p className="text-[10px] text-zinc-600">
-            {lang === "en" ? "Largest Commits" : "En Büyük Commitler"}
-          </p>
-          {biggestCommits.length === 0 ? (
-            <p className="text-[10px] text-zinc-700">
-              {lang === "en" ? "No line data" : "Satır verisi yok"}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {biggestCommits.map((c, i) => {
-                const tot = c.additions + c.deletions;
-                const addPct = tot > 0 ? (c.additions / tot) * 100 : 50;
-                return (
-                  <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-800/20 p-2.5 space-y-1.5">
-                    <p className="text-xs text-zinc-300 leading-snug line-clamp-2">
-                      {c.message || (lang === "en" ? "(empty)" : "(boş)")}
-                    </p>
-                    <div className="flex h-1 rounded-full overflow-hidden">
-                      <div className="h-full" style={{ width: `${addPct}%`, backgroundColor: "#34d399" }} />
-                      <div className="h-full" style={{ width: `${100 - addPct}%`, backgroundColor: "#f87171" }} />
-                    </div>
-                    <div className="flex items-center justify-between text-[10px]">
-                      <div className="flex gap-2">
-                        <span className="text-emerald-400 tabular-nums">+{c.additions.toLocaleString(locale)}</span>
-                        <span className="text-red-400 tabular-nums">-{c.deletions.toLocaleString(locale)}</span>
-                      </div>
-                      <span className="text-zinc-700">{c.date}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {avgMsgLength < 20 && (
-            <div className="rounded-xl border p-2.5 mt-1" style={{ borderColor: "#f8717120", backgroundColor: "#f8717106" }}>
-              <div className="flex items-start gap-1.5">
-                <AlertCircle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-red-300">
-                  {lang === "en" ? `Your commit messages average ${avgMsgLength} characters.` : `Commit mesajların ortalama ${avgMsgLength} karakter.`}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+function Metric({ v, k, color }: { v: string; k: string; color?: string }) {
+  return (
+    <div>
+      <div className="figure text-[26px]" style={color ? { color } : undefined}>
+        {v}
       </div>
+      <div className="label mt-1.5">{k}</div>
     </div>
   );
 }
