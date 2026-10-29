@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
+import { dayKey } from "@/lib/tz";
+import { getRequestTz, saveUserTz } from "@/lib/tz-server";
 
 const GITHUB_API = "https://api.github.com";
 
@@ -277,6 +279,8 @@ export async function GET() {
 
         // 7. Günlük istatistikler — sadece etkilenen günler güncellenir (J.2)
         send(controller, "progress", { step: "stats", message: "İstatistikler hesaplanıyor..." });
+        const tz = await getRequestTz();
+        await saveUserTz(userId, tz);
         const { data: allCommits } = await supabaseAdmin
           .from("commits").select("committed_at, repo_id, additions, deletions")
           .in("repo_id", dbRepos.map((r) => r.id))
@@ -285,7 +289,7 @@ export async function GET() {
         if (allCommits && allCommits.length > 0) {
           const dailyMap = new Map<string, { commitCount: number; repos: Set<string>; linesAdded: number; linesDeleted: number }>();
           for (const c of allCommits) {
-            const date = c.committed_at.slice(0, 10);
+            const date = dayKey(c.committed_at, tz);
             if (!dailyMap.has(date)) dailyMap.set(date, { commitCount: 0, repos: new Set(), linesAdded: 0, linesDeleted: 0 });
             const e = dailyMap.get(date)!;
             e.commitCount++; e.repos.add(c.repo_id);

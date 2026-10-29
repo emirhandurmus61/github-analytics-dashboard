@@ -6,22 +6,23 @@ import { Panel, Spark, Bars, Delta, Dot, Track } from "@/components/ui/primitive
 import { Glance, KV } from "@/components/ui/glance";
 import { useWidgetSize } from "@/components/ui/widget-size";
 import { fmtCompact, fmtInt, fmtPct, fmtDay, type Lang } from "@/lib/ui/format";
+import { dayKey } from "@/lib/tz";
+import { useTz } from "@/lib/tz-context";
 import { langColor } from "@/lib/ui/lang-colors";
 import type { DashboardData, DateRange, DayCount } from "./types";
 
 const DAY = 86400000;
-const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 
-function lastDays(daily: DayCount[], n: number) {
+function lastDays(daily: DayCount[], n: number, tz: string) {
   const m = new Map(daily.map((d) => [d.date, d.commit_count]));
   return Array.from({ length: n }, (_, i) => {
-    const date = iso(Date.now() - (n - 1 - i) * DAY);
+    const date = dayKey(Date.now() - (n - 1 - i) * DAY, tz);
     return { date, v: m.get(date) ?? 0 };
   });
 }
 
-function weekly(daily: DayCount[], weeks: number) {
-  const days = lastDays(daily, weeks * 7);
+function weekly(daily: DayCount[], weeks: number, tz: string) {
+  const days = lastDays(daily, weeks * 7, tz);
   return Array.from({ length: weeks }, (_, w) => days.slice(w * 7, w * 7 + 7).reduce((s, d) => s + d.v, 0));
 }
 
@@ -41,11 +42,12 @@ function fmtBytes(b: number, l: Lang) {
 export function StatCommits({ count, prev, range, daily }: { count: number; prev: number | null; range: DateRange; daily: DayCount[] }) {
   const { lang } = useLanguage();
   const l = lang as Lang;
+  const tz = useTz();
   const { shape, h, wide } = useWidgetSize();
   const delta = prev !== null && prev > 0 ? Math.round(((count - prev) / prev) * 100) : null;
-  const d30 = lastDays(daily, 30);
+  const d30 = lastDays(daily, 30, tz);
   const span = Number(range);
-  const inRange = lastDays(daily, Math.min(span, 365));
+  const inRange = lastDays(daily, Math.min(span, 365), tz);
   const active = inRange.filter((d) => d.v > 0).length;
   const best = inRange.reduce((a, b) => (b.v > a.v ? b : a), { date: "", v: 0 });
   const avg = count / Math.max(1, Math.min(span, 365));
@@ -94,7 +96,7 @@ export function StatCommits({ count, prev, range, daily }: { count: number; prev
           <div className="mt-auto min-h-0 flex flex-col">
             <div className="mb-1.5 text-[11px] text-ink-4">{h >= 2 && (wide || shape === "block") ? (l === "en" ? "Weekly, last 12 weeks" : "Haftalık, son 12 hafta") : l === "en" ? "Last 30 days" : "Son 30 gün"}</div>
             {shape === "block" ? (
-              <Bars values={weekly(daily, 12)} height={h >= 2 ? 72 : 40} gap={4} />
+              <Bars values={weekly(daily, 12, tz)} height={h >= 2 ? 72 : 40} gap={4} />
             ) : (
               <Bars values={d30.map((d) => d.v)} height={56} />
             )}

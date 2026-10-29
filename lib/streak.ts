@@ -1,4 +1,6 @@
-export function calculateStreaks(dates: string[]): {
+import { dayKey, shiftDay } from "@/lib/tz";
+
+export function calculateStreaks(dates: string[], tz = "UTC"): {
   currentStreak: number;
   longestStreak: number;
   totalActiveDays: number;
@@ -42,17 +44,17 @@ export function calculateStreaks(dates: string[]): {
   }
 
   // Mevcut streak (bugünden geriye say)
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = dayKey(Date.now(), tz);
+  const yesterday = shiftDay(today, -1);
 
   // Bugün veya dün commit varsa streak devam ediyor
   let currentStreak = 0;
   if (dateSet.has(today) || dateSet.has(yesterday)) {
     const startDate = dateSet.has(today) ? today : yesterday;
-    let check = new Date(startDate);
-    while (dateSet.has(check.toISOString().slice(0, 10))) {
+    let check = startDate;
+    while (dateSet.has(check)) {
       currentStreak++;
-      check = new Date(check.getTime() - 86400000);
+      check = shiftDay(check, -1);
     }
   }
 
@@ -67,10 +69,10 @@ export function calculateStreaks(dates: string[]): {
       const diffMs = new Date(today).getTime() - new Date(lastActiveDate).getTime();
       daysSinceLastCommit = Math.round(diffMs / 86400000);
 
-      let check = new Date(lastActiveDate);
-      while (dateSet.has(check.toISOString().slice(0, 10))) {
+      let check = lastActiveDate;
+      while (dateSet.has(check)) {
         brokenStreak++;
-        check = new Date(check.getTime() - 86400000);
+        check = shiftDay(check, -1);
       }
     }
   }

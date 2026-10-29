@@ -1,5 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
+import { dayKey } from "@/lib/tz";
+import { getStoredTz } from "@/lib/tz-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 dakika — Vercel Pro sınırı
@@ -155,6 +157,7 @@ async function syncUser(userId: string, username: string, token: string, lastSyn
   }
 
   // Günlük istatistikleri güncelle — sadece `since` sonrası günler için
+  const tz = await getStoredTz(userId);
   const { data: recentCommits } = await supabaseAdmin
     .from("commits")
     .select("committed_at, repo_id, additions, deletions")
@@ -164,7 +167,7 @@ async function syncUser(userId: string, username: string, token: string, lastSyn
   if (recentCommits && recentCommits.length > 0) {
     const dailyMap = new Map<string, { commitCount: number; repos: Set<string>; linesAdded: number; linesDeleted: number }>();
     for (const c of recentCommits) {
-      const date = c.committed_at.slice(0, 10);
+      const date = dayKey(c.committed_at, tz);
       if (!dailyMap.has(date)) dailyMap.set(date, { commitCount: 0, repos: new Set(), linesAdded: 0, linesDeleted: 0 });
       const e = dailyMap.get(date)!;
       e.commitCount++; e.repos.add(c.repo_id);

@@ -3,6 +3,8 @@
 import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
+import { dayKey } from "@/lib/tz";
+import { getRequestTz, saveUserTz } from "@/lib/tz-server";
 
 const GITHUB_API = "https://api.github.com";
 
@@ -283,7 +285,9 @@ export async function startSync(): Promise<{ success: boolean; error?: string }>
       }
     } catch { /* README bulunamadı */ }
 
-    // 7. Günlük istatistikleri güncelle
+    // 7. Günlük istatistikleri güncelle (kullanıcının saat dilimine göre günlere böl)
+    const tz = await getRequestTz();
+    await saveUserTz(userId, tz);
     const { data: allCommits } = await supabaseAdmin
       .from("commits")
       .select("committed_at, repo_id, additions, deletions")
@@ -296,7 +300,7 @@ export async function startSync(): Promise<{ success: boolean; error?: string }>
       >();
 
       for (const commit of allCommits) {
-        const date = commit.committed_at.slice(0, 10);
+        const date = dayKey(commit.committed_at, tz);
         if (!dailyMap.has(date)) {
           dailyMap.set(date, { commitCount: 0, repos: new Set(), linesAdded: 0, linesDeleted: 0 });
         }

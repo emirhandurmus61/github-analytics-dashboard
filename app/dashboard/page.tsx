@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { cookies, headers } from "next/headers";
 import type { Language } from "@/lib/i18n";
 import { loadDashboard } from "./data";
+import { getRequestTz } from "@/lib/tz-server";
 import DashboardView from "./dashboard-view";
 import type { DateRange } from "./types";
 
@@ -27,6 +28,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     lang,
     dateRange,
     hideForks: hideForks === "1",
+    tz: await getRequestTz(),
   });
 
   return <DashboardView data={data} initialCompact={initialCompact} />;

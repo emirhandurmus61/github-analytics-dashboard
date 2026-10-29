@@ -10,29 +10,30 @@ import type { DashboardData, DayCount } from "./types";
 import type { StreakStatus } from "./streak-guard";
 import { HeatGrid, buildWeeks, type Cell as HeatCell } from "./contribution-heatmap";
 import { useMemo } from "react";
+import { dayKey } from "@/lib/tz";
+import { useTz } from "@/lib/tz-context";
 
 const DAY = 86400000;
-const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 
 type Cell = { date: string; v: number; inStreak: boolean; today: boolean };
 
 /** Last n days, flagged with whether each day belongs to the running streak. */
-function chain(heatmap: DayCount[], n: number, current: number): Cell[] {
+function chain(heatmap: DayCount[], n: number, current: number, tz: string): Cell[] {
   const m = new Map(heatmap.map((d) => [d.date, d.commit_count]));
-  const todayStr = iso(Date.now());
+  const todayStr = dayKey(Date.now(), tz);
   const hasToday = (m.get(todayStr) ?? 0) > 0;
   // The streak ends today if there is a commit today, otherwise yesterday.
   const end = hasToday ? 0 : 1;
   return Array.from({ length: n }, (_, i) => {
     const back = n - 1 - i;
-    const date = iso(Date.now() - back * DAY);
+    const date = dayKey(Date.now() - back * DAY, tz);
     return { date, v: m.get(date) ?? 0, inStreak: current > 0 && back >= end && back < end + current, today: back === 0 };
   });
 }
 
 /** Dates that belong to the running streak. */
-function streakDates(heatmap: DayCount[], current: number) {
-  return new Set(chain(heatmap, Math.max(current + 2, 2), current).filter((c) => c.inStreak).map((c) => c.date));
+function streakDates(heatmap: DayCount[], current: number, tz: string) {
+  return new Set(chain(heatmap, Math.max(current + 2, 2), current, tz).filter((c) => c.inStreak).map((c) => c.date));
 }
 
 function cellColor(c: Cell) {
@@ -54,13 +55,14 @@ export default function StreakCard({
 }) {
   const { lang } = useLanguage();
   const l = lang as Lang;
+  const tz = useTz();
   const { shape, w, h } = useWidgetSize();
   const { currentStreak: cur, longestStreak: rec, totalActiveDays: active } = streak;
   const onFire = cur > 0;
   const atRisk = status === "at_risk";
   const hoursLeft = 24 - new Date().getHours();
-  const weeks = useMemo(() => buildWeeks(heatmap), [heatmap]);
-  const inStreak = useMemo(() => streakDates(heatmap, cur), [heatmap, cur]);
+  const weeks = useMemo(() => buildWeeks(heatmap, tz), [heatmap, tz]);
+  const inStreak = useMemo(() => streakDates(heatmap, cur, tz), [heatmap, cur, tz]);
   const colorOf = (c: HeatCell) => (inStreak.has(c.date) ? "var(--accent)" : c.v > 0 ? "var(--heat-2)" : "var(--heat-0)");
 
   const todayLine = todayCommits > 0 ? (
@@ -106,7 +108,7 @@ export default function StreakCard({
             {w >= 2 && <Fig v={active} label={l === "en" ? "active days" : "aktif gün"} />}
             <div className="ml-auto text-[12px] text-ink-3 self-center">{todayLine}</div>
           </div>
-          <Row cells={chain(heatmap, w >= 4 ? 42 : w >= 3 ? 35 : 21, cur)} l={l} />
+          <Row cells={chain(heatmap, w >= 4 ? 42 : w >= 3 ? 35 : 21, cur, tz)} l={l} />
         </div>
       )}
 

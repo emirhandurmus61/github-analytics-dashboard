@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
+import { dayKey, weekStartKey } from "@/lib/tz";
+import { getRequestTz } from "@/lib/tz-server";
 import ShellClient from "./shell-client";
 import type { ShellStatus, ShellUser } from "./chrome";
 
@@ -23,6 +25,7 @@ export default async function AppShell({ children, bleed }: { children: ReactNod
   }
 
   const username = session.user.username;
+  const tz = await getRequestTz();
   const user: ShellUser = {
     username,
     name: session.user.name ?? username,
@@ -51,13 +54,10 @@ export default async function AppShell({ children, bleed }: { children: ReactNod
         .gte("date", since);
       const list = days ?? [];
       const active = list.filter((d) => d.commit_count > 0).map((d) => d.date);
-      const today = new Date();
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-      const weekStart = monday.toISOString().slice(0, 10);
-      const todayStr = today.toISOString().slice(0, 10);
+      const todayStr = dayKey(Date.now(), tz);
+      const weekStart = weekStartKey(todayStr);
       status = {
-        streak: calculateStreaks(active).currentStreak,
+        streak: calculateStreaks(active, tz).currentStreak,
         weekCommits: list.filter((d) => d.date >= weekStart).reduce((s, d) => s + d.commit_count, 0),
         todayCommits: list.find((d) => d.date === todayStr)?.commit_count ?? 0,
       };

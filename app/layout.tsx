@@ -14,6 +14,9 @@ import { LanguageProvider, type Language } from "@/lib/i18n";
 import { UIPrefsProvider } from "@/components/ui-prefs";
 import { buildSchemeCss, htmlAttributes, parsePrefs, UI_COOKIE } from "@/lib/ui/prefs";
 import { SCHEMES } from "@/lib/ui/schemes";
+import TzSync from "@/components/tz-sync";
+import { TzProvider } from "@/lib/tz-context";
+import { getRequestTz } from "@/lib/tz-server";
 
 // Recursive is the house face: one family that is both the UI sans (MONO 0)
 // and the code mono (MONO 1). The alternates load only when picked.
@@ -63,6 +66,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const store = await cookies();
+  const tz = await getRequestTz();
   const prefs = parsePrefs(store.get(UI_COOKIE)?.value);
   const langCookie = store.get("devboard_lang")?.value;
   const lang: Language | undefined = langCookie === "en" || langCookie === "tr" ? langCookie : undefined;
@@ -79,7 +83,10 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full">
         <UIPrefsProvider initial={prefs}>
-          <LanguageProvider initialLang={lang}>{children}</LanguageProvider>
+          <TzProvider tz={tz}>
+            <LanguageProvider initialLang={lang}>{children}</LanguageProvider>
+          </TzProvider>
+          <TzSync />
         </UIPrefsProvider>
       </body>
     </html>

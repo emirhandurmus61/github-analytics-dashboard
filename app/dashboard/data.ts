@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { calcBadges, type Badge } from "@/lib/badges";
 import { calculateStreaks } from "@/lib/streak";
+import { dayKey, shiftDay, weekStartKey } from "@/lib/tz";
 import { generateInsights } from "@/lib/insights";
 import { calcDeveloperDNA } from "@/lib/developer-dna";
 import { calcPercentileRank } from "@/lib/percentile";
@@ -10,7 +11,6 @@ import type { DashboardData, DateRange } from "./types";
 import { MONTHS_LONG, MONTHS_SHORT } from "@/lib/ui/format";
 
 const DAY = 86400000;
-const isoDay = (t: number | Date) => new Date(t).toISOString().slice(0, 10);
 
 function emptyData(base: Pick<DashboardData, "username" | "firstName" | "lastSyncedAt" | "dateRange" | "hideForks" | "hasSynced" | "weeklyGoal">): DashboardData {
   return {
@@ -72,8 +72,11 @@ export async function loadDashboard(opts: {
   lang: Language;
   dateRange: DateRange;
   hideForks: boolean;
+  tz: string;
 }): Promise<DashboardData> {
-  const { username, lang, dateRange, hideForks } = opts;
+  const { username, lang, dateRange, hideForks, tz } = opts;
+  // Days follow the viewer's wall clock, not UTC.
+  const isoDay = (t: number | Date) => dayKey(t, tz);
 
   const { data: dbUser } = await supabaseAdmin
     .from("users")
@@ -297,23 +300,19 @@ export async function loadDashboard(opts: {
   });
 
   /* Weeks */
-  const now = new Date();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-  monday.setHours(0, 0, 0, 0);
+  const todayKey = isoDay(Date.now());
+  const weekStartStr = weekStartKey(todayKey);
   for (let i = 0; i < 7; i++) {
-    const cur = new Date(monday.getTime() + i * DAY);
-    const prv = new Date(monday.getTime() + (i - 7) * DAY);
-    d.weekDays.current[i] = dayMap.get(isoDay(cur)) ?? 0;
-    d.weekDays.previous[i] = dayMap.get(isoDay(prv)) ?? 0;
+    d.weekDays.current[i] = dayMap.get(shiftDay(weekStartStr, i)) ?? 0;
+    d.weekDays.previous[i] = dayMap.get(shiftDay(weekStartStr, i - 7)) ?? 0;
   }
   d.thisWeek = d.weekDays.current.reduce((s, v) => s + v, 0);
   d.lastWeek = d.weekDays.previous.reduce((s, v) => s + v, 0);
 
   /* Streak */
   const activeDates = d.heatmapData.filter((x) => x.commit_count > 0).map((x) => x.date);
-  d.streak = calculateStreaks(activeDates);
-  const yesterdayStr = isoDay(Date.now() - DAY);
+  d.streak = calculateStreaks(activeDates, tz);
+  const yesterdayStr = shiftDay(todayKey, -1);
   const activeSet = new Set(activeDates);
   d.streakStatus = d.streak.isRecordBrokenToday
     ? "record_broken"
@@ -342,21 +341,21 @@ export async function loadDashboard(opts: {
   };
 
   /* Month vs month */
-  const thisMonthStart = isoDay(new Date(now.getFullYear(), now.getMonth(), 1));
-  const lastMonthStart = isoDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const lastMonthEnd = isoDay(new Date(now.getFullYear(), now.getMonth(), 0));
+  const thisMonthStart = `${todayKey.slice(0, 8)}01`;
+  const lastMonthEnd = shiftDay(thisMonthStart, -1);
+  const lastMonthStart = `${lastMonthEnd.slice(0, 8)}01`;
   const inMonth = (x: { date: string }, a: string, b?: string) => x.date >= a && (!b || x.date <= b);
   const linesByDate = dailyLines.data ?? [];
   const tm = d.heatmapData.filter((x) => inMonth(x, thisMonthStart));
   const lm = d.heatmapData.filter((x) => inMonth(x, lastMonthStart, lastMonthEnd));
   d.thisMonth = {
-    label: MONTHS_LONG[lang][now.getMonth()],
+    label: MONTHS_LONG[lang][Number(todayKey.slice(5, 7)) - 1],
     commits: tm.reduce((s, x) => s + x.commit_count, 0),
     activeDays: tm.filter((x) => x.commit_count > 0).length,
     linesAdded: linesByDate.filter((x) => inMonth(x, thisMonthStart)).reduce((s, x) => s + (x.lines_added ?? 0), 0),
   };
   d.lastMonth = {
-    label: MONTHS_LONG[lang][(now.getMonth() + 11) % 12],
+    label: MONTHS_LONG[lang][(Number(todayKey.slice(5, 7)) + 10) % 12],
     commits: lm.reduce((s, x) => s + x.commit_count, 0),
     activeDays: lm.filter((x) => x.commit_count > 0).length,
     linesAdded: linesByDate.filter((x) => inMonth(x, lastMonthStart, lastMonthEnd)).reduce((s, x) => s + (x.lines_added ?? 0), 0),
@@ -398,8 +397,8 @@ export async function loadDashboard(opts: {
     });
   d.badges = badgeInput(commits, d.streak.longestStreak, d.streak.totalActiveDays);
   if (activeSet.has(todayStr)) {
-    const past = commits.filter((c) => c.committed_at.slice(0, 10) < todayStr);
-    const pastStreak = calculateStreaks(activeDates.filter((x) => x < todayStr));
+    const past = commits.filter((c) => dayKey(c.committed_at, tz) < todayStr);
+    const pastStreak = calculateStreaks(activeDates.filter((x) => x < todayStr), tz);
     const pastEarned = new Set(badgeInput(past, pastStreak.longestStreak, pastStreak.totalActiveDays).filter((b) => b.earned).map((b) => b.id));
     d.todayBadges = d.badges.filter((b) => b.earned && !pastEarned.has(b.id));
   }
@@ -446,10 +445,11 @@ export async function loadDashboard(opts: {
     ]);
     d.userGoals = (goalsRes.data ?? []).map((g) => ({ id: g.id, type: g.type, target: g.target, chainOrder: g.chain_order, completedAt: g.completed_at, isActive: g.is_active }));
     d.goalAchievements = (achRes.data ?? []).map((a) => a.achieved_on);
-    const monthStart = isoDay(new Date(now.getFullYear(), now.getMonth(), 1));
-    const quarterStart = isoDay(new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1));
+    const monthStart = thisMonthStart;
+    const qMonth = Math.floor((Number(todayKey.slice(5, 7)) - 1) / 3) * 3 + 1;
+    const quarterStart = `${todayKey.slice(0, 5)}${String(qMonth).padStart(2, "0")}-01`;
     const [weekPRs, quarterRepos] = await Promise.all([
-      supabaseAdmin.from("pull_requests").select("id", { count: "exact", head: true }).in("repo_id", ownIds).gte("created_at", isoDay(monday)),
+      supabaseAdmin.from("pull_requests").select("id", { count: "exact", head: true }).in("repo_id", ownIds).gte("created_at", weekStartStr),
       supabaseAdmin.from("repositories").select("id", { count: "exact", head: true }).eq("user_id", dbUser.id).gte("created_at", quarterStart),
     ]);
     d.goalMetrics = {
@@ -463,7 +463,7 @@ export async function loadDashboard(opts: {
   }
 
   /* Weekly goal history (records this week's actual on view) */
-  const weekStart = isoDay(monday);
+  const weekStart = weekStartStr;
   await supabaseAdmin
     .from("weekly_goal_history")
     .upsert({ user_id: dbUser.id, week_start: weekStart, goal: d.weeklyGoal, actual: d.thisWeek }, { onConflict: "user_id,week_start", ignoreDuplicates: false });

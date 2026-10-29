@@ -459,7 +459,7 @@ export default function CommandPalette({
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={onKey}
         placeholder={placeholder}
-        className={cn("flex-1 min-w-0 bg-transparent outline-none text-[14px] text-ink placeholder:text-ink-4", variant === "cmdline" && "font-mono")}
+        className={cn("flex-1 min-w-0 bg-transparent outline-none text-base sm:text-[14px] text-ink placeholder:text-ink-4", variant === "cmdline" && "font-mono")}
         aria-label={L("Komut ara", "Search commands")}
         role="combobox"
         aria-expanded
@@ -508,9 +508,9 @@ export default function CommandPalette({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-start justify-center sm:pt-[12vh]">
+    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-hidden px-3 pt-[calc(env(safe-area-inset-top)+10px)] sm:pt-[12vh]">
       <div className="absolute inset-0 bg-[var(--scrim)] anim-fade" onMouseDown={close} />
-      <div className="relative w-full sm:max-w-[620px] sm:mx-4 surface-pop flex flex-col max-h-[78vh] sm:max-h-[64vh] anim-sheet sm:anim-pop rounded-b-none sm:rounded-b-[calc(var(--r-panel)+2px)] pb-[env(safe-area-inset-bottom)]">
+      <div className="relative w-full min-w-0 sm:max-w-[620px] sm:mx-4 surface-pop flex flex-col max-h-[46dvh] sm:max-h-[64vh] anim-pop">
         {input}
         {list}
         {footer}

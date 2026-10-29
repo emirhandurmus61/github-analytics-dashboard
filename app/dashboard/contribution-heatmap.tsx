@@ -3,27 +3,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Grid3x3 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
+import { dayKey } from "@/lib/tz";
+import { useTz } from "@/lib/tz-context";
 import { Panel } from "@/components/ui/primitives";
 import { useWidgetSize } from "@/components/ui/widget-size";
 import { MONTHS_SHORT, WEEKDAYS_SHORT, fmtDay, fmtInt, cn, type Lang } from "@/lib/ui/format";
 import type { DashboardData, DayCount } from "./types";
 
 const DAY = 86400000;
-const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 
 export type Cell = { date: string; v: number; lvl: 0 | 1 | 2 | 3 | 4; future: boolean };
 
 /** Weeks (Mon→Sun) covering the last year, newest last. Levels use quartiles of active days. */
-export function buildWeeks(data: DayCount[]): Cell[][] {
+export function buildWeeks(data: DayCount[], tz: string): Cell[][] {
   const m = new Map(data.map((d) => [d.date, d.commit_count]));
   const nonzero = data.map((d) => d.commit_count).filter((v) => v > 0).sort((a, b) => a - b);
   const q = (p: number) => nonzero[Math.min(nonzero.length - 1, Math.floor(p * nonzero.length))] ?? 1;
   const [q1, q2, q3] = [q(0.25), q(0.5), q(0.75)];
   const level = (v: number): Cell["lvl"] => (v <= 0 ? 0 : v <= q1 ? 1 : v <= q2 ? 2 : v <= q3 ? 3 : 4);
 
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  const dow = (today.getDay() + 6) % 7;
+  // Noon UTC of the viewer's "today" so whole-day steps never cross a date line.
+  const todayKey = dayKey(Date.now(), tz);
+  const today = new Date(`${todayKey}T12:00:00Z`);
+  const dow = (today.getUTCDay() + 6) % 7;
   const end = today.getTime() + (6 - dow) * DAY;
   const start = end - (53 * 7 - 1) * DAY;
   const weeks: Cell[][] = [];
@@ -31,7 +33,7 @@ export function buildWeeks(data: DayCount[]): Cell[][] {
     const wk: Cell[] = [];
     for (let i = 0; i < 7; i++) {
       const ts = t + i * DAY;
-      const date = iso(ts);
+      const date = dayKey(ts, "UTC");
       const v = m.get(date) ?? 0;
       wk.push({ date, v, lvl: level(v), future: ts > today.getTime() });
     }
@@ -232,8 +234,9 @@ function Legend({ l }: { l: Lang }) {
 export default function ContributionHeatmap({ data, streak }: { data: DayCount[]; streak?: DashboardData["streak"] }) {
   const { lang } = useLanguage();
   const l = lang as Lang;
+  const tz = useTz();
   const { shape, h, w } = useWidgetSize();
-  const weeks = useMemo(() => buildWeeks(data), [data]);
+  const weeks = useMemo(() => buildWeeks(data, tz), [data, tz]);
   const total = data.reduce((s, d) => s + d.commit_count, 0);
   const activeDays = data.filter((d) => d.commit_count > 0).length;
   const best = data.reduce((a, b) => (b.commit_count > a.commit_count ? b : a), { date: "", commit_count: 0 });

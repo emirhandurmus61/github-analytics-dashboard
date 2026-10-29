@@ -9,11 +9,11 @@ import { calcDeveloperDNA } from "@/lib/developer-dna";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { Language } from "@/lib/i18n";
-import ProfileClient from "./profile-client";
-import { recordProfileView } from "./actions";
+import ProfileClient from "../profile-client";
+import { recordProfileView } from "../actions";
 import { auth } from "@/lib/auth";
-import AppShell from "@/components/shell/app-shell";
 import { daysAgoISO } from "@/lib/ui/format";
+import { getRequestTz } from "@/lib/tz-server";
 
 type Props = { params: Promise<{ username: string }> };
 
@@ -60,6 +60,26 @@ export default async function PublicProfilePage({ params }: Props) {
   if (!user || !user.last_synced_at) notFound();
 
   // Yeni kolonlar (pinned_repos, profile_readme, social_*) henuz migration yapilmamis olabilir — ayri sorgula
+  const oneYearAgo = daysAgoISO(365);
+  const tz = await getRequestTz();
+
+  // Independent of each other, so fetch together instead of one after another.
+  const extraP = supabaseAdmin
+    .from("users")
+    .select("pinned_repos, profile_readme, github_readme, readme_source, social_twitter, social_linkedin, social_website, social_discord")
+    .eq("id", user.id)
+    .single();
+  const repoP = supabaseAdmin
+    .from("repositories")
+    .select("id, name, full_name, description, language, stars, forks, is_fork")
+    .eq("user_id", user.id);
+  const heatmapP = supabaseAdmin
+    .from("daily_stats")
+    .select("date, commit_count")
+    .eq("user_id", user.id)
+    .gte("date", oneYearAgo.slice(0, 10))
+    .order("date", { ascending: true });
+
   let pinnedReposDb: string[] = [];
   let profileReadmeDb: string | null = null;
   let githubReadmeDb: string | null = null;
@@ -68,11 +88,7 @@ export default async function PublicProfilePage({ params }: Props) {
     twitter: null, linkedin: null, website: null, discord: null,
   };
   try {
-    const { data: extra } = await supabaseAdmin
-      .from("users")
-      .select("pinned_repos, profile_readme, github_readme, readme_source, social_twitter, social_linkedin, social_website, social_discord")
-      .eq("id", user.id)
-      .single();
+    const { data: extra } = await extraP;
     if (extra) {
       pinnedReposDb = Array.isArray(extra.pinned_repos) ? extra.pinned_repos : [];
       profileReadmeDb = extra.profile_readme ?? null;
@@ -112,39 +128,20 @@ export default async function PublicProfilePage({ params }: Props) {
   const techTags: string[] = Array.isArray(user.tech_tags) ? user.tech_tags : [];
 
   // Repos
-  const { data: repoRows } = await supabaseAdmin
-    .from("repositories")
-    .select("id, name, full_name, description, language, stars, forks, is_fork")
-    .eq("user_id", user.id);
+  const [{ data: repoRows }, heatmapRes] = await Promise.all([repoP, heatmapP]);
 
   const ids = (repoRows ?? []).map((r) => r.id);
   const ownIds = (repoRows ?? []).filter((r) => !r.is_fork).map((r) => r.id);
 
-  const oneYearAgo = daysAgoISO(365);
-
-  const [reposRes, commitsRes, langsRes, heatmapRes, badgeCommitsRes, dnaCommitsRes] = await Promise.all([
-    supabaseAdmin.from("repositories").select("count", { count: "exact", head: true }).eq("user_id", user.id),
+  const [commitsRes, langsRes, yearCommitsRes, mergedPRsRes, closedIssuesRes] = await Promise.all([
     supabaseAdmin.from("commits").select("count", { count: "exact", head: true }).in("repo_id", ids),
     supabaseAdmin.from("repo_languages").select("language, bytes").in("repo_id", ids),
-    supabaseAdmin
-      .from("daily_stats")
-      .select("date, commit_count")
-      .eq("user_id", user.id)
-      .gte("date", oneYearAgo.slice(0, 10))
-      .order("date", { ascending: true }),
+    // One pass over the year's commits feeds both the badges and the Developer DNA.
     supabaseAdmin
       .from("commits")
-      .select("committed_at, repo_id, deletions")
+      .select("committed_at, repo_id, additions, deletions, message")
       .in("repo_id", ownIds)
       .gte("committed_at", oneYearAgo),
-    supabaseAdmin
-      .from("commits")
-      .select("committed_at, additions, deletions, message")
-      .in("repo_id", ownIds)
-      .gte("committed_at", oneYearAgo),
-  ]);
-
-  const [mergedPRsRes, closedIssuesRes] = await Promise.all([
     supabaseAdmin
       .from("pull_requests")
       .select("count", { count: "exact", head: true })
@@ -174,10 +171,10 @@ export default async function PublicProfilePage({ params }: Props) {
   // Stats
   const heatmapData = heatmapRes.data ?? [];
   const activeDates = heatmapData.filter((d) => d.commit_count > 0).map((d) => d.date);
-  const { currentStreak, longestStreak, totalActiveDays } = calculateStreaks(activeDates);
+  const { currentStreak, longestStreak, totalActiveDays } = calculateStreaks(activeDates, tz);
 
   const stats = {
-    repoCount: reposRes.count ?? 0,
+    repoCount: (repoRows ?? []).length,
     commitCount: commitsRes.count ?? 0,
     languageCount: langMap.size,
     activeDays: totalActiveDays,
@@ -187,7 +184,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const repoForkMap = new Map<string, boolean>(
     (repoRows ?? []).map((r) => [r.id, r.is_fork])
   );
-  const badgeCommits = badgeCommitsRes.data ?? [];
+  const badgeCommits = yearCommitsRes.data ?? [];
   const earnedBadges = calcBadges({
     hasSynced: true,
     longestStreak,
@@ -200,13 +197,13 @@ export default async function PublicProfilePage({ params }: Props) {
     repoCount: stats.repoCount,
     mergedPRs: mergedPRsRes.count ?? 0,
     closedIssues: closedIssuesRes.count ?? 0,
-    linesAdded: (dnaCommitsRes.data ?? []).reduce((s, c) => s + (c.additions ?? 0), 0),
+    linesAdded: (yearCommitsRes.data ?? []).reduce((s, c) => s + (c.additions ?? 0), 0),
     totalActiveDays: totalActiveDays,
     totalStars: (repoRows ?? []).reduce((s, r) => s + (r.stars ?? 0), 0),
   }).filter((b) => b.earned);
 
   // Developer DNA
-  const dnaCommits = dnaCommitsRes.data ?? [];
+  const dnaCommits = yearCommitsRes.data ?? [];
   const dnaHourMap = new Map<string, number>();
   for (const { committed_at } of dnaCommits) {
     const d = new Date(committed_at);
@@ -245,7 +242,7 @@ export default async function PublicProfilePage({ params }: Props) {
     topLang: dnaTopLang,
     conventionalPct: dnaCommits.length > 0 ? Math.round((conventionalCount / dnaCommits.length) * 100) : 0,
     avgMsgLength: dnaCommits.length > 0 ? Math.round(totalMsgLen / dnaCommits.length) : 0,
-    repoCount: reposRes.count ?? 0,
+    repoCount: (repoRows ?? []).length,
     totalCommits: commitsRes.count ?? 0,
     topRepoCommits: 0,
   }) : null;
@@ -269,7 +266,6 @@ export default async function PublicProfilePage({ params }: Props) {
     .map((r) => ({ name: r.name, full_name: r.full_name, language: r.language, stars: r.stars, forks: r.forks, description: r.description }));
 
   return (
-    <AppShell>
     <ThemeProvider accent={accent}>
       <ProfileClient
         username={username}
@@ -299,6 +295,5 @@ export default async function PublicProfilePage({ params }: Props) {
         recordView={recordProfileView}
       />
     </ThemeProvider>
-    </AppShell>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   Search,
   RefreshCw,
@@ -161,12 +162,15 @@ export function UserMenu({ user, year, align = "right", side = "bottom" }: { use
   const { openPalette } = useShell();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const l = lang as Lang;
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || sheetRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDown);
@@ -264,14 +268,18 @@ export function UserMenu({ user, year, align = "right", side = "bottom" }: { use
       </button>
       {open && (
         <>
-          {/* phones: bottom sheet */}
-          <div className="md:hidden fixed inset-0 z-[70]">
-            <div className="absolute inset-0 bg-[var(--scrim)] anim-fade" onClick={() => setOpen(false)} />
-            <div className="absolute inset-x-0 bottom-0 surface-pop rounded-b-none p-1.5 pb-[calc(env(safe-area-inset-bottom)+8px)] anim-sheet">
-              <div className="mx-auto mb-1 mt-1 h-1 w-9 rounded-full bg-line-strong" />
-              {content}
-            </div>
-          </div>
+          {/* phones: bottom sheet. Portaled to <body>: the top bar's backdrop-filter would otherwise
+              become the containing block of this `fixed` layer and clip it to the bar's height. */}
+          {createPortal(
+            <div className="md:hidden fixed inset-0 z-[70]" ref={sheetRef}>
+              <div className="absolute inset-0 bg-[var(--scrim)] anim-fade" onClick={() => setOpen(false)} />
+              <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain surface-pop rounded-b-none p-1.5 pb-[calc(env(safe-area-inset-bottom)+8px)] anim-sheet">
+                <div className="mx-auto mb-1 mt-1 h-1 w-9 rounded-full bg-line-strong" />
+                {content}
+              </div>
+            </div>,
+            document.body,
+          )}
           {/* desktop: popover */}
           <div
             className={cn(
