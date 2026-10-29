@@ -1,4 +1,5 @@
 import { findUser, yearDays, langOf } from "@/lib/og/widget-data";
+import { dayKey, shiftDay } from "@/lib/tz";
 import { imagePalette, svgPanel, svgResponse, SVG_MONO, SVG_SANS } from "@/lib/og/palette";
 
 export const revalidate = 3600;
@@ -9,9 +10,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
   if (!user) return new Response("Not found", { status: 404 });
   const p = imagePalette(user.theme_accent, new URL(req.url).searchParams);
   const en = langOf(req) === "en";
-  const { days, streak } = await yearDays(user.id);
+  const { days, streak, tz } = await yearDays(user.id);
   const map = new Map(days.map((d) => [d.date, d.commit_count]));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dayKey(Date.now(), tz);
   const hasToday = (map.get(today) ?? 0) > 0;
   const cur = streak.currentStreak;
 
@@ -20,7 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
   const end = hasToday ? 0 : 1;
   const cells = Array.from({ length: N }, (_, i) => {
     const back = N - 1 - i;
-    const date = new Date(Date.now() - back * 86400000).toISOString().slice(0, 10);
+    const date = shiftDay(today, -back);
     const v = map.get(date) ?? 0;
     const inStreak = cur > 0 && back >= end && back < end + cur;
     return { v, inStreak, today: back === 0 };

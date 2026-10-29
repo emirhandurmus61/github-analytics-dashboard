@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
+import { dayKey, weekStartKey } from "@/lib/tz";
+import { getStoredTzs } from "@/lib/tz-server";
 
 function initVapid() {
   const email = process.env.VAPID_EMAIL;
@@ -58,14 +60,16 @@ export async function POST(req: Request) {
   }
 
   // Bugün commit var mı kontrol et
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const tzs = await getStoredTzs(userIds);
 
   let sent = 0;
   const failed: string[] = [];
 
   for (const sub of subs) {
     const dates = userDates.get(sub.user_id) ?? [];
-    const { currentStreak, isRecordBrokenToday, previousRecord } = calculateStreaks(dates);
+    const tz = tzs.get(sub.user_id) ?? "UTC";
+    const todayStr = dayKey(Date.now(), tz);
+    const { currentStreak, isRecordBrokenToday, previousRecord } = calculateStreaks(dates, tz);
     const hasToday = dates.includes(todayStr);
 
     let notification: { title: string; body: string; tag: string; url: string } | null = null;
@@ -94,11 +98,7 @@ export async function POST(req: Request) {
         url: "/dashboard",
       };
     } else if (type === "summary") {
-      const weekStart = (() => {
-        const d = new Date();
-        d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-        return d.toISOString().slice(0, 10);
-      })();
+      const weekStart = weekStartKey(todayStr);
       const weekCommits = dates.filter((d) => d >= weekStart).length;
       notification = {
         title: "📊 Haftalık özetin hazır",

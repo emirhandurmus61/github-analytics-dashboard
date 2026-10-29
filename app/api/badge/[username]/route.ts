@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
+import { getStoredTz } from "@/lib/tz-server";
 import { NextRequest, NextResponse } from "next/server";
 import { imagePalette, svgResponse, esc, SVG_MONO, type ImagePalette } from "@/lib/og/palette";
 import { langOf } from "@/lib/og/widget-data";
@@ -56,7 +57,7 @@ export async function GET(
     .filter((d) => d.commit_count > 0)
     .map((d) => d.date);
 
-  const { currentStreak } = calculateStreaks(activeDates);
+  const { currentStreak } = calculateStreaks(activeDates, await getStoredTz(user.id));
 
   // En aktif dil
   const { data: repoIds } = await supabaseAdmin

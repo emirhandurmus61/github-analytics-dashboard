@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
 import { daysAgoISO } from "@/lib/ui/format";
+import { getStoredTz } from "@/lib/tz-server";
 
 export type WidgetUser = { id: string; theme_accent: string | null };
 
@@ -10,6 +11,7 @@ export async function findUser(username: string): Promise<WidgetUser | null> {
 }
 
 export async function yearDays(userId: string) {
+  const tz = await getStoredTz(userId);
   const { data } = await supabaseAdmin
     .from("daily_stats")
     .select("date, commit_count")
@@ -17,8 +19,8 @@ export async function yearDays(userId: string) {
     .gte("date", daysAgoISO(365).slice(0, 10))
     .order("date", { ascending: true });
   const days = data ?? [];
-  const streak = calculateStreaks(days.filter((d) => d.commit_count > 0).map((d) => d.date));
-  return { days, streak, total: days.reduce((s, d) => s + d.commit_count, 0) };
+  const streak = calculateStreaks(days.filter((d) => d.commit_count > 0).map((d) => d.date), tz);
+  return { days, streak, tz, total: days.reduce((s, d) => s + d.commit_count, 0) };
 }
 
 export async function ownLanguages(userId: string) {

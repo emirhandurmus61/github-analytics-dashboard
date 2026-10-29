@@ -34,3 +34,30 @@ export function weekStartKey(key: string): string {
   const dow = new Date(`${key}T00:00:00Z`).getUTCDay();
   return shiftDay(key, -((dow + 6) % 7));
 }
+
+/**
+ * Window for re-counting days after `sinceISO`. Incremental syncs only fetch new commits, but a
+ * day's count must be rebuilt from *all* its commits, so the query starts a day and a half early
+ * (enough for any UTC offset) and only days from `firstDay` on are written back.
+ */
+export function recountWindow(sinceISO: string, tz: string) {
+  return {
+    queryFrom: new Date(new Date(sinceISO).getTime() - 36 * 3600_000).toISOString(),
+    firstDay: dayKey(sinceISO, tz),
+  };
+}
+
+const hourFmtCache = new Map<string, Intl.DateTimeFormat>();
+
+/** Weekday (0 = Monday) and hour (0-23) of an instant on the wall clock in `tz`. */
+export function weekdayHour(when: Date | string | number, tz = "UTC"): { day: number; hour: number } {
+  let f = hourFmtCache.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", hour: "2-digit", hourCycle: "h23" });
+    hourFmtCache.set(tz, f);
+  }
+  const parts = f.formatToParts(new Date(when));
+  const wd = parts.find((p) => p.type === "weekday")?.value ?? "Mon";
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  return { day: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(wd), hour };
+}

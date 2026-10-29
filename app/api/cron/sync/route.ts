@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
-import { dayKey } from "@/lib/tz";
+import { dayKey, recountWindow } from "@/lib/tz";
 import { getStoredTz } from "@/lib/tz-server";
 
 export const runtime = "nodejs";
@@ -158,16 +158,18 @@ async function syncUser(userId: string, username: string, token: string, lastSyn
 
   // Günlük istatistikleri güncelle — sadece `since` sonrası günler için
   const tz = await getStoredTz(userId);
+  const { firstDay } = recountWindow(since, tz);
   const { data: recentCommits } = await supabaseAdmin
     .from("commits")
     .select("committed_at, repo_id, additions, deletions")
     .in("repo_id", dbRepos.map((r) => r.id))
-    .gte("committed_at", since);
+    .gte("committed_at", recountWindow(since, tz).queryFrom);
 
   if (recentCommits && recentCommits.length > 0) {
     const dailyMap = new Map<string, { commitCount: number; repos: Set<string>; linesAdded: number; linesDeleted: number }>();
     for (const c of recentCommits) {
       const date = dayKey(c.committed_at, tz);
+      if (date < firstDay) continue;
       if (!dailyMap.has(date)) dailyMap.set(date, { commitCount: 0, repos: new Set(), linesAdded: 0, linesDeleted: 0 });
       const e = dailyMap.get(date)!;
       e.commitCount++; e.repos.add(c.repo_id);

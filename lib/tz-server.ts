@@ -22,3 +22,13 @@ export async function getStoredTz(userId: string): Promise<string> {
   const tz = (data as { timezone?: string | null } | null)?.timezone;
   return isValidTz(tz) ? tz : "UTC";
 }
+
+export async function getStoredTzs(userIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (userIds.length === 0) return map;
+  const { data } = await supabaseAdmin.from("users").select("id, timezone").in("id", userIds);
+  for (const row of (data ?? []) as { id: string; timezone?: string | null }[]) {
+    if (isValidTz(row.timezone)) map.set(row.id, row.timezone);
+  }
+  return map;
+}

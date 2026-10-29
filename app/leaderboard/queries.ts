@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase";
+import { getStoredTzs } from "@/lib/tz-server";
 import { calculateStreaks } from "@/lib/streak";
 import { calcBadges } from "@/lib/badges";
 
@@ -38,9 +39,10 @@ export async function getCurrentStreaks(userIds: string[]): Promise<Map<string, 
     }
   }
 
+  const tzs = await getStoredTzs([...grouped.keys()]);
   const map = new Map<string, number>();
   for (const [uid, dates] of grouped) {
-    const { currentStreak } = calculateStreaks(dates);
+    const { currentStreak } = calculateStreaks(dates, tzs.get(uid) ?? "UTC");
     map.set(uid, currentStreak);
   }
   return map;

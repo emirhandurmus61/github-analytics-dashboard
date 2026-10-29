@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "./supabase";
+import { calculateStreaks } from "./streak";
+import { getStoredTzs } from "./tz-server";
 
 export type PercentileData = {
   // Commit sayısı yüzdelik dilim (son 365 gün)
@@ -83,27 +85,10 @@ export async function calcPercentileRank(
     }
   }
 
-  // Basit streak hesaplama (calculateStreaks'i burada inline edelim — import döngüsü yaratmamak için)
-  function calcCurrentStreak(dates: string[]): number {
-    if (dates.length === 0) return 0;
-    const sorted = [...dates].sort().reverse();
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    if (sorted[0] !== today && sorted[0] !== yesterday) return 0;
-    let streak = 0;
-    let prev = sorted[0];
-    for (const d of sorted) {
-      const diff = (new Date(prev).getTime() - new Date(d).getTime()) / 86400000;
-      if (diff > 1) break;
-      streak++;
-      prev = d;
-    }
-    return streak;
-  }
-
+  const tzs = await getStoredTzs([...streakGrouped.keys()]);
   const allStreaks: number[] = [];
   for (const [uid, dates] of streakGrouped) {
-    if (uid !== userId) allStreaks.push(calcCurrentStreak(dates));
+    if (uid !== userId) allStreaks.push(calculateStreaks(dates, tzs.get(uid) ?? "UTC").currentStreak);
   }
 
   // Dil bazlı commit: kullanıcının topLang'ındaki commit sayıları

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
+import { dayKey } from "@/lib/tz";
+import { getStoredTzs } from "@/lib/tz-server";
 
 export async function GET() {
   const session = await auth();
@@ -61,9 +63,11 @@ export async function GET() {
   };
 
   const activities: Activity[] = [];
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const tzs = await getStoredTzs(users.map((u) => u.id));
+  const todayFor = (id: string) => dayKey(Date.now(), tzs.get(id) ?? "UTC");
 
   for (const user of users) {
+    const todayStr = todayFor(user.id);
     const dates = userDates.get(user.id) ?? [];
 
     // Tüm zamanlar için streak hesapla
@@ -75,7 +79,7 @@ export async function GET() {
       .order("date", { ascending: true });
 
     const allDates = (allStats ?? []).filter((d) => d.commit_count > 0).map((d) => d.date);
-    const { currentStreak } = calculateStreaks(allDates);
+    const { currentStreak } = calculateStreaks(allDates, tzs.get(user.id) ?? "UTC");
 
     const userData = {
       id: user.id,

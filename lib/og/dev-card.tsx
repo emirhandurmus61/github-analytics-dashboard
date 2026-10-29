@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { supabaseAdmin } from "@/lib/supabase";
 import { calculateStreaks } from "@/lib/streak";
+import { getStoredTz } from "@/lib/tz-server";
 import { daysAgoISO } from "@/lib/ui/format";
 import { imagePalette } from "@/lib/og/palette";
 import { ogFonts, OG_MONO, OG_SANS } from "@/lib/og/fonts";
@@ -36,7 +37,7 @@ export async function devCardImage({ username, format: fp, searchParams, lang }:
   ]);
 
   const days = daysRes.data ?? [];
-  const { currentStreak, longestStreak, totalActiveDays } = calculateStreaks(days.filter((d) => d.commit_count > 0).map((d) => d.date));
+  const { currentStreak, longestStreak, totalActiveDays } = calculateStreaks(days.filter((d) => d.commit_count > 0).map((d) => d.date), await getStoredTz(user.id));
   const commits = days.reduce((s, d) => s + d.commit_count, 0);
   const langMap = new Map<string, number>();
   for (const r of langsRes.data ?? []) langMap.set(r.language, (langMap.get(r.language) ?? 0) + r.bytes);
