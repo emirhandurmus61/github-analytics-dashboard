@@ -316,7 +316,7 @@ export const tr: Dictionary = {
   },
 };
 
-export const en: Dictionary = {
+const en: Dictionary = {
   common: {
     loading: "Loading...",
     error: "An error occurred",
@@ -636,7 +636,3 @@ export const dictionaries: Record<Language, Dictionary> = {
   tr,
   en,
 };
-
-export function getDictionary(lang: Language): Dictionary {
-  return dictionaries[lang] ?? dictionaries.tr;
-}

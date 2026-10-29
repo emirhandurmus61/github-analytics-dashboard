@@ -2,7 +2,7 @@ export type WidgetKey = "streak" | "heatmap" | "languages" | "repos";
 
 export const WIDGET_KEYS: WidgetKey[] = ["streak", "heatmap", "languages", "repos"];
 
-export const WIDGET_LABELS: Record<WidgetKey, string> = {
+const WIDGET_LABELS: Record<WidgetKey, string> = {
   streak: "Streak Kartı",
   heatmap: "Katkı Heatmap",
   languages: "Dil Dağılımı",
@@ -32,7 +32,7 @@ export const PRESETS: Record<WidgetPreset, { label: string; desc: string; order:
   },
 };
 
-export const WIDGET_LABELS_EN: Record<WidgetKey, string> = {
+const WIDGET_LABELS_EN: Record<WidgetKey, string> = {
   streak: "Streak Card",
   heatmap: "Contribution Heatmap",
   languages: "Language Distribution",

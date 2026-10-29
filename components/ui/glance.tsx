@@ -39,16 +39,6 @@ export function Glance({
   );
 }
 
-/** Two-column strip: summary on the left, a visual filling the rest. */
-export function Strip({ left, right, className }: { left: ReactNode; right?: ReactNode; className?: string }) {
-  return (
-    <div className={cn("flex h-full min-h-0 gap-4 @max-[300px]:flex-col @max-[300px]:gap-2", className)}>
-      <div className="flex shrink-0 flex-col justify-center min-w-0 @min-[300px]:max-w-[45%]">{left}</div>
-      {right && <div className="flex min-w-0 flex-1 flex-col justify-end min-h-0">{right}</div>}
-    </div>
-  );
-}
-
 /** A compact label/value row used in lists inside cards. */
 export function KV({ k, v, className }: { k: ReactNode; v: ReactNode; className?: string }) {
   return (

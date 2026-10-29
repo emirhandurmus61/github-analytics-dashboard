@@ -14,7 +14,7 @@ import { cn, type Lang } from "@/lib/ui/format";
 import { Seg } from "@/components/ui/primitives";
 
 /* ── Setting row: VS Code-style "Category › Name", description, control ── */
-export function SettingRow({
+function SettingRow({
   path,
   title,
   desc,

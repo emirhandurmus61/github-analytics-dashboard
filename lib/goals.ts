@@ -24,7 +24,7 @@ export interface GoalProgress {
   hint: string | null;
 }
 
-export const GOAL_META: Record<
+const GOAL_META: Record<
   GoalType,
   { label: string; unit: string; description: string; presets: number[] }
 > = {

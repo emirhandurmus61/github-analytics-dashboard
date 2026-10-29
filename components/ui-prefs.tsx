@@ -84,8 +84,3 @@ export function UIPrefsProvider({ initial, children }: { initial: UIPrefs; child
 export function useUIPrefs() {
   return useContext(UIPrefsContext);
 }
-
-/** Shorthand for components that only branch on the interface. */
-export function useInterface() {
-  return useContext(UIPrefsContext).prefs.ui;
-}

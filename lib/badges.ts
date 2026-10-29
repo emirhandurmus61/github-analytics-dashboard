@@ -98,7 +98,7 @@ export type Badge = {
   maxTier?: number;
 };
 
-export const SERIES_INFO: Record<
+const SERIES_INFO: Record<
   BadgeSeries,
   {
     title: string;
@@ -123,7 +123,7 @@ export const SERIES_INFO: Record<
   cleanup: { title: "Kod Temizliği", icon: "🧹", description: "Refactor ve silinen kod satırı serisi" },
 };
 
-export const SERIES_INFO_EN: Record<
+const SERIES_INFO_EN: Record<
   BadgeSeries,
   {
     title: string;
@@ -148,7 +148,7 @@ export const SERIES_INFO_EN: Record<
   cleanup: { title: "Code Cleanup", icon: "🧹", description: "Refactoring and deleted code lines" },
 };
 
-export const BADGE_EN: Record<BadgeId, { name: string; description: string; unit?: string }> = {
+const BADGE_EN: Record<BadgeId, { name: string; description: string; unit?: string }> = {
   first_sync: { name: "First Step", description: "Completed your first synchronization", unit: "sync" },
   commit_1: { name: "First Spark", description: "Push your first commit", unit: "commit" },
   commit_25: { name: "Apprentice Dev", description: "Reach 25 commits", unit: "commits" },
@@ -1090,40 +1090,3 @@ export function calcBadges(input: BadgeInput): Badge[] {
 
   return BADGES;
 }
-
-export const RARITY_COLORS: Record<
-  Badge["rarity"],
-  {
-    text: string;
-    bg: string;
-    border: string;
-    glow: string;
-    badgeBg: string;
-    badgeBorder: string;
-  }
-> = {
-  common: {
-    text: "#94a3b8",
-    bg: "rgba(148, 163, 184, 0.08)",
-    border: "rgba(148, 163, 184, 0.25)",
-    glow: "rgba(148, 163, 184, 0.15)",
-    badgeBg: "rgba(148, 163, 184, 0.12)",
-    badgeBorder: "rgba(148, 163, 184, 0.3)",
-  },
-  rare: {
-    text: "#38bdf8",
-    bg: "rgba(56, 189, 248, 0.09)",
-    border: "rgba(56, 189, 248, 0.3)",
-    glow: "rgba(56, 189, 248, 0.22)",
-    badgeBg: "rgba(56, 189, 248, 0.14)",
-    badgeBorder: "rgba(56, 189, 248, 0.35)",
-  },
-  epic: {
-    text: "#c084fc",
-    bg: "rgba(192, 132, 252, 0.10)",
-    border: "rgba(192, 132, 252, 0.32)",
-    glow: "rgba(192, 132, 252, 0.25)",
-    badgeBg: "rgba(192, 132, 252, 0.16)",
-    badgeBorder: "rgba(192, 132, 252, 0.4)",
-  },
-};

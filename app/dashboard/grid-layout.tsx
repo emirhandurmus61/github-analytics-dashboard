@@ -162,7 +162,7 @@ function resolve(raw: string | null, widgetIds: WidgetId[]): { configs: WidgetCo
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(v)));
 
-export const SHAPE_NAME: Record<WidgetShape, { tr: string; en: string }> = {
+const SHAPE_NAME: Record<WidgetShape, { tr: string; en: string }> = {
   glance: { tr: "Bakış", en: "Glance" },
   strip: { tr: "Şerit", en: "Strip" },
   column: { tr: "Sütun", en: "Column" },

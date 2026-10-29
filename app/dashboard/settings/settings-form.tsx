@@ -84,7 +84,7 @@ export type SettingsSectionId =
   | "bildirimler"
   | "gizlilik";
 
-export const VALID_SECTION_IDS: SettingsSectionId[] = [
+const VALID_SECTION_IDS: SettingsSectionId[] = [
   "gorunum",
   "profil",
   "sosyal",

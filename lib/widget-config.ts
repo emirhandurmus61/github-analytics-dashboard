@@ -56,10 +56,6 @@ export interface WidgetConfig {
   mobileSizes: MobileSize[];
 }
 
-/** Legacy pixel constants (overridden by the density setting at runtime). */
-export const CELL_SIZE = 184;
-export const GRID_GAP = 12;
-
 const ALL: MobileSize[] = ["S", "M", "L", "XL"];
 const NO_XL: MobileSize[] = ["S", "M", "L"];
 
@@ -117,7 +113,7 @@ export const DEFAULT_WIDGET_CONFIGS: WidgetConfig[] = DEFS.map((d) => ({
   mobileSizes: d.mobileSizes ?? ALL,
 }));
 
-export const WIDGET_LABELS_EN: Record<WidgetId, string> = {
+const WIDGET_LABELS_EN: Record<WidgetId, string> = {
   "stat-repos": "Repositories",
   "stat-commits": "Commits",
   "stat-langs": "Languages",

@@ -157,12 +157,3 @@ export async function saveWeeklyGoal(goal: number) {
   revalidatePath("/dashboard");
   return { success: true };
 }
-
-export async function syncWeeklyGoalHistory(userId: string, weekStart: string, actual: number, goal: number) {
-  await supabaseAdmin
-    .from("weekly_goal_history")
-    .upsert(
-      { user_id: userId, week_start: weekStart, goal, actual },
-      { onConflict: "user_id,week_start", ignoreDuplicates: false }
-    );
-}

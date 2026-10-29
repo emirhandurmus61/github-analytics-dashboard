@@ -51,7 +51,7 @@ const L = (lang: Lang, tr: string, en: string) => (lang === "en" ? en : tr);
 
 /* ── Shared bits ──────────────────────────────────────────────────────── */
 
-export function Avatar({ user, size = 26, className }: { user: ShellUser; size?: number; className?: string }) {
+function Avatar({ user, size = 26, className }: { user: ShellUser; size?: number; className?: string }) {
   return user.avatarUrl ? (
     <Image
       src={user.avatarUrl}
@@ -88,7 +88,7 @@ function useSyncLabel() {
   return { text: sync.lastSyncedAt ? timeAgo(sync.lastSyncedAt, lang) : L(lang as Lang, "hiç senkronlanmadı", "never synced"), tone: "ok" as const };
 }
 
-export function SyncButton({ compact }: { compact?: boolean }) {
+function SyncButton({ compact }: { compact?: boolean }) {
   const { lang } = useLanguage();
   const { sync, startSync } = useShell();
   const label = useSyncLabel();
@@ -156,7 +156,7 @@ function LangSeg() {
 
 /* ── User menu (desktop popover / mobile sheet) ───────────────────────── */
 
-export function UserMenu({ user, year, align = "right", side = "bottom" }: { user: ShellUser; year: number; align?: "left" | "right"; side?: "bottom" | "top" }) {
+function UserMenu({ user, year, align = "right", side = "bottom" }: { user: ShellUser; year: number; align?: "left" | "right"; side?: "bottom" | "top" }) {
   const { lang } = useLanguage();
   const { prefs, setPrefs } = useUIPrefs();
   const { openPalette } = useShell();
@@ -705,7 +705,7 @@ export function TabBar({ nav, active }: ChromeProps) {
 
 /* ── Sign-in (logged out) ─────────────────────────────────────────────── */
 
-export function SignInButton({ compact, terminal }: { compact?: boolean; terminal?: boolean }) {
+function SignInButton({ compact, terminal }: { compact?: boolean; terminal?: boolean }) {
   const { lang } = useLanguage();
   return (
     <form action={handleSignIn}>

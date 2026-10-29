@@ -14,7 +14,7 @@ function hexToRgb(h: string) {
 }
 
 /** Linear sRGB mix: t=1 → a, t=0 → b. */
-export function mix(a: string, b: string, t: number) {
+function mix(a: string, b: string, t: number) {
   const A = hexToRgb(a);
   const B = hexToRgb(b);
   return (

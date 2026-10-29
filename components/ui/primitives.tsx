@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useId, type ComponentType, type ReactNode, type CSSProperties } from "react";
+import { useId, type ComponentType, type ReactNode, type CSSProperties } from "react";
 import { useIsClient } from "@/lib/ui/hooks";
 import { createPortal } from "react-dom";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
@@ -269,68 +269,6 @@ export function Kbd({ children, className }: { children: ReactNode; className?: 
   return <kbd className={cn("kbd", className)}>{children}</kbd>;
 }
 
-/* ── Empty state ───────────────────────────────────────────────────────── */
-export function Empty({
-  icon: IconCmp,
-  title,
-  hint,
-  action,
-  className,
-}: {
-  icon?: Icon;
-  title: ReactNode;
-  hint?: ReactNode;
-  action?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("h-full w-full flex flex-col items-center justify-center text-center gap-1.5 px-4", className)}>
-      {IconCmp && (
-        <span className="mb-1 text-ink-4">
-          <IconCmp size={20} strokeWidth={1.6} />
-        </span>
-      )}
-      <p className="text-[13px] font-medium text-ink-2">{title}</p>
-      {hint && <p className="text-[12px] text-ink-3 max-w-[32ch] leading-snug">{hint}</p>}
-      {action && <div className="mt-2">{action}</div>}
-    </div>
-  );
-}
-
-/* ── Icon button ───────────────────────────────────────────────────────── */
-export const IconBtn = forwardRef<
-  HTMLButtonElement,
-  {
-    label: string;
-    icon: Icon;
-    onClick?: () => void;
-    active?: boolean;
-    className?: string;
-    size?: "sm" | "md";
-    disabled?: boolean;
-  }
->(function IconBtn({ label, icon: IconCmp, onClick, active, className, size = "sm", disabled }, ref) {
-  return (
-    <button
-      ref={ref}
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={active}
-      className={cn(
-        "btn btn-ghost btn-icon",
-        size === "sm" && "btn-sm",
-        active && "!bg-raised !text-ink",
-        className,
-      )}
-    >
-      <IconCmp size={size === "sm" ? 13 : 15} strokeWidth={1.8} />
-    </button>
-  );
-});
-
 /* ── Dot (status / legend) ─────────────────────────────────────────────── */
 export function Dot({ color, className, size = 8 }: { color: string; className?: string; size?: number }) {
   return (
@@ -339,34 +277,6 @@ export function Dot({ color, className, size = 8 }: { color: string; className?:
       className={cn("inline-block shrink-0 rounded-full", className)}
       style={{ width: size, height: size, background: color }}
     />
-  );
-}
-
-/* ── Stat: a figure with a label, sized by its container ──────────────── */
-export function Stat({
-  value,
-  label,
-  sub,
-  size = "md",
-  color,
-  className,
-}: {
-  value: ReactNode;
-  label?: ReactNode;
-  sub?: ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
-  color?: string;
-  className?: string;
-}) {
-  const fs = { sm: "text-[18px]", md: "text-[26px]", lg: "text-[38px]", xl: "text-[56px]" }[size];
-  return (
-    <div className={cn("min-w-0", className)}>
-      <div className={cn("figure", fs)} style={color ? { color } : undefined}>
-        {value}
-      </div>
-      {label && <div className="label mt-1.5 truncate">{label}</div>}
-      {sub && <div className="mt-1">{sub}</div>}
-    </div>
   );
 }
 

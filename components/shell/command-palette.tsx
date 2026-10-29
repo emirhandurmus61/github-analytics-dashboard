@@ -87,7 +87,7 @@ function Highlight({ text, idx }: { text: string; idx: number[] }) {
   );
 }
 
-export function SchemeSwatch({ id, size = 14 }: { id: SchemeId; size?: number }) {
+function SchemeSwatch({ id, size = 14 }: { id: SchemeId; size?: number }) {
   const s = SCHEMES[id];
   return (
     <span

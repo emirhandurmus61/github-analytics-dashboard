@@ -46,25 +46,3 @@ export async function deleteGoal(goalId: string) {
   revalidatePath("/dashboard");
   return { success: true };
 }
-
-export async function markGoalAchieved(goalId: string, achievedOn: string) {
-  const userId = await getUserId();
-  if (!userId) return { error: "Oturum bulunamadı" };
-
-  await supabaseAdmin
-    .from("goal_achievements")
-    .upsert(
-      { user_id: userId, goal_id: goalId, achieved_on: achievedOn },
-      { onConflict: "user_id,goal_id,achieved_on" }
-    );
-
-  // Tamamlandı işareti
-  await supabaseAdmin
-    .from("user_goals")
-    .update({ completed_at: new Date().toISOString() })
-    .eq("id", goalId)
-    .eq("user_id", userId);
-
-  revalidatePath("/dashboard");
-  return { success: true };
-}

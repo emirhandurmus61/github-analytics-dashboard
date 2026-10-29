@@ -1,6 +1,6 @@
 export type Lang = "tr" | "en";
 
-export const localeOf = (lang: Lang | string) => (lang === "en" ? "en-US" : "tr-TR");
+const localeOf = (lang: Lang | string) => (lang === "en" ? "en-US" : "tr-TR");
 
 export function fmtInt(n: number, lang: Lang | string) {
   return Math.round(n).toLocaleString(localeOf(lang));
@@ -21,10 +21,6 @@ export function fmtCompact(n: number, lang: Lang | string) {
 export function fmtPct(n: number, lang: Lang | string) {
   const v = Math.round(n);
   return lang === "en" ? `${v}%` : `%${v}`;
-}
-
-export function plural(n: number, one: string, many: string) {
-  return n === 1 ? one : many;
 }
 
 export function timeAgo(iso: string | null | undefined, lang: Lang | string): string {
@@ -63,10 +59,6 @@ export const WEEKDAYS_MIN: Record<Lang, string[]> = {
   tr: ["P", "S", "Ç", "P", "C", "C", "P"],
   en: ["M", "T", "W", "T", "F", "S", "S"],
 };
-
-export function asLang(l: string): Lang {
-  return l === "en" ? "en" : "tr";
-}
 
 export function fmtDay(iso: string, lang: Lang | string, opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" }) {
   return new Date(iso.length === 10 ? iso + "T00:00:00" : iso).toLocaleDateString(localeOf(lang), opts);
