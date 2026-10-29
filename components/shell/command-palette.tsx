@@ -1,25 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Search,
-  RefreshCw,
-  Pencil,
-  Languages,
-  Keyboard,
-  LogOut,
-  Check,
-  PanelsTopLeft,
-  SquareTerminal,
-  AppWindow,
-  Moon,
-  Sun,
-  Monitor,
-  Rows3,
-  CornerDownLeft,
-  X,
-} from "lucide-react";
+import { Search, RefreshCw, Pencil, Languages, Keyboard, LogOut, Check, PanelsTopLeft, SquareTerminal, AppWindow, Moon, Sun, Monitor, Rows3, CornerDownLeft, X } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useUIPrefs } from "@/components/ui-prefs";
 import { useShell } from "./shell-context";
@@ -31,78 +14,7 @@ import { saveAccent } from "@/app/actions/ui";
 import { handleSignOut } from "@/app/actions/auth";
 import { cn } from "@/lib/ui/format";
 import { Kbd } from "@/components/ui/primitives";
-
-type Icon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
-
-type Cmd = {
-  id: string;
-  group: string;
-  label: string;
-  keywords?: string;
-  icon?: Icon;
-  visual?: ReactNode;
-  hint?: ReactNode;
-  current?: boolean;
-  preview?: () => void;
-  run: () => void;
-};
-
-/** Subsequence match. Returns score (higher is better) and matched indices. */
-function match(q: string, text: string): { score: number; idx: number[] } | null {
-  if (!q) return { score: 0, idx: [] };
-  const t = text.toLocaleLowerCase("tr");
-  const s = q.toLocaleLowerCase("tr");
-  const direct = t.indexOf(s);
-  if (direct >= 0) {
-    return { score: 100 - direct + (direct === 0 ? 50 : 0), idx: Array.from({ length: s.length }, (_, i) => direct + i) };
-  }
-  const idx: number[] = [];
-  let ti = 0;
-  for (const ch of s) {
-    if (ch === " ") continue;
-    const at = t.indexOf(ch, ti);
-    if (at < 0) return null;
-    idx.push(at);
-    ti = at + 1;
-  }
-  const spread = idx[idx.length - 1] - idx[0];
-  return { score: 40 - spread, idx };
-}
-
-function Highlight({ text, idx }: { text: string; idx: number[] }) {
-  if (!idx.length) return <>{text}</>;
-  const set = new Set(idx);
-  return (
-    <>
-      {Array.from(text).map((c, i) =>
-        set.has(i) ? (
-          <span key={i} className="text-accent font-semibold">
-            {c}
-          </span>
-        ) : (
-          <span key={i}>{c}</span>
-        ),
-      )}
-    </>
-  );
-}
-
-function SchemeSwatch({ id, size = 14 }: { id: SchemeId; size?: number }) {
-  const s = SCHEMES[id];
-  return (
-    <span
-      className="inline-grid grid-cols-2 overflow-hidden shrink-0 border"
-      style={{ width: size * 1.6, height: size, borderColor: s.line2, borderRadius: 3, background: s.bg[1] }}
-      aria-hidden
-    >
-      <span style={{ background: s.bg[0] }} />
-      <span className="grid grid-rows-2">
-        <span style={{ background: s.hue.green }} />
-        <span style={{ background: s.hue.purple }} />
-      </span>
-    </span>
-  );
-}
+import { Icon, Cmd, match, Highlight, SchemeSwatch } from "./palette-parts";
 
 export default function CommandPalette({
   username,

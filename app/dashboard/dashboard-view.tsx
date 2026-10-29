@@ -9,7 +9,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Kbd, Seg } from "@/components/ui/primitives";
 import { cn, fmtInt, timeAgo, type Lang } from "@/lib/ui/format";
 import { DEFAULT_WIDGET_CONFIGS } from "@/lib/widget-config";
-import GridLayout, { SortableWidget } from "./grid-layout";
+import GridLayout from "./grid-layout";
+import { SortableWidget } from "./grid/sortable-widget";
 import StreakGuard from "./streak-guard";
 import type { DashboardData, DateRange } from "./types";
 
